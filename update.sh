@@ -2,6 +2,7 @@
 SCRIPTPATH=$( cd $(dirname $0) ; pwd -P );
 SELF=`basename $0`;
 
-cd SCRIPTPATH;
+echo "Wechsle ins Verzeichniss ($SCRIPTPATH) dieses Skripts"
+cd $SCRIPTPATH;
 git pull git://xeon.lan/mqttRaspberry;
 exit $?
