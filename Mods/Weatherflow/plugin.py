@@ -151,7 +151,10 @@ class WeatherflowPlugin:
     def register_new_sensor(self, serial_number, visible_name, name, messurement_value, device_class: autodisc.DeviceClass, devInf: autodisc.DeviceInfo, value_template=None, json_attributes=None):
         topic = self._config.get_autodiscovery_topic(autodisc.Component.SENSOR, name, device_class, node_id=serial_number)
         online_topic = WeatherflowPlugin.get_device_online_topic(serial_number)
-        payload = topic.get_config_payload(visible_name, messurement_value, online_topic, value_template=value_template, json_attributes=json_attributes)
+
+        uID = "{}.wf-{}.{}".format( "binary_sensor" if isinstance(device_class, autodisc.BinarySensorDeviceClasses) else "sensor", serial_number, name )
+
+        payload = topic.get_config_payload(visible_name, messurement_value, online_topic, value_template=value_template, json_attributes=json_attributes, device=devInf, unique_id=uID)
         self._logger.info(
             "Neuen Sensor ({}) regestriert. Folgendes ist die Config Payload: {}".format(visible_name, payload))
         self._client.publish(topic.config, payload, retain=True)
