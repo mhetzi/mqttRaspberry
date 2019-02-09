@@ -126,6 +126,9 @@ class Topics:
         elif device is not None and unique_id is None:
             raise AttributeError("Wenn Device verwendet wird muss auch unique_id gesetzt werden.")
 
+        if unique_id is not None:
+            p["unique_id"] = unique_id
+
         try:
             return json.dumps(p)
         except Exception:
