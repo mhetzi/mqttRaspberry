@@ -4,3 +4,4 @@ SELF=`basename $0`;
 
 cd SCRIPTPATH;
 git pull git://xeon.lan/mqttRaspberry;
+exit $?
