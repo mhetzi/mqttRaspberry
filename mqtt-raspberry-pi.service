@@ -3,6 +3,7 @@ Description=MQTT Raspberry Provider
 
 [Service]
 TimeoutStartSec=0
+ExecStartPre=/home/pi/progs/mqttRaspberry/update.sh
 ExecStart=/home/pi/progs/mqttRaspberry/Launcher.py --systemd --config /home/pi/.config/mqttra.config
 TimeoutStopSec=10s
 Restart=always
