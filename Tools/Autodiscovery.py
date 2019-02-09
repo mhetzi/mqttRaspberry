@@ -87,7 +87,7 @@ class Topics:
             "state_topic": self.state
         }
 
-        if self._component == Component.SENSOR:
+        if self._component == Component.SENSOR and not isinstance(self._dev_class, BinarySensorDeviceClasses):
             p["unit_of_measurement"] = measurement_unit
 
         if isinstance(self._dev_class, BinarySensorDeviceClasses):
