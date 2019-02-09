@@ -1,0 +1,14 @@
+[Unit]
+Description=MQTT Raspberry Provider
+
+[Service]
+TimeoutStartSec=0
+ExecStart=/home/osmc/progs/mqttRaspberry/Launcher.py --systemd --config /home/osmc/.config/mqttra.config
+TimeoutStopSec=10s
+Restart=always
+Type=idle
+User=osmc
+
+[Install]
+WantedBy=multi-user.target
+

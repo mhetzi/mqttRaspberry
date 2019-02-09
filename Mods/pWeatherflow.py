@@ -1,0 +1,23 @@
+# -*- coding: utf-8 -*-
+
+import paho.mqtt.client as mclient
+import Tools.Config as conf
+import logging
+
+
+class PluginLoader:
+
+    @staticmethod
+    def getConfigKey():
+        return "Weatherflow"
+
+    @staticmethod
+    def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        import Mods.Weatherflow.plugin as p
+        return p.WeatherflowPlugin(client, opts, logger, device_id)
+
+    @staticmethod
+    def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
+        import Mods.Weatherflow.configurator as s
+        s.WeatherflowConfigurator().configure(conf)
+

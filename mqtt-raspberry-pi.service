@@ -1,0 +1,14 @@
+[Unit]
+Description=MQTT Raspberry Provider
+
+[Service]
+TimeoutStartSec=0
+ExecStart=/home/pi/progs/mqttRaspberry/Launcher.py --systemd --config /home/pi/.config/mqttra.config
+TimeoutStopSec=10s
+Restart=always
+Type=idle
+User=pi
+
+[Install]
+WantedBy=multi-user.target
+
