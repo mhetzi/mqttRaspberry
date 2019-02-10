@@ -30,7 +30,7 @@ class Launcher:
             gitVer = ""
             osRelease = ""
             try:
-                gitVerProc = subprocess.run(["git", "rev-parse", "--short", "HEAD"], stdout=PIPE, stderr=PIPE)
+                gitVerProc = subprocess.run(["git", "rev-parse", "--short", "HEAD"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 gitVer = gitVerProc.stdout.decode('utf-8').replace("\n","")
             except:
                 self._log.exception("Git ver")
@@ -51,7 +51,7 @@ class Launcher:
                 self._log.exception("rpiModel")
             MACs = []
             try:
-                ip_link_proc = subprocess.run(["ip", "link"], stdout=PIPE, stderr=PIPE)
+                ip_link_proc = subprocess.run(["ip", "link"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 for MAC in re.findall("..:..:..:..:..:..", ip_link_proc.stdout.decode('utf-8')):
                     if MAC != "ff:ff:ff:ff:ff:ff" and MAC != "00:00:00:00:00:00":
                         MACs.append(MAC)
