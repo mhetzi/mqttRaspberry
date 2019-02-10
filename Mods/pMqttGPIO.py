@@ -85,7 +85,7 @@ class RaspberryPiGpio:
         for d in self._pins:
             self.register_pin(d)
         self.__logger.debug("Regestriere Schedule Jobs für ¼ Stündliche resend Aufgaben...")
-        schedule.every(15).minute.do(RaspberryPiGpio.send_updates, self)
+        schedule.every(15).minutes.do(RaspberryPiGpio.send_updates, self)
 
     def register_pin(self, d: dict):
         pin = d["p"]
