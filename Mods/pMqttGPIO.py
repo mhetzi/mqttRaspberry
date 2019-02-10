@@ -103,7 +103,8 @@ class RaspberryPiGpio:
             self.__client.will_set(online_topic, "offline", retain=True)
             self.__client.publish(online_topic, "online", retain=True)
             self.__client.subscribe(topic.command)
-            self.__client.message_callback_add(topic.command, self.on_message)
+            time.sleep(2)
+            self.__client.message_callback_add(topic.command, lambda x,y,z: self.on_message(x,y,z))
         else:
             self.__logger.debug("Bin kein switch. Brauche kein callback.")
             uid = "binary_sensor.rPiGPIO-{}.{}".format(Autodiscovery.Topics.get_std_devInf().pi_serial, name)
