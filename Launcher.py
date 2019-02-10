@@ -37,7 +37,7 @@ class Launcher:
             try:
                 osReleaseFile = open("/etc/os-release", "r")
                 osReleaseBuffer = osReleaseFile.read()
-                osRelease = re.findall('PRETTY_NAME=\".*?\"', osReleaseBuffer)[0].replace("PRETTY_NAME=")
+                osRelease = re.findall('PRETTY_NAME=\".*?\"', osReleaseBuffer)[0].replace("PRETTY_NAME=", "")
             except:
                 self._log.exception("os-release")
 
