@@ -55,7 +55,8 @@ class Launcher:
                 for MAC in re.findall("..:..:..:..:..:..", ip_link_proc.stdout):
                     if MAC != "ff:ff:ff:ff:ff:ff" and MAC != "00:00:00:00:00:00":
                         devInf.IDs.append(MAC)
-
+            except:
+                self._log.exception("IDs")
         ad.Topics.set_standard_deviceinfo(devInf)
 
 
