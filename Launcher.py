@@ -31,7 +31,7 @@ class Launcher:
             osRelease = ""
             try:
                 gitVerProc = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True)
-                gitVer = gitVerProc.stdout
+                gitVer = gitVerProc.stdout.decode('utf-8').replace("\n","")
             except:
                 self._log.exception("Git ver")
             try:
@@ -44,7 +44,7 @@ class Launcher:
             devInf.sw_version = "OS; {}, APP: {}".format(osRelease, gitVer)
 
             try:
-                rpi_model = open("/sys/firmware/devicetree/base/model", "r").read()
+                rpi_model = open("/sys/firmware/devicetree/base/model", "r").read().decode('utf-8').replace("\n","")
                 devInf.model = rpi_model
                 devInf.mfr = "Raspberry"
             except:
@@ -52,7 +52,7 @@ class Launcher:
 
             try:
                 ip_link_proc = subprocess.run(["ip", "link"], capture_output=True)
-                for MAC in re.findall("..:..:..:..:..:..", ip_link_proc.stdout):
+                for MAC in re.findall("..:..:..:..:..:..", ip_link_proc.stdout.decode('utf-8')):
                     if MAC != "ff:ff:ff:ff:ff:ff" and MAC != "00:00:00:00:00:00":
                         devInf.IDs.append(MAC)
             except:
