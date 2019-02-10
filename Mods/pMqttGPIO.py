@@ -96,17 +96,19 @@ class RaspberryPiGpio:
         self.__logger.debug("Regestriere {} unter {}".format(name, topic.state))
 
         if pin.get_direction() == Pin.PinDirection.OUT:
+            uid = "switch.rPiGPIO-{}.{}".format(Autodiscovery.Topics.get_std_devInf().pi_serial, name)
             self.__logger.debug("Bin switch. Regestriere msqtt callback unter {}".format(topic.command))
             if topic.config is not None:
-                self.__client.publish(topic.config, topic.get_config_payload(name, meas_val, online_topic), retain=True)
+                self.__client.publish(topic.config, topic.get_config_payload(name, meas_val, online_topic, unique_id=uid), retain=True)
             self.__client.will_set(online_topic, "offline", retain=True)
             self.__client.publish(online_topic, "online", retain=True)
             self.__client.subscribe(topic.command)
             self.__client.message_callback_add(topic.command, self.on_message)
         else:
             self.__logger.debug("Bin kein switch. Brauche kein callback.")
+            uid = "binary_sensor.rPiGPIO-{}.{}".format(Autodiscovery.Topics.get_std_devInf().pi_serial, name)
             if topic.config is not None:
-                self.__client.publish(topic.config, topic.get_config_payload(name, meas_val, online_topic), retain=True)
+                self.__client.publish(topic.config, topic.get_config_payload(name, meas_val, online_topic, unique_id=uid), retain=True)
             self.__client.will_set(online_topic, "offline", retain=True)
             self.__client.publish(online_topic, "online", retain=True)
             pin.set_detect(self.send_updates, Pin.PinEventEdge.BOTH)

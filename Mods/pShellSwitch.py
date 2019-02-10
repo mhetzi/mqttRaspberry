@@ -87,8 +87,9 @@ class ShellSwitch:
         for name in self._config.get("ShellSwitch/entrys", {}).keys():
             self.__logger.info("Erstelle MQTT zeugs für {}...".format(name))
             friendly_name = self._config["ShellSwitch/entrys"][name]["name"]
+            uid = "switch.ShSw-{}.{}".format(conf.autodisc.Topics.get_std_devInf().pi_serial, name)
             topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SWITCH, name, conf.autodisc.SensorDeviceClasses.GENERIC_SENSOR)
-            conf_payload = topics.get_config_payload(friendly_name, "", ava_topic, value_template="{{ value_json.state }}", json_attributes=["on", "off", "error_code"])
+            conf_payload = topics.get_config_payload(friendly_name, "", ava_topic, value_template="{{ value_json.state }}", json_attributes=["on", "off", "error_code"], unique_id=uid)
             self.__logger.debug("Veröffentliche Config Payload {} in Topic {}".format(topics.config, conf_payload))
             self.__client.publish(topics.config, conf_payload, retain=True)
             self.__client.subscribe(topics.command)

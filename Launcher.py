@@ -41,15 +41,19 @@ class Launcher:
             except:
                 self._log.exception("os-release")
 
-            devInf.sw_version = "OS; {}, APP: {}".format(osRelease, gitVer)
+            devInf.sw_version = "{}|APP:{}".format(osRelease, gitVer)
 
+            MACs = []
             try:
                 rpi_model = open("/sys/firmware/devicetree/base/model", "r").read().replace("\n","")
                 devInf.model = rpi_model
                 devInf.mfr = "Raspberry"
+                serial = open("/proc/cpuinfo", "r").read()
+                serial = re.findall("Serial.*?$")[0].replace(" ", "").replace("Serial:", "")
+                MACs.append(serial)
+                devInf.pi_serial = serial
             except:
                 self._log.exception("rpiModel")
-            MACs = []
             try:
                 ip_link_proc = subprocess.run(["ip", "link"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 for MAC in re.findall("..:..:..:..:..:..", ip_link_proc.stdout.decode('utf-8')):

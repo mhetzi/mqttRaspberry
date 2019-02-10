@@ -59,6 +59,7 @@ class CoverDeviceClasses(DeviceClass, enum.Enum):
 
 class DeviceInfo:
     IDs = []
+    pi_serial = ""
     mfr = ""
     model = ""
     name  = ""
@@ -76,6 +77,10 @@ class Topics:
     def set_standard_deviceinfo(di: DeviceInfo):
         global __global_device_info
         __global_device_info = di
+    
+    @staticmethod
+    def get_std_devInf() -> DeviceInfo:
+        return __global_device_info
 
     def __init__(self, comp: Component, dev_class: DeviceClass, autodiscovery: bool):
         self._component = comp
