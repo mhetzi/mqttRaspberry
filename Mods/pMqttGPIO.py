@@ -54,6 +54,7 @@ class RaspberryPiGpio:
         self._config = opts
         self._pins = []
         self._device_id = device_id
+        self._registered_callback_topics = []
 
     def register(self):
         self.__logger.debug("Regestriere Raspberry GPIO...")
@@ -107,7 +108,9 @@ class RaspberryPiGpio:
             self.__client.subscribe(topic.command)
             time.sleep(2)
             self.__logger.debug("Bin switch. Regestriere msqtt callback unter {}".format(topic.command))
-            self.__client.message_callback_add(topic.command, lambda x,y,z: self.on_message(x,y,z))
+            self.__client.message_callback_add(topic.command, self.on_message)
+            self._registered_callback_topics.append(topic.command)
+
         else:
             self.__logger.debug("Bin kein switch. Brauche kein callback.")
             uid = "binary_sensor.rPiGPIO-{}.{}".format(Autodiscovery.Topics.get_std_devInf().pi_serial, name)
@@ -135,6 +138,10 @@ class RaspberryPiGpio:
                 self.send_updates()
                 return
         self.__logger.warning("Habe keinen Pin für message gefunden :(")
+
+    def stop(self):
+        for reg in self._registered_callback_topics:
+            self.__client.message_callback_remove(reg)
 
     @staticmethod
     def convert_input_to_string(to_convert: int) -> str:
