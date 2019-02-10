@@ -49,15 +49,18 @@ class Launcher:
                 devInf.mfr = "Raspberry"
             except:
                 self._log.exception("rpiModel")
-
+            MACs = []
             try:
                 ip_link_proc = subprocess.run(["ip", "link"], capture_output=True)
                 for MAC in re.findall("..:..:..:..:..:..", ip_link_proc.stdout.decode('utf-8')):
                     if MAC != "ff:ff:ff:ff:ff:ff" and MAC != "00:00:00:00:00:00":
-                        devInf.IDs.append(MAC)
+                        MACs.append(MAC)
+                        self._log.info("Füge MAC {} hinzu".format(MAC))
             except:
                 self._log.exception("IDs")
+        devInf.IDs = MACs
         ad.Topics.set_standard_deviceinfo(devInf)
+        self._log.debug(devInf)
 
 
     def __init__(self):
