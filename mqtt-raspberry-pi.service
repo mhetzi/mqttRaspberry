@@ -9,6 +9,7 @@ TimeoutStopSec=10s
 Restart=always
 Type=idle
 User=pi
+WorkingDirectory=/home/pi/progs/mqttRaspberry/
 
 [Install]
 WantedBy=multi-user.target

@@ -9,6 +9,7 @@ TimeoutStopSec=10s
 Restart=always
 Type=idle
 User=osmc
+WorkingDirectory=/home/osmc/progs/mqttRaspberry/
 
 [Install]
 WantedBy=multi-user.target
