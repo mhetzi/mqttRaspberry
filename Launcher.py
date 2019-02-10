@@ -30,28 +30,28 @@ class Launcher:
             gitVer = ""
             osRelease = ""
             try:
-                gitVerProc = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True)
+                gitVerProc = subprocess.run(["git", "rev-parse", "--short", "HEAD"], stdout=PIPE, stderr=PIPE)
                 gitVer = gitVerProc.stdout.decode('utf-8').replace("\n","")
             except:
                 self._log.exception("Git ver")
             try:
                 osReleaseFile = open("/etc/os-release", "r")
                 osReleaseBuffer = osReleaseFile.read()
-                osRelease = re.findall('PRETTY_NAME=\".*?\"', osReleaseBuffer)[0].decode('utf-8').replace("PRETTY_NAME=")
+                osRelease = re.findall('PRETTY_NAME=\".*?\"', osReleaseBuffer)[0].replace("PRETTY_NAME=")
             except:
                 self._log.exception("os-release")
 
             devInf.sw_version = "OS; {}, APP: {}".format(osRelease, gitVer)
 
             try:
-                rpi_model = open("/sys/firmware/devicetree/base/model", "r").read().decode('utf-8').replace("\n","")
+                rpi_model = open("/sys/firmware/devicetree/base/model", "r").read().replace("\n","")
                 devInf.model = rpi_model
                 devInf.mfr = "Raspberry"
             except:
                 self._log.exception("rpiModel")
             MACs = []
             try:
-                ip_link_proc = subprocess.run(["ip", "link"], capture_output=True)
+                ip_link_proc = subprocess.run(["ip", "link"], stdout=PIPE, stderr=PIPE)
                 for MAC in re.findall("..:..:..:..:..:..", ip_link_proc.stdout.decode('utf-8')):
                     if MAC != "ff:ff:ff:ff:ff:ff" and MAC != "00:00:00:00:00:00":
                         MACs.append(MAC)
