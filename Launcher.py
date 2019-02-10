@@ -49,7 +49,7 @@ class Launcher:
                 devInf.model = rpi_model
                 devInf.mfr = "Raspberry"
                 serial = open("/proc/cpuinfo", "r").read()
-                serial = re.findall("Serial.*?$")[0].replace(" ", "").replace("Serial:", "")
+                serial = re.findall("Serial.*?$", serial)[0].replace(" ", "").replace("Serial:", "")
                 MACs.append(serial)
                 devInf.pi_serial = serial
             except:
