@@ -10,7 +10,6 @@ import Tools.PluginManager as pman
 import Tools.Config as tc
 import signal
 
-
 class Launcher:
 
     pm = None
@@ -18,6 +17,47 @@ class Launcher:
     reload = True
     reconnect_time = 0.1
     mqtt_client = None
+
+    def build_std_device_info(self):
+        import sys
+        import subprocess
+        import Tools.Autodiscovery as ad
+        import re
+        import platform
+        devInf = ad.DeviceInfo()
+        devInf.name = platform.node()
+        if sys.platform == "linux":
+            gitVer = ""
+            osRelease = ""
+            try:
+                gitVerProc = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True)
+                gitVer = gitVerProc.stdout
+            except:
+                self._log.exception("Git ver")
+            try:
+                osReleaseFile = open("/etc/os-release", "r")
+                osReleaseBuffer = osReleaseFile.read()
+                osRelease = re.findall('PRETTY_NAME=\".*?\"', osReleaseBuffer)[0]
+            except:
+                self._log.exception("os-release")
+
+            devInf.sw_version = "OS; {}, APP: {}".format(osRelease, gitVer)
+
+            try:
+                rpi_model = open("/sys/firmware/devicetree/base/model", "r").read()
+                devInf.model = rpi_model
+                devInf.mfr = "Raspberry"
+            except:
+                self._log.exception("rpiModel")
+
+            try:
+                ip_link_proc = subprocess.run(["ip", "link"], capture_output=True)
+                for MAC in re.findall("..:..:..:..:..:..", ip_link_proc.stdout):
+                    if MAC != "ff:ff:ff:ff:ff:ff" and MAC != "00:00:00:00:00:00":
+                        devInf.IDs.append(MAC)
+
+        ad.Topics.set_standard_deviceinfo(devInf)
+
 
     def __init__(self):
         log = logging.getLogger("Launch")
@@ -127,6 +167,7 @@ class Launcher:
                 conf_all_mods = True
 
         self.config = tc.config_factory(configPath, logger=self._log, do_load=True, filesystem_listen=auto_reload_config)
+        self.build_std_device_info()
 
         if door_hall_calib_mode:
             self._log.info("Ermittle noise für Halleffekt Sensor (Raspberry Tor)...")

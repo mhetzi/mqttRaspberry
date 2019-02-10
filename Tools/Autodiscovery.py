@@ -15,10 +15,8 @@ class Component(enum.Enum):
     SWITCH = "switch"
     SENSOR = "sensor"
 
-
 class DeviceClass:
     pass
-
 
 class SensorDeviceClasses(DeviceClass, enum.Enum):
     BATTERY = "battery"
@@ -54,7 +52,6 @@ class BinarySensorDeviceClasses(DeviceClass, enum.Enum):
     WINDOW = "window"
     GENERIC_SENSOR = None
 
-
 class CoverDeviceClasses(DeviceClass, enum.Enum):
     WINDOW = "window"
     GARAGE = "garage"
@@ -67,11 +64,18 @@ class DeviceInfo:
     name  = ""
     sw_version = ""
 
+__global_device_info = None
+
 class Topics:
     state = ""
     command = ""
     config = ""
     ava_topic = ""
+
+    @staticmethod
+    def set_standard_deviceinfo(di: DeviceInfo):
+        global __global_device_info
+        __global_device_info = di
 
     def __init__(self, comp: Component, dev_class: DeviceClass, autodiscovery: bool):
         self._component = comp
@@ -80,6 +84,7 @@ class Topics:
         else:
             self._dev_class = SensorDeviceClasses.GENERIC_SENSOR
 
+    # Wenn unique_id gesetzt ist wird die globale device info verwendet, ist device gesetzt wird diese device info genommen
     def get_config_payload(self, name: str, measurement_unit: str, ava_topic=None, value_template=None, json_attributes=None, device=None, unique_id=None) -> str:
 
         p = {
@@ -114,6 +119,9 @@ class Topics:
             p["value_template"] = value_template
         if json_attributes is True:
             p["json_attributes_topic"] = self.state
+
+        if device is None and isinstance(__global_device_info, DeviceInfo) and unique_id is not None:
+            device = __global_device_info
 
         if (device is not None and isinstance(device, DeviceInfo) and unique_id is not None):
             p["device"] = {

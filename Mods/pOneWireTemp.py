@@ -48,7 +48,8 @@ class OneWireTemp(threading.Thread):
 
     def register(self):
         for d in self._paths:
-            topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, d["n"], conf.autodisc.SensorDeviceClasses.TEMPERATURE)
+            unique_id = "sensor.w1-{}.{}".format(d["i"], d["n"])
+            topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, d["n"], conf.autodisc.SensorDeviceClasses.TEMPERATURE, unique_id=unique_id)
             if topics.config is not None:
                 self.__logger.info("Werde AutodiscoveryTopic senden mit der Payload: {}".format(topics.get_config_payload(d["n"], "°C"), retain=True))
                 self.__client.publish(topics.config, topics.get_config_payload(d["n"], "°C"), retain=True)
