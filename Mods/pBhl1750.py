@@ -30,8 +30,11 @@ class bhl1750:
     topic = None
     topic_alt = None
 
-    device_offline = True
-    devAlt_offline = True
+    _device_offline = True
+    _devAlt_offline = True
+
+    _dev_last = 0
+    _dev_alt_last = 0
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         self._client = client
@@ -69,24 +72,30 @@ class bhl1750:
         if self.topic is not None:
             try:
                 lux = bhref.convertToNumber( self._bus.read_i2c_block_data(bhref.DEVICE, bhref.ONE_TIME_HIGH_RES_MODE_1) )
-                self._client.publish(self.topic.state, lux)
-                if self.device_offline:
-                    self._client.publish(self.topic.ava_topic, "online", retain=True)
-                    self.device_offline = False
+                lux = round(lux, 1)
+                if lux != self._dev_last:
+                    self._dev_last = lux
+                    self._client.publish(self.topic.state, lux)
+                    if self._device_offline:
+                        self._client.publish(self.topic.ava_topic, "online", retain=True)
+                        self._device_offline = False
             except OSError:
                 self._client.publish(self.topic.ava_topic, "offline", retain=True)
-                self.device_offline = True
+                self._device_offline = True
 
         if self.topic_alt is not None:
             try:
                 lux = bhref.convertToNumber( self._bus.read_i2c_block_data(bhref.DEVICE_ALT, bhref.ONE_TIME_HIGH_RES_MODE_1) )
-                self._client.publish(self.topic_alt.state, lux)
-                if (self.devAlt_offline):
-                    self._client.publish(self.topic_alt.ava_topic, "online", retain=True)
-                    self.devAlt_offline = False
+                lux = round(lux, 1)
+                if lux != self._dev_alt_last:
+                    self._dev_alt_last = lux
+                    self._client.publish(self.topic_alt.state, lux)
+                    if (self._devAlt_offline):
+                        self._client.publish(self.topic_alt.ava_topic, "online", retain=True)
+                        self._devAlt_offline = False
             except OSError:
                 self._client.publish(self.topic.ava_topic, "offline", retain=True)
-                self.devAlt_offline = True
+                self._devAlt_offline = True
 
 
 class bhl1750Conf:
