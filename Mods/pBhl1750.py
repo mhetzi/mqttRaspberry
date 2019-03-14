@@ -81,7 +81,7 @@ class bhl1750:
                 self._threasholds[0] = 35
             elif self._dev_last > 250:
                 self._threasholds[0] = 10
-            else
+            else:
                 self._threasholds[0] = 0.5
 
         if self._conf["BHL1750/device_alt"]:
@@ -91,7 +91,7 @@ class bhl1750:
                 self._threasholds[1] = 35
             elif self._dev_alt_last > 250:
                 self._threasholds[1] = 10
-            else
+            else:
                 self._threasholds[1] = 0.5
 
 
