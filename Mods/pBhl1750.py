@@ -52,7 +52,7 @@ class bhl1750:
             self._logger.info("Erzeuge Autodiscovery Config für Addresse 1")
             unique_id = "sensor.bht1750-{}.{}".format(self._devID, "addr")
             self.topic = self._conf.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, "Licht", conf.autodisc.SensorDeviceClasses.ILLUMINANCE)
-            payload = self.topic.get_config_payload("Licht", "Lux", unique_id=unique_id)
+            payload = self.topic.get_config_payload("Licht", "lux", unique_id=unique_id)
             if (self.topic.config is not None):
                 self._client.publish(self.topic.config, payload=payload, qos=0, retain=True)
 
@@ -60,7 +60,7 @@ class bhl1750:
             self._logger.info("Erzeuge Autodiscovery Config für Addresse 2")
             unique_id = "sensor.bht1750-{}.{}".format(self._devID, "addr_alt")
             self.topic_alt = self._conf.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, "Licht a", conf.autodisc.SensorDeviceClasses.ILLUMINANCE)
-            payload = self.topic_alt.get_config_payload("Licht", "Lux", unique_id=unique_id)
+            payload = self.topic_alt.get_config_payload("Licht", "lux", unique_id=unique_id)
             if (self.topic_alt.config is not None):
                 self._client.publish(self.topic_alt.config, payload=payload, qos=0, retain=True)
 
