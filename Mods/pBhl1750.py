@@ -9,7 +9,7 @@ import threading
 import schedule
 
 import smbus
-import referenz.bh1750 as bhref
+import Mods.referenz.bh1750 as bhref
 
 class PluginLoader:
 
