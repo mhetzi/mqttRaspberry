@@ -71,7 +71,7 @@ class bhl1750:
     def send_update(self):
         if self.topic is not None:
             try:
-                lux = bhref.convertToNumber( self._bus.read_i2c_block_data(bhref.DEVICE, bhref.ONE_TIME_HIGH_RES_MODE_1) )
+                lux = bhref.convertToNumber( self._bus.read_i2c_block_data(bhref.DEVICE, bhref.CONTINUOUS_HIGH_RES_MODE_2) )
                 lux = round(lux, 1)
                 if lux != self._dev_last:
                     self._dev_last = lux
@@ -85,7 +85,7 @@ class bhl1750:
 
         if self.topic_alt is not None:
             try:
-                lux = bhref.convertToNumber( self._bus.read_i2c_block_data(bhref.DEVICE_ALT, bhref.ONE_TIME_HIGH_RES_MODE_1) )
+                lux = bhref.convertToNumber( self._bus.read_i2c_block_data(bhref.DEVICE_ALT, bhref.CONTINUOUS_HIGH_RES_MODE_2) )
                 lux = round(lux, 1)
                 if lux != self._dev_alt_last:
                     self._dev_alt_last = lux
