@@ -30,6 +30,9 @@ class bhl1750:
     topic = None
     topic_alt = None
 
+    device_offline = True
+    devAlt_offline = True
+
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         self._client = client
         self._conf = opts
@@ -47,7 +50,6 @@ class bhl1750:
             payload = self.topic.get_config_payload("Licht", "Lux", unique_id=unique_id)
             if (self.topic.config is not None):
                 self._client.publish(self.topic.config, payload=payload, qos=0, retain=True)
-            self._client.publish(self.topic.ava_topic, "online", retain=True)
 
         if self._conf["BHL1750/device_alt"]:
             self._logger.info("Erzeuge Autodiscovery Config für Addresse 2")
@@ -56,7 +58,6 @@ class bhl1750:
             payload = self.topic_alt.get_config_payload("Licht", "Lux", unique_id=unique_id)
             if (self.topic_alt.config is not None):
                 self._client.publish(self.topic_alt.config, payload=payload, qos=0, retain=True)
-            self._client.publish(self.topic_alt.ava_topic, "online", retain=True)
 
         self._job_inst = schedule.every().seconds.do(bhl1750.send_update, self)
 
@@ -66,11 +67,23 @@ class bhl1750:
 
     def send_update(self):
         if self.topic is not None:
-            lux = bhref.convertToNumber( self._bus.read_i2c_block_data(bhref.DEVICE, bhref.ONE_TIME_HIGH_RES_MODE_1) )
-            self._client.publish(self.topic.state, lux)
+            try:
+                lux = bhref.convertToNumber( self._bus.read_i2c_block_data(bhref.DEVICE, bhref.ONE_TIME_HIGH_RES_MODE_1) )
+                self._client.publish(self.topic.state, lux)
+                if self.device_offline:
+                    self._client.publish(self.topic.ava_topic, "online", retain=True)
+            except OSError:
+                self._client.publish(self.topic.ava_topic, "offline", retain=True)
+
         if self.topic_alt is not None:
-            lux = bhref.convertToNumber( self._bus.read_i2c_block_data(bhref.DEVICE_ALT, bhref.ONE_TIME_HIGH_RES_MODE_1) )
-            self._client.publish(self.topic_alt.state, lux)
+            try:
+                lux = bhref.convertToNumber( self._bus.read_i2c_block_data(bhref.DEVICE_ALT, bhref.ONE_TIME_HIGH_RES_MODE_1) )
+                self._client.publish(self.topic_alt.state, lux)
+                if (self.devAlt_offline):
+                    self._client.publish(self.topic_alt.ava_topic, "online", retain=True)
+            except OSError:
+                self._client.publish(self.topic.ava_topic, "offline", retain=True)
+
 
 class bhl1750Conf:
     def __init__(self, conf: conf.BasicConfig):
@@ -85,8 +98,13 @@ class bhl1750Conf:
         bus_nr = ConsoleInputTools.get_number_input("smbus nummer", 1)
         bus = smbus.SMBus(bus_nr)
         self.c["BHL1750/bus"] = bus_nr
-
-        measument = bus.read_i2c_block_data(bhref.DEVICE, bhref.ONE_TIME_HIGH_RES_MODE_1)
-        self.c["BHL1750/device"] = ConsoleInputTools.get_bool_input("Auf Adresse wurden {} Lux gemessen. Verwenden?".format(bhref.convertToNumber(measument)))
-        measument = bhref.convertToNumber(bus.read_i2c_block_data(bhref.DEVICE_ALT, bhref.ONE_TIME_HIGH_RES_MODE_1))
-        self.c["BHL1750/device_alt"] = ConsoleInputTools.get_bool_input("Auf Adresse_ALT wurden {} Lux gemessen. Verwenden?".format(measument))
+        try:
+            measument = bus.read_i2c_block_data(bhref.DEVICE, bhref.ONE_TIME_HIGH_RES_MODE_1)
+            self.c["BHL1750/device"] = ConsoleInputTools.get_bool_input("Auf Adresse wurden {} Lux gemessen. Verwenden?".format(bhref.convertToNumber(measument)))
+        except OSError:
+            pass
+        try:
+            measument = bhref.convertToNumber(bus.read_i2c_block_data(bhref.DEVICE_ALT, bhref.ONE_TIME_HIGH_RES_MODE_1))
+            self.c["BHL1750/device_alt"] = ConsoleInputTools.get_bool_input("Auf Adresse_ALT wurden {} Lux gemessen. Verwenden?".format(measument))
+        except OSError:
+            pass   
