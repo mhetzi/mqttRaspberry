@@ -72,8 +72,10 @@ class bhl1750:
                 self._client.publish(self.topic.state, lux)
                 if self.device_offline:
                     self._client.publish(self.topic.ava_topic, "online", retain=True)
+                    self.device_offline = False
             except OSError:
                 self._client.publish(self.topic.ava_topic, "offline", retain=True)
+                self.device_offline = True
 
         if self.topic_alt is not None:
             try:
@@ -81,8 +83,10 @@ class bhl1750:
                 self._client.publish(self.topic_alt.state, lux)
                 if (self.devAlt_offline):
                     self._client.publish(self.topic_alt.ava_topic, "online", retain=True)
+                    self.devAlt_offline = False
             except OSError:
                 self._client.publish(self.topic.ava_topic, "offline", retain=True)
+                self.devAlt_offline = True
 
 
 class bhl1750Conf:
