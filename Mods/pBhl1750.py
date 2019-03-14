@@ -36,13 +36,15 @@ class bhl1750:
     _dev_last = 0
     _dev_alt_last = 0
 
+    _threasholds = [0,0]
+
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         self._client = client
         self._conf = opts
         self._logger = logger.getChild("BHL1750")
         self._devID = device_id
         
-        self._job_inst = None
+        self._job_inst = []
         self._bus = smbus.SMBus(self._conf["BHL1750/bus"])
 
     def register(self):
@@ -62,18 +64,43 @@ class bhl1750:
             if (self.topic_alt.config is not None):
                 self._client.publish(self.topic_alt.config, payload=payload, qos=0, retain=True)
 
-        self._job_inst = schedule.every().seconds.do(bhl1750.send_update, self)
+        self._job_inst.append(schedule.every().seconds.do(bhl1750.send_update, self))
+        self._job_inst.append(schedule.every(5).minute.do(bhl1750.update_threshhold, self))
+        self.update_threshhold()
 
     def stop(self):
-        schedule.cancel_job(self._job_inst)
+        for (job in self._job_inst):
+            schedule.cancel_job(job)
         self._client.publish(self.topic.ava_topic, "offline", retain=True)
+
+    def update_threshhold(self):
+        if self._conf["BHL1750/device"]:
+            if self._dev_last > 900:
+                self._threasholds[0] = 110
+            elif self._dev_last > 500:
+                self._threasholds[0] = 35
+            elif self._dev_last > 250:
+                self._threasholds[0] = 10
+            else
+                self._threasholds[0] = 0.5
+
+        if self._conf["BHL1750/device_alt"]:
+            if self._dev_alt_last > 900:
+                self._threasholds[1] = 110
+            elif self._dev_alt_last > 500:
+                self._threasholds[1] = 35
+            elif self._dev_alt_last > 250:
+                self._threasholds[1] = 10
+            else
+                self._threasholds[1] = 0.5
+
 
     def send_update(self):
         if self.topic is not None:
             try:
                 lux = bhref.convertToNumber( self._bus.read_i2c_block_data(bhref.DEVICE, bhref.CONTINUOUS_HIGH_RES_MODE_2) )
                 lux = round(lux, 1)
-                if lux != self._dev_last:
+                if bhl1750.inbetween(lux, self._dev_alt_last, self._threasholds[0]):
                     self._dev_last = lux
                     self._client.publish(self.topic.state, lux)
                     if self._device_offline:
@@ -87,7 +114,7 @@ class bhl1750:
             try:
                 lux = bhref.convertToNumber( self._bus.read_i2c_block_data(bhref.DEVICE_ALT, bhref.CONTINUOUS_HIGH_RES_MODE_2) )
                 lux = round(lux, 1)
-                if lux != self._dev_alt_last:
+                if bhl1750.inbetween(lux, self._dev_alt_last, self._threasholds[1]):
                     self._dev_alt_last = lux
                     self._client.publish(self.topic_alt.state, lux)
                     if (self._devAlt_offline):
@@ -96,6 +123,12 @@ class bhl1750:
             except OSError:
                 self._client.publish(self.topic.ava_topic, "offline", retain=True)
                 self._devAlt_offline = True
+
+    @staticmethod
+    def inbetween(toTest, oldVal, upDown):
+        min = oldVal - upDown
+        max = oldVal + upDown
+        return toTest < min or toTest > max
 
 
 class bhl1750Conf:
