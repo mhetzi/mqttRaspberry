@@ -64,8 +64,8 @@ class bhl1750:
             if (self.topic_alt.config is not None):
                 self._client.publish(self.topic_alt.config, payload=payload, qos=0, retain=True)
 
-        self._job_inst.append(schedule.every().seconds.do(bhl1750.send_update, self))
-        self._job_inst.append(schedule.every(5).minute.do(bhl1750.update_threshhold, self))
+        self._job_inst.append(schedule.every().second.do(bhl1750.send_update, self))
+        self._job_inst.append(schedule.every(5).minutes.do(bhl1750.update_threshhold, self))
         self.update_threshhold()
 
     def stop(self):
