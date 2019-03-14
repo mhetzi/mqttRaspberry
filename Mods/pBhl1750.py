@@ -69,7 +69,7 @@ class bhl1750:
         self.update_threshhold()
 
     def stop(self):
-        for (job in self._job_inst):
+        for job in self._job_inst:
             schedule.cancel_job(job)
         self._client.publish(self.topic.ava_topic, "offline", retain=True)
 
