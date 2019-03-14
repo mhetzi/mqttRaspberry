@@ -82,7 +82,6 @@ class bhl1750:
                 self._threasholds[0] = 10
             else:
                 self._threasholds[0] = 0.5
-
         if self._conf["BHL1750/device_alt"]:
             if self._dev_alt_last > 900:
                 self._threasholds[1] = 110
@@ -92,6 +91,7 @@ class bhl1750:
                 self._threasholds[1] = 10
             else:
                 self._threasholds[1] = 0.5
+        self._logger.info("Threshold sind jetzt auf ({}, {})".format(self._threasholds[0], self._threasholds[1]))
 
 
     def send_update(self):
@@ -99,7 +99,7 @@ class bhl1750:
             try:
                 lux = bhref.convertToNumber( self._bus.read_i2c_block_data(bhref.DEVICE, bhref.CONTINUOUS_HIGH_RES_MODE_2) )
                 lux = round(lux, 1)
-                if bhl1750.inbetween(lux, self._dev_alt_last, self._threasholds[0]):
+                if bhl1750.inbetween(lux, self._dev_last, self._threasholds[0]):
                     self._dev_last = lux
                     self._client.publish(self.topic.state, lux)
                     if self._device_offline:
