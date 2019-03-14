@@ -140,7 +140,7 @@ class Topics:
             raise AttributeError("Wenn Device verwendet wird muss auch unique_id gesetzt werden.")
 
         if unique_id is not None:
-            p["unique_id"] = unique_id
+            p["unique_id"] = unique_id.replace(" ", "_").replace("-","_")
 
         try:
             return json.dumps(p)
@@ -155,9 +155,9 @@ def getTopics(discoveryPrefix: str, comp: Component, devicedID: str, entitiyID: 
         comp = Component.BINARY_SENROR
 
     if discoveryPrefix is not None:
-        mainPath = "{0}/{1}/{2}/{3}/".format(discoveryPrefix, str(comp.value), devicedID, entitiyID.replace(" ", "_"))
+        mainPath = "{0}/{1}/{2}/{3}/".format(discoveryPrefix, str(comp.value), devicedID, entitiyID).replace(" ", "_").replace("-","_")
     else:
-        mainPath = "{0}/{1}/{2}/".format(devicedID, comp.value, entitiyID)
+        mainPath = "{0}/{1}/{2}/".format(devicedID, comp.value, entitiyID).replace(" ", "_").replace("-","_")
     t = Topics(comp, device_class, discoveryPrefix is not None)
     t.state = mainPath + "state"
     t.command = mainPath + "set"
