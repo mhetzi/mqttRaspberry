@@ -99,7 +99,7 @@ class bhl1750Conf:
         bus = smbus.SMBus(bus_nr)
         self.c["BHL1750/bus"] = bus_nr
         try:
-             measument = bhref.convertToNumber(bus.read_i2c_block_data(bhref.DEVICE, bhref.ONE_TIME_HIGH_RES_MODE_1))
+            measument = bhref.convertToNumber(bus.read_i2c_block_data(bhref.DEVICE, bhref.ONE_TIME_HIGH_RES_MODE_1))
             self.c["BHL1750/device"] = ConsoleInputTools.get_bool_input("Auf Adresse wurden {} Lux gemessen. Verwenden?".format(measument))
         except OSError:
             pass
