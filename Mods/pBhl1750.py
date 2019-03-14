@@ -27,8 +27,8 @@ class PluginLoader:
 
 
 class bhl1750:
-    topic: conf.autodisc.Topics = None
-    topic_alt: conf.autodisc.Topics = None
+    topic = None
+    topic_alt = None
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         self._client = client
