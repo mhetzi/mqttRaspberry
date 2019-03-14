@@ -66,7 +66,6 @@ class bhl1750:
 
         self._job_inst.append(schedule.every().second.do(bhl1750.send_update, self))
         self._job_inst.append(schedule.every(5).minutes.do(bhl1750.update_threshhold, self))
-        self.update_threshhold()
 
     def stop(self):
         for job in self._job_inst:
@@ -106,6 +105,7 @@ class bhl1750:
                     if self._device_offline:
                         self._client.publish(self.topic.ava_topic, "online", retain=True)
                         self._device_offline = False
+                        self.update_threshhold()
             except OSError:
                 self._client.publish(self.topic.ava_topic, "offline", retain=True)
                 self._device_offline = True
@@ -120,6 +120,7 @@ class bhl1750:
                     if (self._devAlt_offline):
                         self._client.publish(self.topic_alt.ava_topic, "online", retain=True)
                         self._devAlt_offline = False
+                        self.update_threshhold()
             except OSError:
                 self._client.publish(self.topic.ava_topic, "offline", retain=True)
                 self._devAlt_offline = True
