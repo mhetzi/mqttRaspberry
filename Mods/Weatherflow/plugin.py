@@ -345,7 +345,7 @@ class WeatherflowPlugin:
         self.update_sensor(update.serial_number, "wind_lull", update.wind_lull, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
         self.update_sensor(update.serial_number, "wind_direction", update.wind_direction, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
         self.update_sensor(update.serial_number, "solar_radiation", update.solar_radiation, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
-        self.update_sensor(update.serial_number, "local_day_rain_accumulation", self._config["Weatherflow/daily_rain"], autodisc.SensorDeviceClasses.GENERIC_SENSOR)
+        self.update_sensor(update.serial_number, "local_day_rain_accumulation", round(self._config["Weatherflow/daily_rain"], 1), autodisc.SensorDeviceClasses.GENERIC_SENSOR)
         self.update_sensor(update.serial_number, "local_hour_rain_accumulation", self._config["Weatherflow/hourly_rain"], autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR)
         self.update_is_windy(update.serial_number, True, update.wind_avg, update.wind_direction)
 
