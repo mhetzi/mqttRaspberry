@@ -62,7 +62,7 @@ class Analyzer(cama.PiMotionAnalysis):
         for x in range(0, rows):
             row = a[x]
             cols = len(row)
-            print("{}: {}".format(rowi, row))
+            print("{}: {}".format(x, row))
 
 
     def getTotalChanged(self, a):
