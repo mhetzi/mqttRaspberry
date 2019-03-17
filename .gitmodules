@@ -1,0 +1,3 @@
+[submodule "Mods/referenz/picamera"]
+	path = Mods/referenz/picamera
+	url = https://github.com/waveform80/picamera.git
