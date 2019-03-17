@@ -71,6 +71,7 @@ class Analyzer(cama.PiMotionAnalysis):
                     hottestBlock = [x,y,hottness]
                     print("H", end="")
                 print(hottness, end=" ")
+            print("")
         
         print("HottestBlock (x,y,val) = {}".format(hottestBlock))
 
