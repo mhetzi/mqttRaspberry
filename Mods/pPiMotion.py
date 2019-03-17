@@ -62,17 +62,17 @@ class Analyzer(cama.PiMotionAnalysis):
         #    ).clip(0, 255).astype(np.uint8)
 
         print("XXX")
-        print(np.square(a['x'].astype(np.float))
+        print(np.square(a['x'].astype(np.float)))
         print("YYY")
-        print(np.square(a['y'].astype(np.float))
+        print(np.square(a['y'].astype(np.float)))
         print("END")
 
         #If there're more than 10 vectors with a magnitude greater
         #than 60, then say we've detected motion
-        if (a > 60).sum() > 10:
-            print('Motion detected!')
-            if callable(self.motion_call):
-                self.motion_call()
+        #if (a > 60).sum() > 10:
+        #    print('Motion detected!')
+        #    if callable(self.motion_call):
+        #        self.motion_call()
 
 class PiMotionMain(threading.Thread):
 
