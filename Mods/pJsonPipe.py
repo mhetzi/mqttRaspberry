@@ -63,6 +63,8 @@ class JsonPipe(threading.Thread):
                         self.__logger.debug("FIFI gegenstelle geschlossen.")
                         break
                     self.__logger.debug('Read: "{0}"'.format(data))
+                    if data == "kill" and self._doExit:
+                        return
                     try:
                         d = json.loads(data)
                         self.__client.publish(d["t"], d["p"], d.get("r", False))
