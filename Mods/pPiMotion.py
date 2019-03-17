@@ -52,6 +52,8 @@ class NullOutput(object):
 
 class Analyzer(cama.PiMotionAnalysis):
     motion_call = None
+    logger = None
+
     def analyze(self, a: cama.motion_dtype):
         self.hotBlock(a)
     
@@ -72,8 +74,7 @@ class Analyzer(cama.PiMotionAnalysis):
                     #print("H", end="")
                 #print(hottness, end=" ")
             #print("")
-        
-        print("HottestBlock (x,y,val) = {}".format(hottestBlock))
+        self.logger.info("(x,y,val) = {}", hottestBlock)
 
 
     def getTotalChanged(self, a):
@@ -86,7 +87,7 @@ class Analyzer(cama.PiMotionAnalysis):
         for yy in y:
             for yyy in yy:
                 added += yyy
-        print("Changed: {}".format(added))
+        self.logger.info("Changed: {}", added)
 
 
 class PiMotionMain(threading.Thread):
@@ -122,6 +123,7 @@ class PiMotionMain(threading.Thread):
 
             with Analyzer(camera) as anal:
                 anal.motion_call = self.motion
+                anal.logger = self.__logger.getChild("Analyzer")
                 camera.start_recording(self._circularStream, format='h264', motion_output=anal)
                 camera.start_recording(self._webStream, format='mjpeg', splitter_port=2)
                 # Und jetzt einfach warten
