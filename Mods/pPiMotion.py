@@ -53,16 +53,26 @@ class NullOutput(object):
 class Analyzer(cama.PiMotionAnalysis):
     motion_call = None
     def analyze(self, a: cama.motion_dtype):
-        self.rowCollum(a)
+        self.hotBlock(a)
     
-    def rowCollum(self, a):
+    def hotBlock(self, a):
+        hottestBlock = [0,0,0]
         print("   Columns    ")
         print( list(range(0, len(a[0]))) )
         rows = len(a)
         for x in range(0, rows):
             row = a[x]
             cols = len(row)
-            print("{}: {}".format(x, row))
+            print(x, end = ": ")
+            for y in range(0, cols):
+                col = row[y]
+                hottness = col[2]
+                if hottestBlock[2] < hottness:
+                    hottestBlock = [x,y,hottness]
+                    print("H", end="")
+                print(hottness, end=" ")
+        
+        print("HottestBlock (x,y,val) = {}".format(hottestBlock))
 
 
     def getTotalChanged(self, a):
