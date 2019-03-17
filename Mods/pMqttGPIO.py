@@ -57,6 +57,11 @@ class RaspberryPiGpio:
 
     def register(self):
         self.__logger.debug("Regestriere Raspberry GPIO...")
+        from gpiozero.pins.native import NativeFactory
+        from gpiozero import Device
+
+        Device.pin_factory = NativeFactory()
+
         for p in self._config.get("RaspberryPiGPIO", []):
             pin = Pin.Pin(p["Pin"], Pin.PinDirection(p["direction"]))
             if p.get("pulse_width", None) is not None:
