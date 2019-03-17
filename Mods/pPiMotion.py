@@ -83,8 +83,10 @@ class PiMotionMain(threading.Thread, cama.PiMotionAnalysis):
 
                 camera.start_recording(self._circularStream, format='h264', motion_output=self)
                 camera.start_recording(self._webStream, format='mjpeg', splitter_port=2)
-
-                camera.wait_recording(30)
+                try:
+                    camera.wait_recording(30)
+                except:
+                    self.__logger.exception("Kamera Fehler")
         camera.stop_recording()
         camera.stop_recording(splitter_port=2)
 
@@ -95,6 +97,9 @@ class PiMotionMain(threading.Thread, cama.PiMotionAnalysis):
         
 
     def write(self, a):
+        print("DATA")
+        print(a)
+        print("END")
         a = np.sqrt(
             np.square(a['x'].astype(np.float)) +
             np.square(a['y'].astype(np.float))
@@ -104,6 +109,3 @@ class PiMotionMain(threading.Thread, cama.PiMotionAnalysis):
         if (a > 60).sum() > 10:
             print('Motion detected!')
             self.motion
-        print("DATA")
-        print(a)
-        print("END")
