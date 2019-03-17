@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import RPi.GPIO as GPIO
+from gpiozero import LED, Button
 import enum
 import time
 
@@ -21,66 +21,57 @@ class Pin:
         self._pulse_width = None
         self._direction = direction
         self._out = False
+        self._underlying = None
+
+        if init == -1:
+            init = None
 
         if direction == PinDirection.IN:
-            GPIO.setup(pin, GPIO.IN)
+            self._underlying = Button(pin=pin, pull_up=None)
         elif direction == PinDirection.OUT:
-            GPIO.setup(pin, GPIO.OUT)
+            self._underlying = LED(pin=pin, active_high=True, initial_value=init)
         elif direction == PinDirection.IN_PULL_LOW:
-            GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+            self._underlying = Button(pin=pin, pull_up=False)
         elif direction == PinDirection.IN_PULL_UP:
-            GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+            self._underlying = Button(pin=pin, pull_up=True)
         else:
             raise Exception("Pin richtung ist falsch")
 
-        if init != -1:
-            self.output(bool(init))
-        elif direction == PinDirection.OUT:
-            self.output(False)
-
     def turnOn(self):
-        self.output(True)
+        self._underlying.on()
 
     def turnOff(self):
-        self.output(False)
+        self._underlying.off()
 
     def toggle(self):
         print("Pin ist jetzt {} und wird {}".format(self.input(), not self.input()))
-        self.output(not self.input())
+        self._underlying.toggle()
 
     def set_pulse_width(self, delay):
         self._pulse_width = delay
 
     def pulse(self, delay_ms=250):
-        self.toggle()
-        if self._pulse_width is not None:
-            time.sleep(self._pulse_width / 1000)
-        else:
-            time.sleep(delay_ms/1000)
-        self.toggle()
+        self._underlying.blink( on_time=delay_ms/1000, off_time=1, n=1, background=False)
 
     def input(self) -> bool:
         if self._direction == PinDirection.OUT:
-            return self._out
-        return GPIO.input(self._pin)
+            return self._underlying.value
+        return self._underlying.value
 
     def output(self, val: bool):
         self._out = val
-        try:
-            GPIO.output(self._pin, val)
-        except RuntimeError as x:
-            if self._direction == PinDirection.OUT:
-                print("Switch to output")
-                GPIO.setup(self._pin, GPIO.OUT)
-                GPIO.output(self._pin, val)
+        if self._direction == PinDirection.OUT:
+            self._underlying.value = val
 
     def get_direction(self):
         return self._direction
 
     def set_detect(self, callback, level: PinEventEdge):
         if level == PinEventEdge.RISING:
-            GPIO.add_event_callback(self._pin, GPIO.RISING, callback)
+            self._underlying.when_pressed = callback
         elif level == PinEventEdge.FALLING:
-            GPIO.add_event_callback(self._pin, GPIO.FALLING, callback)
+            self._underlying.when_released = callback
         elif level == PinEventEdge.BOTH:
-            GPIO.add_event_callback(self._pin, GPIO.BOTH, callback)
+            self._underlying.when_released = callback
+            self._underlying.when_pressed = callback
+
