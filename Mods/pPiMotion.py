@@ -60,17 +60,16 @@ class Analyzer(cama.PiMotionAnalysis):
         #    np.square(a['x'].astype(np.float)) +
         #    np.square(a['y'].astype(np.float))
         #    ).clip(0, 255).astype(np.uint8)
+        added = 0
         x = np.square(a['x'].astype(np.float))
-        print("XXX len({})".format(len(x)))
         for xx in x:
             for xxx in xx:
-                print(xxx)
+                added += xxx
         y = np.square(a['y'].astype(np.float))
-        print("YYY len({})".format(len(y)))
         for yy in y:
             for yyy in yy:
-                print(yyy)
-        print("END")
+                added += yyy
+        print("Changed: {}".format(added))
 
         #If there're more than 10 vectors with a magnitude greater
         #than 60, then say we've detected motion
