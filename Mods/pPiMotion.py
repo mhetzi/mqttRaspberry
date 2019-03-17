@@ -50,7 +50,23 @@ class NullOutput(object):
     def reset(self):
         self.size = 0
 
-class PiMotionMain(threading.Thread, cama.PiMotionAnalysis):
+class Analyzer(cama.PiMotionAnalysis):
+    motion_call = None
+    def analyze(self, a):
+        print("DATA")
+        print(a)
+        print("END")
+        a = np.sqrt(
+            np.square(a['x'].astype(np.float)) +
+            np.square(a['y'].astype(np.float))
+            ).clip(0, 255).astype(np.uint8)
+        #If there're more than 10 vectors with a magnitude greater
+        #than 60, then say we've detected motion
+        if (a > 60).sum() > 10:
+            print('Motion detected!')
+            if (callable(motion_call))
+
+class PiMotionMain(threading.Thread):
 
     _motionStream = NullOutput()
     _webStream = NullOutput()
@@ -81,14 +97,16 @@ class PiMotionMain(threading.Thread, cama.PiMotionAnalysis):
             camera.resolution = (self._config["PiMotion/camera/width"], self._config["PiMotion/camera/height"])
             self._circularStream = cam.PiCameraCircularIO(camera, seconds=self._config["PiMotion/motion/recordPre"])
 
-            camera.start_recording(self._circularStream, format='h264', motion_output=self)
-            camera.start_recording(self._webStream, format='mjpeg', splitter_port=2)
-            # Und jetzt einfach warten
-            while not self._doExit:
-                try:
-                    camera.wait_recording(30)
-                except:
-                    self.__logger.exception("Kamera Fehler")
+            with Analyzer(camera) as anal:
+                anal.motion_call = self.motion
+                camera.start_recording(self._circularStream, format='h264', motion_output=anal)
+                camera.start_recording(self._webStream, format='mjpeg', splitter_port=2)
+                # Und jetzt einfach warten
+                while not self._doExit:
+                    try:
+                        camera.wait_recording(30)
+                    except:
+                        self.__logger.exception("Kamera Fehler")
         camera.stop_recording()
         camera.stop_recording(splitter_port=2)
 
@@ -97,17 +115,3 @@ class PiMotionMain(threading.Thread, cama.PiMotionAnalysis):
             return
         return
         
-
-    def analyze(self, a):
-        print("DATA")
-        print(a)
-        print("END")
-        a = np.sqrt(
-            np.square(a['x'].astype(np.float)) +
-            np.square(a['y'].astype(np.float))
-            ).clip(0, 255).astype(np.uint8)
-        #If there're more than 10 vectors with a magnitude greater
-        #than 60, then say we've detected motion
-        if (a > 60).sum() > 10:
-            print('Motion detected!')
-            self.motion
