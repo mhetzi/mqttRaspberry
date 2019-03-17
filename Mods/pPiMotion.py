@@ -64,7 +64,8 @@ class Analyzer(cama.PiMotionAnalysis):
         #than 60, then say we've detected motion
         if (a > 60).sum() > 10:
             print('Motion detected!')
-            if (callable(motion_call))
+            if callable(self.motion_call):
+                self.motion_call()
 
 class PiMotionMain(threading.Thread):
 
