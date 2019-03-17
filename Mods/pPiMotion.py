@@ -62,9 +62,9 @@ class Analyzer(cama.PiMotionAnalysis):
         #    ).clip(0, 255).astype(np.uint8)
 
         print("XXX")
-        print(a['x'].astype(np.float))
+        print(np.square(a['x'].astype(np.float))
         print("YYY")
-        print(a['y'].astype(np.float))
+        print(np.square(a['y'].astype(np.float))
         print("END")
 
         #If there're more than 10 vectors with a magnitude greater
