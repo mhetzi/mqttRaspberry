@@ -57,21 +57,21 @@ class Analyzer(cama.PiMotionAnalysis):
     
     def hotBlock(self, a):
         hottestBlock = [0,0,0]
-        print("   Columns    ")
-        print( list(range(0, len(a[0]))) )
+        #print("   Columns    ")
+        #print( list(range(0, len(a[0]))) )
         rows = len(a)
         for x in range(0, rows):
             row = a[x]
             cols = len(row)
-            print(x, end = ": ")
+            #print(x, end = ": ")
             for y in range(0, cols):
                 col = row[y]
                 hottness = col[2]
                 if hottestBlock[2] < hottness:
                     hottestBlock = [x,y,hottness]
-                    print("H", end="")
-                print(hottness, end=" ")
-            print("")
+                    #print("H", end="")
+                #print(hottness, end=" ")
+            #print("")
         
         print("HottestBlock (x,y,val) = {}".format(hottestBlock))
 
