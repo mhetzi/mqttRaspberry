@@ -77,12 +77,14 @@ class PiMotionMain(threading.Thread, cama.PiMotionAnalysis):
 
     def run(self):
         with cam.PiCamera() as camera:
-            while not self._doExit:
-                self._circularStream = cam.PiCameraCircularIO(camera, seconds=self._config["PiMotion/motion/recordPre"])
-                camera.resolution = (self._config["PiMotion/camera/width"], self._config["PiMotion/camera/height"])
+            # Init Kamera
+            camera.resolution = (self._config["PiMotion/camera/width"], self._config["PiMotion/camera/height"])
+            self._circularStream = cam.PiCameraCircularIO(camera, seconds=self._config["PiMotion/motion/recordPre"])
 
-                camera.start_recording(self._circularStream, format='h264', motion_output=self)
-                camera.start_recording(self._webStream, format='mjpeg', splitter_port=2)
+            camera.start_recording(self._circularStream, format='h264', motion_output=self)
+            camera.start_recording(self._webStream, format='mjpeg', splitter_port=2)
+            # Und jetzt einfach warten
+            while not self._doExit:
                 try:
                     camera.wait_recording(30)
                 except:
