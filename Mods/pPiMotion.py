@@ -88,7 +88,7 @@ class PiMotionMain(threading.Thread, cama.PiMotionAnalysis):
         camera.stop_recording()
         camera.stop_recording(splitter_port=2)
 
-    def motion:
+    def motion(self):
         if self._inMotion:
             return
         return
