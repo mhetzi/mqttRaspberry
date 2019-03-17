@@ -53,13 +53,18 @@ class NullOutput(object):
 class Analyzer(cama.PiMotionAnalysis):
     motion_call = None
     def analyze(self, a: cama.motion_dtype):
-        #print("DATA")
-        #print(a)
-        #print("END")
-        #a = np.sqrt(
-        #    np.square(a['x'].astype(np.float)) +
-        #    np.square(a['y'].astype(np.float))
-        #    ).clip(0, 255).astype(np.uint8)
+        self.rowCollum(a)
+    
+    def rowCollum(self, a):
+        print("   Columns    ")
+        print( list(range(0, len())) )
+        rows = len(a)
+        for row in range(0, rows):
+            cols = len(row)
+            print("{}: {}".format(row, cols))
+
+
+    def getTotalChanged(self, a):
         added = 0
         x = np.square(a['x'].astype(np.float))
         for xx in x:
@@ -71,12 +76,6 @@ class Analyzer(cama.PiMotionAnalysis):
                 added += yyy
         print("Changed: {}".format(added))
 
-        #If there're more than 10 vectors with a magnitude greater
-        #than 60, then say we've detected motion
-        #if (a > 60).sum() > 10:
-        #    print('Motion detected!')
-        #    if callable(self.motion_call):
-        #        self.motion_call()
 
 class PiMotionMain(threading.Thread):
 
@@ -116,7 +115,7 @@ class PiMotionMain(threading.Thread):
                 # Und jetzt einfach warten
                 while not self._doExit:
                     try:
-                        camera.wait_recording(30)
+                        camera.wait_recording(5)
                     except:
                         self.__logger.exception("Kamera Fehler")
         camera.stop_recording(splitter_port=2)
