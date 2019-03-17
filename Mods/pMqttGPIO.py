@@ -48,7 +48,7 @@ class PluginLoader:
 class RaspberryPiGpio:
 
     def __init__(self, client: mclient.Client, opts: Config.BasicConfig, logger: logging.Logger, device_id: str):
-        gpio.setmode(gpio.BOARD)
+        gpio.setmode(gpio.BCM)
         self.__client = client
         self.__logger = logger.getChild("rPiGPIO")
         self._config = opts

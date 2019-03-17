@@ -134,7 +134,7 @@ class PiMotionMain(threading.Thread):
                         camera.wait_recording(5)
                         pps = anal.processed / 5
                         anal.processed = 0
-                        self.__logger.info("Pro Sekunde verarbeitet: %d", pps)
+                        self.__logger.debug("Pro Sekunde verarbeitet: %d", pps)
                     except:
                         self.__logger.exception("Kamera Fehler")
         camera.stop_recording(splitter_port=2)

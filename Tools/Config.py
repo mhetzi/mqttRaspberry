@@ -83,7 +83,7 @@ class BasicConfig:
             resolved = str(self._conf_path.absolute())
         self._logger.debug("[1/2] Öffne Konfigurationsdatei zum speichern" + resolved)
         with open(resolved, "w") as json_file:
-            json.dump(self._config, json_file)
+            json.dump(self._config, json_file, indent=2)
             self._logger.info("[2/2] Gespeichert...")
 
     def pre_reload(self):
