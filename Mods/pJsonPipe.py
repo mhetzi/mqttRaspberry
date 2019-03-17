@@ -37,6 +37,7 @@ class JsonPipe(threading.Thread):
         self._device_id = device_id
         self.setName("JsonPipeReader")
         self._doExit = False
+        self._lastData = None
 
     def register(self):
         self.start()
@@ -62,6 +63,8 @@ class JsonPipe(threading.Thread):
                     if len(data) == 0:
                         self.__logger.debug("FIFI gegenstelle geschlossen.")
                         break
+                    if data == self._lastData:
+                        continue
                     self.__logger.debug('Read: "{0}"'.format(data))
                     if data == "kill" and self._doExit:
                         return
