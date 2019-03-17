@@ -53,6 +53,7 @@ class NullOutput(object):
 class Analyzer(cama.PiMotionAnalysis):
     motion_call = None
     logger = None
+    processed = 0
 
     def analyze(self, a: cama.motion_dtype):
         self.hotBlock(a)
@@ -75,6 +76,7 @@ class Analyzer(cama.PiMotionAnalysis):
                 #print(hottness, end=" ")
             #print("")
         self.logger.info("(x,y,val) = (%d,%d,%d) ", hottestBlock[0],hottestBlock[1],hottestBlock[2])
+        self.processed += 1
 
 
     def getTotalChanged(self, a):
@@ -130,6 +132,8 @@ class PiMotionMain(threading.Thread):
                 while not self._doExit:
                     try:
                         camera.wait_recording(5)
+                        pps = anal.processed / 5
+                        self.__logger.info("Pro Sekunde verarbeitet: %d", pps)
                     except:
                         self.__logger.exception("Kamera Fehler")
         camera.stop_recording(splitter_port=2)
