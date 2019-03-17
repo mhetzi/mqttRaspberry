@@ -60,7 +60,7 @@ class Analyzer(cama.PiMotionAnalysis):
         print( list(range(0, len(a[0]))) )
         rows = len(a)
         for rowi in range(0, rows):
-            row = rows[rowi]
+            row = a[rowi]
             cols = len(row)
             print("{}: {}".format(rowi, cols))
 
