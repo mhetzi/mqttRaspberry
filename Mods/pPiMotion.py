@@ -57,7 +57,7 @@ class Analyzer(cama.PiMotionAnalysis):
     
     def rowCollum(self, a):
         print("   Columns    ")
-        print( list(range(0, len())) )
+        print( list(range(0, len(a[0]))) )
         rows = len(a)
         for row in range(0, rows):
             cols = len(row)
