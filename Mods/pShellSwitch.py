@@ -32,23 +32,29 @@ class ShellSwitch:
         self._name_topic_map = {}
         self._state_name_map = {}
 
-    def exec_switch(self, name:str, on:bool):
+    def exec_switch(self, name:str, on:bool, initKill=None):
         switch = self._config["ShellSwitch/entrys/{}".format(name)]
         state_js = {"on": switch["on_command"], "off": switch["off_command"]}
         try:
-            if on:
-                cp = subprocess.run(switch["on_command"], shell=True, check=True)
-                self._config["ShellSwitch/entrys/{}/wasOn".format(name)] = on
-                state_js["state"] = "ON"
-                state_js["error_code"] = cp.returncode
-                self.__logger.info("{} wurde angeschaltet.".format(name))
-            else:
-                cp = subprocess.run(switch["off_command"], shell=True, check=True)
-                self._config["ShellSwitch/entrys/{}/wasOn".format(name)] = on
-                state_js["state"] = "OFF"
-                state_js["error_code"] = cp.returncode
-                self.__logger.info("{} wurde ausgeschaltet.".format(name))
-            switch["wasOn"] = on
+            if initKill is None:
+                if on:
+                    cp = subprocess.run(switch["on_command"], shell=True, check=True)
+                    self._config["ShellSwitch/entrys/{}/wasOn".format(name)] = on
+                    state_js["state"] = "ON"
+                    state_js["error_code"] = cp.returncode
+                    self.__logger.info("{} wurde angeschaltet.".format(name))
+                else:
+                    cp = subprocess.run(switch["off_command"], shell=True, check=True)
+                    self._config["ShellSwitch/entrys/{}/wasOn".format(name)] = on
+                    state_js["state"] = "OFF"
+                    state_js["error_code"] = cp.returncode
+                    self.__logger.info("{} wurde ausgeschaltet.".format(name))
+                switch["wasOn"] = on
+            elif initKill and switch["init_command"] is not None:
+                cp = subprocess.run(switch["init_command"], shell=True, check=True)
+            elif not initKill and switch["clean_command"] is not None:
+                cp = subprocess.run(switch["clean_command"], shell=True, check=True)
+
         except subprocess.CalledProcessError as e:
             state_js["state"] = "OFF" if on else "ON"
             state_js["error_code"] = e.returncode
@@ -98,9 +104,13 @@ class ShellSwitch:
             self._registered_callback_topics.append(topics.command)
             self._name_topic_map[topics.command] = name
             self._state_name_map[name] = topics.state
+            self.exec_switch(name, False, True)
             self.exec_switch(name, self._config["ShellSwitch/entrys"][name]["wasOn"])
 
     def stop(self):
+        for name in self._config.get("ShellSwitch/entrys", {}).keys():
+            self.exec_switch(name, False, False)
+
         for reg in self._registered_callback_topics:
             self.__client.message_callback_remove(reg)
 
@@ -139,6 +149,8 @@ class ShellSwitchConf:
             elif action == 1:
                 entry = {"wasOn": False}
                 onOff = ConsoleInputTools.get_bool_input("Welcher Modus soll angewendet werden? Ein/Aus (J) oder Pulse (N)", True)
+                entry["init_command"] = ConsoleInputTools.get_input("Kommando beim initialisieren?: ")
+                entry["clean_command"] = ConsoleInputTools.get_input("Kommando beim beenden?: ")
                 entry["onOff"] = onOff
                 if onOff:
                     entry["on_command"] = ConsoleInputTools.get_input("Kommando beim Einschalten?: ")
