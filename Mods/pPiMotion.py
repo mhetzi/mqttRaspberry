@@ -74,7 +74,7 @@ class Analyzer(cama.PiMotionAnalysis):
                     #print("H", end="")
                 #print(hottness, end=" ")
             #print("")
-        self.logger.info("(x,y,val) = {}", hottestBlock)
+        self.logger.info("(x,y,val) = (%d,%d,%d) ", hottestBlock[0],hottestBlock[1],hottestBlock[2])
 
 
     def getTotalChanged(self, a):
@@ -87,7 +87,7 @@ class Analyzer(cama.PiMotionAnalysis):
         for yy in y:
             for yyy in yy:
                 added += yyy
-        self.logger.info("Changed: {}", added)
+        self.logger.info("Changed: %d", added)
 
 
 class PiMotionMain(threading.Thread):
