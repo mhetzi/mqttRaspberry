@@ -40,7 +40,8 @@ class WeatherflowPlugin:
         if self._lightning_counter["lastTime"] < datetime.datetime.now() - delta:
             self._logger.debug("Prüfe Blitzmelder")
             if self._lightning_counter["serial"] is None:
-
+                self._lightning_counter["init"] = 100
+                self.count_lightnings_per_minute()
 
     def __init__(self, client: mclient.Client, opts: BasicConfig, logger: logging.Logger, device_id: str):
         self._client = client
