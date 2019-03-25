@@ -36,6 +36,11 @@ class WeatherflowPlugin:
     def reset_hourly_rain(self):
         self._logger.debug("Setze Stündlichen Regenzähler zurück...")
         self._config["Weatherflow/hourly_rain"] = 0
+        delta = datetime.timedelta(hours=1)
+        if self._lightning_counter["lastTime"] < datetime.datetime.now() - delta:
+            self._logger.debug("Prüfe Blitzmelder")
+            if self._lightning_counter["serial"] is None:
+
 
     def __init__(self, client: mclient.Client, opts: BasicConfig, logger: logging.Logger, device_id: str):
         self._client = client
@@ -44,7 +49,7 @@ class WeatherflowPlugin:
         self._device_id = device_id
         self._udp = None
         self._timer = threading.Timer(2, self.check_online_status)
-        self._lightning_counter = {"count": 0, "timer": None, "serial": None, "init": 0}
+        self._lightning_counter = {"count": 0, "timer": None, "serial": None, "init": 0, "lastTime": datetime.datetime.now()}
         self._raining_info = {}
         self._wind_info = {}
         self._online_states = {}
@@ -228,7 +233,7 @@ class WeatherflowPlugin:
             self.update_sensor(pupd.serial_number, "lightning_last_dist", pupd.distance, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
             self.update_sensor(pupd.serial_number, "lightning_last_nrg", pupd.energy, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
             self.update_sensor(pupd.serial_number, "es_blitzt", 1, autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR)
-
+            self._lightning_counter["lastTime"] = datetime.datetime.now()
             if self._lightning_counter["serial"] is None:
                 self._lightning_counter["serial"] = pupd.serial_number
                 self._logger.debug("Seriennummer des Blitzmeldenden Gerätes kopiert")
@@ -389,6 +394,8 @@ class WeatherflowPlugin:
             self._logger.info("Es Blitzt, Regestriere Blitze pro Minute zähler für {}".format(self._lightning_counter["serial"]))
             self.register_new_sensor(self._lightning_counter["serial"], "Blitze in der Minute", "lightning_count_min", "Stk/Min", autodisc.SensorDeviceClasses.GENERIC_SENSOR)
             self._lightning_counter["init"] = 1
+            self._lightning_counter["timer"] = threading.Timer(60, self.count_lightnings_per_minute)
+            self._lightning_counter["timer"].start()
         if 0 < self._lightning_counter["init"] <= 10:
             if count == 0:
                 self._lightning_counter["init"] += 1
@@ -397,11 +404,12 @@ class WeatherflowPlugin:
             self._lightning_counter["timer"] = threading.Timer(60, self.count_lightnings_per_minute)
             self._lightning_counter["timer"].start()
             self._logger.debug("Es blitzt immer nocht. Restarte timer...")
-            self.update_sensor(self._lightning_counter["serial"], "es_blitzt", 1, autodisc.BinarySensorDeviceClasses.POWER)
+            self.update_sensor(self._lightning_counter["serial"], "es_blitzt", 1, autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR)
         elif self._lightning_counter["init"] > 5:
             self._lightning_counter["timer"] = None
             self._logger.debug("Es blitzt nicht mehr. Timer wird nicht neu gestartet...")
-            self.update_sensor(self._lightning_counter["serial"], "es_blitzt", 0, autodisc.BinarySensorDeviceClasses.POWER)
+            self.update_sensor(self._lightning_counter["serial"], "es_blitzt", 0,autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR)
+            self._lightning_counter = {"count": 0, "timer": None, "serial": None, "init": 0, "lastTime": datetime.datetime.now()}
 
         if self._lightning_counter["serial"] is not None:
             self.update_sensor(self._lightning_counter["serial"], "lightning_count_min", count, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
