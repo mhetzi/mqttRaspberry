@@ -21,7 +21,7 @@ cdef BLOCK chotBlock(np.ndarray[BLOCK, ndim=2] arr, np.int16_t rows, np.int16_t 
     cdef BLOCK b
     for r in range(rows):
         for c in range(cols):
-            b = arr[r][c]
+            b = arr[r, c]
             if hotest.sad < b.sad:
                 hotest.x = b.x
                 hotest.y = b.y
