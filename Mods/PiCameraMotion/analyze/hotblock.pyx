@@ -31,6 +31,7 @@ def hotBlock(a):
     print("Rows: Typ: {}, länge: {}".format(a.__class__.__name__, rows))
     cols = len(a[0])
     print("Cols: Typ: {}, länge: {}".format(a[0].__class__.__name__, cols))
+    print("Data: Typ: {}, Data: {}".format(a[0][0].__class__.__name__, a[0][0]))
     meh = chotBlock(a, rows, cols)
     print(meh.__class__.__name__)
     return meh.x, meh.y, meh.SAD
