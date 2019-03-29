@@ -35,4 +35,4 @@ def hotBlock(a, np.int16_t rows, np.int16_t cols):
     meh = chotBlock(a, rows, cols)
     print("Return: Typ: {}, länge: {}".format(meh.__class__.__name__, rows))
     print(meh.__class__.__name__)
-    return meh.x, meh.y, meh.SAD
+    return meh.x, meh.y, meh.sad
