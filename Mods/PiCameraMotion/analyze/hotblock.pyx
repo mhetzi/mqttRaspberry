@@ -2,10 +2,10 @@ import numpy as np
 cimport numpy as np
 cimport cython
 
-cdef struct sBLOCK:
+cdef packed struct sBLOCK:
     np.int8_t x
     np.int8_t y
-    np.uint16_t SAD
+    np.uint16_t sad
 
 ctypedef sBLOCK BLOCK
 
@@ -15,16 +15,17 @@ cdef BLOCK chotBlock(np.ndarray[BLOCK, ndim=2] arr, np.int16_t rows, np.int16_t 
     cdef BLOCK hotest
     hotest.x = 0
     hotest.y = 0
-    hotest.SAD = 0
+    hotest.sad = 0
     cdef np.int16_t r
     cdef np.int16_t c
+    cdef BLOCK b
     for r in range(rows):
         for c in range(cols):
             b = arr[r][c]
-            if hotest.SAD < b[2]:
-                hotest.x = b[0]
-                hotest.y = b[1]
-                hotest.SAD = b[2]
+            if hotest.SAD < b.sad:
+                hotest.x = b.x
+                hotest.y = b.y
+                hotest.sad = b.sad
     return hotest
 
 def hotBlock(a, np.int16_t rows, np.int16_t cols):
