@@ -74,6 +74,7 @@ class PiMotionMain(threading.Thread):
                         self.__logger.debug("Pro Sekunde verarbeitet: %d", pps)
                     except:
                         self.__logger.exception("Kamera Fehler")
+                        exit(-1)
         server.server_close()
         camera.stop_recording(splitter_port=2)
         camera.stop_recording()
