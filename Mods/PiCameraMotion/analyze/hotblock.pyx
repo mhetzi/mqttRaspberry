@@ -19,11 +19,10 @@ def chotBlock(np.ndarray[BLOCK, ndim=2] arr, np.int16_t rows, np.int16_t cols):
     for r in range(rows):
         for c in range(cols):
             b = arr[r][c]
-            if b == np.void:
-                print("void")
-                continue
-            if hotest.SAD < b.SAD:
-                hotest = b
+            if hotest.SAD < b[2]:
+                hotest.x = b[0]
+                hotest.y = b[1]
+                hotest.SAD = b[2]
     return hotest
 
 def hotBlock(a):
