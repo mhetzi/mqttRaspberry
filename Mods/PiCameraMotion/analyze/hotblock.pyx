@@ -27,10 +27,6 @@ cdef BLOCK chotBlock(np.ndarray[BLOCK, ndim=2] arr, np.int16_t rows, np.int16_t 
 
 def hotBlock(a):
     rows = len(a)
-    print("Rows: Typ: {}, länge: {}".format(a.__class__.__name__, rows))
     cols = len(a[0])
-    print("Cols: Typ: {}, länge: {}".format(a[0].__class__.__name__, cols))
-    print("Data: Typ: {}, Data: {}".format(a[0][0].__class__.__name__, a[0][0]))
     meh = chotBlock(a, rows, cols)
-    print("Return: Typ: {}, länge: {}".format(meh.__class__.__name__, meh))
     return meh.x, meh.y, meh.SAD
