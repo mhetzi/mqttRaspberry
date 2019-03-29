@@ -29,10 +29,10 @@ cdef BLOCK chotBlock(np.ndarray[BLOCK, ndim=2] arr, np.int16_t rows, np.int16_t 
     return hotest
 
 def hotBlock(a, np.int16_t rows, np.int16_t cols):
-    print("Rows: Typ: {}, länge: {}".format(a.__class__.__name__, rows))
-    print("Cols: Typ: {}, länge: {}".format(a[0].__class__.__name__, cols))
-    print("Data: Typ: {}, Data: {}".format(a[0][0].__class__.__name__, a[0][0]))
+    #print("Rows: Typ: {}, länge: {}".format(a.__class__.__name__, rows))
+    #print("Cols: Typ: {}, länge: {}".format(a[0].__class__.__name__, cols))
+    #print("Data: Typ: {}, Data: {}".format(a[0][0].__class__.__name__, a[0][0]))
     meh = chotBlock(a, rows, cols)
-    print("Return: Typ: {}, länge: {}".format(meh.__class__.__name__, rows))
-    print(meh.__class__.__name__)
-    return meh.x, meh.y, meh.sad
+    #print("Return: Typ: {}, länge: {}".format(meh.__class__.__name__, rows))
+    #print(meh.__class__.__name__)
+    return meh
