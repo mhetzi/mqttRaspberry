@@ -10,7 +10,7 @@ except ImportError:
     import Mods.referenz.picamera.picamera.array as cama
 
 import pyximport; pyximport.install()
-import Mods.PiCameraMotion.analyze.hotblock as HotBlock
+import hotblock as HotBlock
 
 class Analyzer(cama.PiMotionAnalysis):
     motion_call = None
