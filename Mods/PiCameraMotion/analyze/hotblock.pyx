@@ -11,7 +11,7 @@ ctypedef sBLOCK BLOCK
 
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
-def chotBlock(np.ndarray[BLOCK, ndim=2] arr, np.int16_t rows, np.int16_t cols):
+cdef BLOCK chotBlock(np.ndarray[BLOCK, ndim=2] arr, np.int16_t rows, np.int16_t cols):
     cdef BLOCK hotest
     hotest.x = 0
     hotest.y = 0
@@ -32,5 +32,5 @@ def hotBlock(a):
     print("Cols: Typ: {}, länge: {}".format(a[0].__class__.__name__, cols))
     print("Data: Typ: {}, Data: {}".format(a[0][0].__class__.__name__, a[0][0]))
     meh = chotBlock(a, rows, cols)
-    print(meh.__class__.__name__)
+    print("Return: Typ: {}, länge: {}".format(meh.__class__.__name__, meh))
     return meh.x, meh.y, meh.SAD
