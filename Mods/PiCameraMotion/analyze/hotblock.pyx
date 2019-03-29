@@ -28,6 +28,10 @@ def hotBlock(a):
     print("Rows: Typ: {}, länge: {}".format(a.__class__.__name__, rows))
     cols = len(a[0])
     print("Cols: Typ: {}, länge: {}".format(a[0].__class__.__name__, cols))
-    meh = chotBlock(a, rows, cols)
+    try:
+        meh = chotBlock(a, rows, cols)            # here you can put your code
+    except Exception as e:
+        print(e)                # this prints error message   
+        print(type(e).__name__)
     print(meh.__class__.__name__)
     return meh.x, meh.y, meh.SAD
