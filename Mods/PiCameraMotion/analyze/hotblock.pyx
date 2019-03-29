@@ -19,5 +19,9 @@ cdef BLOCK chotBlock(np.ndarray[BLOCK, ndim=2] arr, np.int16_t rows, np.int16_t 
     return hotest
 
 def hotBlock(a):
-    meh = chotBlock(a, len(a), len(a[0]))
+    print(a.__class__.__name__)
+    rows = len(a)
+    cols = len(a[0])
+    meh = chotBlock(a, rows, cols)
+    print(meh.__class__.__name__)
     return meh.x, meh.y, meh.SAD
