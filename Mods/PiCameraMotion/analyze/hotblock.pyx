@@ -16,17 +16,17 @@ cdef BLOCK chotBlock(np.ndarray[BLOCK, ndim=2] arr, np.int16_t rows, np.int16_t 
     hotest.x = 0
     hotest.y = 0
     hotest.SAD = 0
+    cdef np.uint16_t r
+    cdef np.uint16_t c
+    cdef BLOCK b
     for r in range(rows):
         for c in range(cols):
             b = arr[r][c]
-            if hotest.SAD < b[2]:
-                hotest.x = b[0]
-                hotest.y = b[1]
-                hotest.SAD = b[2]
+            if hotest.SAD < b.SAD:
+                hotest.x = b.x
+                hotest.y = b.y
+                hotest.SAD = b.SAD
     return hotest
 
-def hotBlock(a):
-    rows = len(a)
-    cols = len(a[0])
-    meh = chotBlock(a, rows, cols)
-    return meh.x, meh.y, meh.SAD
+def hotBlock(a, np.int16_t rows, np.int16_t cols):
+    return chotBlock(a, rows, cols)

@@ -12,16 +12,32 @@ except ImportError:
 import pyximport; pyximport.install()
 import Mods.PiCameraMotion.analyze.hotblock
 
-class Analyzer(cama.PiMotionAnalysis):
+class Analyzer(cama.PiAnalysisOutput):
     motion_call = None
     logger = None
     processed = 0
+
+    def __init__(self, camera, size=None):
+        super(Analyzer, self).__init__(camera, size)
+        self.cols = None
+        self.rows = None
+
+    def write(self, b):
+        result = super(Analyzer, self).write(b)
+        if self.cols is None:
+            width, height = self.size or self.camera.resolution
+            self.cols = ((width + 15) // 16) + 1
+            self.rows = (height + 15) // 16
+        self.analyze(
+                np.frombuffer(b, dtype=cama.motion_dtype).\
+                reshape((self.rows, self.cols)))
+        return result
 
     def analyze(self, a: cama.motion_dtype):
         self.cythonHotBlock(a)
     
     def cythonHotBlock(self, a):
-        hottestBlock = Mods.PiCameraMotion.analyze.hotblock.hotBlock(a)
+        hottestBlock = Mods.PiCameraMotion.analyze.hotblock.hotBlock(a, self.rows, self.cols)
         self.logger.info("(x,y,val) = (%d,%d,%d) ", hottestBlock[0],hottestBlock[1],hottestBlock[2])
         self.processed += 1
 
