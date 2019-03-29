@@ -8,3 +8,5 @@ cd $SCRIPTPATH;
 git reset --hard testing;
 git pull git://xeon.lan/mqttRaspberry;
 exit $?
+
+# RANDOM TEXT
