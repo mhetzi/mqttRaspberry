@@ -8,6 +8,7 @@ import errno
 import json
 
 import Mods.PiCameraMotion as pcm
+import Mods.PiCameraMotion.Main as pcma
 
 class PluginLoader:
 
@@ -17,7 +18,7 @@ class PluginLoader:
 
     @staticmethod
     def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        return pcm.Main.PiMotionMain(client, opts, logger, device_id)
+        return pcma.PiMotionMain(client, opts, logger, device_id)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
