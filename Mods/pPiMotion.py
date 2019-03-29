@@ -18,7 +18,8 @@ class PluginLoader:
 
     @staticmethod
     def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        return pcma.PiMotionMain(client, opts, logger, device_id)
+        plugin = pcma.PiMotionMain(client, opts, logger, device_id)
+        return plugin
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):

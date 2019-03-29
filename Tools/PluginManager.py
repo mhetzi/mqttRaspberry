@@ -109,7 +109,7 @@ class PluginManager:
             except AttributeError:
                 self.logger.warning("Modul hat nur attribute: {}. PluginLoader ist nicht dabei!".format(foo.__dict__))
             except RuntimeError as x:
-                self.logger.warning("Modul {} hat RuntimeError verursacht. Die Nachricht war: {} ".format(foo, x.args))
+                self.logger.exception("Modul %s hat RuntimeError verursacht. Die Nachricht war: %s ", foo, x.args)
             #except Exception as x:
             #    self.logger.exception("Modul {} hat ieine Exception verursacht. NICHT laden.".format(foo), x)
             i += 1
