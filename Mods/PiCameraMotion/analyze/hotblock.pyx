@@ -9,11 +9,14 @@ cdef struct BLOCK:
 
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound(False)  # turn off negative index wrapping for entire function
-def hotBlock(np.ndarray[BLOCK, ndim=2] arr, np.int16_t rows, np.int16_t cols):
+cdef BLOCK chotBlock(np.ndarray[BLOCK, ndim=2] arr, np.int16_t rows, np.int16_t cols):
     cdef BLOCK hotest
     for r in range(rows):
         for c in range(cols):
             b = arr[r][c]
             if hotest.SAD < b.SAD:
                 hotest = b
-    return hotest.x, hotest.y, hotest.SAD
+    return hotest
+
+def hotBlock(a):
+    chotBlock(a, len(a), len(a[0]))

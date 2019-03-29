@@ -21,7 +21,7 @@ class Analyzer(cama.PiMotionAnalysis):
         self.cythonHotBlock(a)
     
     def cythonHotBlock(self, a):
-        hottestBlock = Mods.PiCameraMotion.analyze.hotblock.hotBlock(a, len(a), len(a[0]))
+        hottestBlock = Mods.PiCameraMotion.analyze.hotblock.hotBlock(a)
         self.logger.info("(x,y,val) = (%d,%d,%d) ", hottestBlock[0],hottestBlock[1],hottestBlock[2])
         self.processed += 1
 
