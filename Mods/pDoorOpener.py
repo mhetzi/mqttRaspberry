@@ -115,12 +115,16 @@ class DoorOpener:
 
     def InputHandler(self, high):
         # = true wenn tür zu = pin high ist
+        self.__logger.debug("Input ist jetzt %d", int(high))
+        self.__logger.debug("Geschloßen = high = %d", int(self._config["rpiDoor/closedPinHigh"]))
         if high == self._config["rpiDoor/closedPinHigh"]:
             #Tor ist zu
             self._config["rpiDoor/state/ex"] = ExtendetEnums.CLOSED.value
+            self.__logger.debug("Tür ist zu")
         else:
             # Tor ist offen
             self._config["rpiDoor/state/ex"] = ExtendetEnums.OPEN.value
+            self.__logger.debug("Tür ist offen")
         self.sendUpdate(True)
 
     def on_message(self, client, userdata, message: mclient.MQTTMessage):
