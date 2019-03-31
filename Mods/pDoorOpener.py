@@ -61,8 +61,8 @@ class DoorOpener:
         self._registered_callback_topics = []
         self.input = None
         self.out = None
-        self._config.get("rpiDoor/state/sw", default=OnOffEnum.OFF)
-        self._config.get("rpiDoor/state/ex", default=ExtendetEnums.CLOSED)
+        self._config.get("rpiDoor/state/sw", default=OnOffEnum.OFF.value)
+        self._config.get("rpiDoor/state/ex", default=ExtendetEnums.CLOSED.value)
         self._topic = None
 
     def register(self):
@@ -98,25 +98,25 @@ class DoorOpener:
 
     def sendUpdate(self, fromHandler=False):
         if not fromHandler:
-            if self._config["rpiDoor/state/ex"] == ExtendetEnums.UNLOCKED:
+            if self._config["rpiDoor/state/ex"] == ExtendetEnums.UNLOCKED.value:
                 return
             self.InputHandler(self.input.value)
             return
         ex = self._config["rpiDoor/state/ex"]
-        if ex == ExtendetEnums.UNLOCKED or ex == ExtendetEnums.OPEN:
-            self._config["rpiDoor/state/sw"] = OnOffEnum.ON
+        if ex == ExtendetEnums.UNLOCKED or ex == ExtendetEnums.OPEN.value:
+            self._config["rpiDoor/state/sw"] = OnOffEnum.ON.value
         else:
-            self._config["rpiDoor/state/sw"] = OnOffEnum.OFF
+            self._config["rpiDoor/state/sw"] = OnOffEnum.OFF.value
         self.__client.publish(self.topic.state, payload=self._config["rpiDoor/state"])
 
     def InputHandler(self, high):
         # = true wenn tür zu = pin high ist
         if high == self._config["rpiDoor/closedPinHigh"]:
             #Tor ist zu
-            self._config["rpiDoor/state/ex"] = ExtendetEnums.CLOSED
+            self._config["rpiDoor/state/ex"] = ExtendetEnums.CLOSED.value
         else:
             # Tor ist offen
-            self._config["rpiDoor/state/ex"] = ExtendetEnums.OPEN
+            self._config["rpiDoor/state/ex"] = ExtendetEnums.OPEN.value
         self.sendUpdate(True)
 
     def on_message(self, client, userdata, message: mclient.MQTTMessage):
