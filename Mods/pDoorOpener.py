@@ -66,31 +66,35 @@ class DoorOpener:
         self._topic = None
 
     def register(self):
-        self.__logger.debug("Regestriere Raspberry GPIO...")
-        from gpiozero.pins.native import NativeFactory
-        from gpiozero import Device
+        try:
+            self.__logger.debug("Regestriere Raspberry GPIO...")
+            from gpiozero.pins.native import NativeFactory
+            from gpiozero import Device
 
-        Device.pin_factory = NativeFactory()
+            Device.pin_factory = NativeFactory()
 
-        self.input = gpiozero.Button(pin=self._config["rpiDoor/closedPinHigh"])
-        self.out   = gpiozero.LED(   pin=self._config["rpiDoor/unlockPin"])
+            self.input = gpiozero.Button(pin=self._config["rpiDoor/closedPinHigh"])
+            self.out   = gpiozero.LED(   pin=self._config["rpiDoor/unlockPin"])
 
-        self.input.when_activated   = lambda: self.InputHandler(True )
-        self.input.when_deactivated = lambda: self.InputHandler(False)
+            self.input.when_activated   = lambda: self.InputHandler(True )
+            self.input.when_deactivated = lambda: self.InputHandler(False)
 
-        schedule.every(15).minutes.do(self.sendUpdate)
+            schedule.every(15).minutes.do(self.sendUpdate)
 
-        self.__logger.debug("Regestiere MQTT Topics")
-        unique_id = "sensor.doorOpener-{}.{}".format(self._devID, self._config["rpiDoor/name"].replace(" ", "_"))
-        self.topic = self._config.get_autodiscovery_topic(conf.autodisc.Component.SWITCH, self._config["rpiDoor/name"], None)
-        payload = self.topic.get_config_payload(self._config["rpiDoor/name"], None, unique_id=unique_id,
-                        json_attributes=True, value_template="{{ value_json.sw }}")
-        self.__client.publish(self.topic.config, payload=payload, qos=0, retain=True)
-        self.__client.will_set(self.topic.ava_topic, "offline", retain=True)
-        self.__client.publish(self.topic.ava_topic, "online", retain=True)
+            self.__logger.debug("Regestiere MQTT Topics")
+            unique_id = "sensor.doorOpener-{}.{}".format(self._device_id, self._config["rpiDoor/name"].replace(" ", "_"))
+            self.topic = self._config.get_autodiscovery_topic(conf.autodisc.Component.SWITCH, self._config["rpiDoor/name"], None)
+            payload = self.topic.get_config_payload(self._config["rpiDoor/name"], None, unique_id=unique_id,
+                            json_attributes=True, value_template="{{ value_json.sw }}")
+            self.__client.publish(self.topic.config, payload=payload, qos=0, retain=True)
+            self.__client.will_set(self.topic.ava_topic, "offline", retain=True)
+            self.__client.publish(self.topic.ava_topic, "online", retain=True)
 
-        self.__client.message_callback_add(topic.command, self.on_message)
-        self._registered_callback_topics.append(topic.command)
+            self.__client.message_callback_add(self.topic.command, self.on_message)
+            self._registered_callback_topics.append(self.topic.command)
+        except Exception as e:
+            self.__logger.exception("Register hat fehler verursacht!")
+            raise e
 
     def sendUpdate(self, fromHandler=False):
         if not fromHandler:

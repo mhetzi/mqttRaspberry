@@ -121,7 +121,10 @@ class PluginManager:
                 x.set_pluginManager(self)
             except:
                 pass
-            x.register()
+            try:
+                x.register()
+            except:
+                self.logger.exception("Fehler beim Regestireren des Plugins")
 
     def disable_mods(self):
         for x in self.configured_list.keys():
