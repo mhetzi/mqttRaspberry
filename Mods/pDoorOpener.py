@@ -133,6 +133,7 @@ class DoorOpener:
             self.__logger.info("Tür wird entsperrt")
             self._config["rpiDoor/state/ex"] = ExtendetEnums.UNLOCKED.value
             self.out.blink(n=1)
+            self.sendUpdate()
 
     def stop(self):
         for reg in self._registered_callback_topics:
