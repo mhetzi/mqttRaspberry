@@ -93,6 +93,8 @@ class DoorOpener:
 
             self.__client.message_callback_add(self.topic.command, self.on_message)
             self._registered_callback_topics.append(self.topic.command)
+            self.__client.subscribe(self.topic.command)
+            self.sendUpdate()
         except Exception as e:
             self.__logger.exception("Register hat fehler verursacht!")
             raise e
@@ -126,3 +128,7 @@ class DoorOpener:
         if msg == OnOffEnum.ON:
             self.__logger.info("Tür wird entsperrt")
             self.out.blink(n=1)
+
+    def stop(self):
+        for reg in self._registered_callback_topics:
+            self.__client.message_callback_remove(reg)
