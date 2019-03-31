@@ -102,8 +102,6 @@ class DoorOpener:
 
     def sendUpdate(self, fromHandler=False):
         if not fromHandler:
-            if self._config["rpiDoor/state/ex"] == ExtendetEnums.UNLOCKED.value:
-                return
             self.InputHandler(self.input.value)
             return
         ex = self._config["rpiDoor/state/ex"]
@@ -119,7 +117,8 @@ class DoorOpener:
         self.__logger.debug("Geschloßen = high = %d", int(self._config["rpiDoor/closedPinHigh"]))
         if high == self._config["rpiDoor/closedPinHigh"]:
             #Tor ist zu
-            self._config["rpiDoor/state/ex"] = ExtendetEnums.CLOSED.value
+            if self._config["rpiDoor/state/ex"] != ExtendetEnums.UNLOCKED.value:
+                self._config["rpiDoor/state/ex"] = ExtendetEnums.CLOSED.value
             self.__logger.debug("Tür ist zu")
         else:
             # Tor ist offen
@@ -132,6 +131,7 @@ class DoorOpener:
         self.__logger.debug("on_message( {},{} )".format(message.topic, msg))
         if msg == OnOffEnum.ON.value:
             self.__logger.info("Tür wird entsperrt")
+            self._config["rpiDoor/state/ex"] = ExtendetEnums.UNLOCKED.value
             self.out.blink(n=1)
 
     def stop(self):
