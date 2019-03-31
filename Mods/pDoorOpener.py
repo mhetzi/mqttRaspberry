@@ -2,6 +2,7 @@
 
 import logging
 import enum
+import json
 
 import gpiozero
 import paho.mqtt.client as mclient
@@ -110,7 +111,7 @@ class DoorOpener:
             self._config["rpiDoor/state/sw"] = OnOffEnum.ON.value
         else:
             self._config["rpiDoor/state/sw"] = OnOffEnum.OFF.value
-        self.__client.publish(self.topic.state, payload=self._config["rpiDoor/state"])
+        self.__client.publish(self.topic.state, payload=json.dumps(self._config["rpiDoor/state"]))
 
     def InputHandler(self, high):
         # = true wenn tür zu = pin high ist
