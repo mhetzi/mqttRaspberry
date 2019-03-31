@@ -130,7 +130,7 @@ class DoorOpener:
     def on_message(self, client, userdata, message: mclient.MQTTMessage):
         msg = message.payload.decode('utf-8')
         self.__logger.debug("on_message( {},{} )".format(message.topic, msg))
-        if msg == OnOffEnum.ON:
+        if msg == OnOffEnum.ON.value:
             self.__logger.info("Tür wird entsperrt")
             self.out.blink(n=1)
 
