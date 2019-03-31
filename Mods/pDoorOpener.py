@@ -20,7 +20,7 @@ class PluginLoader:
 
     @staticmethod
     def getConfigKey():
-        return "Pi_DoorOpener"
+        return "rpiDoor"
 
     @staticmethod
     def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
