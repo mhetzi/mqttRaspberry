@@ -101,7 +101,7 @@ class DoorOpener:
         ex = self._config["rpiDoor/state/ex"]
         if ex == ExtendetEnums.UNLOCKED or ex == ExtendetEnums.OPEN:
             self._config["rpiDoor/state/sw"] = OnOffEnum.ON
-        else
+        else:
             self._config["rpiDoor/state/sw"] = OnOffEnum.OFF
         self.__client.publish(self.topic.state, payload=self._config["rpiDoor/state"])
 
