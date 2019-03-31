@@ -72,8 +72,8 @@ class DoorOpener:
             from gpiozero import Device
 
             Device.pin_factory = NativeFactory()
-
-            self.input = gpiozero.Button(pin=self._config["rpiDoor/closedPinHigh"])
+            self.__logger.debug("InputPin = %d", self._config["rpiDoor/openedPin"])
+            self.input = gpiozero.Button(pin=self._config["rpiDoor/openedPin"])
             self.out   = gpiozero.LED(   pin=self._config["rpiDoor/unlockPin"])
 
             self.input.when_activated   = lambda: self.InputHandler(True )
