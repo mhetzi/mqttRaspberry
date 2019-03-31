@@ -105,7 +105,7 @@ class DoorOpener:
             self.InputHandler(self.input.value)
             return
         ex = self._config["rpiDoor/state/ex"]
-        if ex == ExtendetEnums.UNLOCKED or ex == ExtendetEnums.OPEN.value:
+        if ex == ExtendetEnums.UNLOCKED.value or ex == ExtendetEnums.OPEN.value:
             self._config["rpiDoor/state/sw"] = OnOffEnum.ON.value
         else:
             self._config["rpiDoor/state/sw"] = OnOffEnum.OFF.value
