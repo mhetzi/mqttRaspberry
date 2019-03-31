@@ -90,7 +90,7 @@ class Topics:
             self._dev_class = SensorDeviceClasses.GENERIC_SENSOR
 
     # Wenn unique_id gesetzt ist wird die globale device info verwendet, ist device gesetzt wird diese device info genommen
-    def get_config_payload(self, name: str, measurement_unit: str, ava_topic=None, value_template=None, json_attributes=None, device=None, unique_id=None) -> str:
+    def get_config_payload(self, name: str, measurement_unit: str, ava_topic=None, value_template=None, json_attributes=False, device=None, unique_id=None) -> str:
 
         p = {
             "name": name,

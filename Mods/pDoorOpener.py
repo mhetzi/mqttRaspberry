@@ -1,8 +1,13 @@
 # -*- coding: utf-8 -*-
 
-import paho.mqtt.client as mclient
-import Tools.Config as conf
 import logging
+import enum
+
+import gpiozero
+import paho.mqtt.client as mclient
+import schedule
+
+import Tools.Config as conf
 
 # Platine Belegung
 # Taster Pin_22 GPIO_25
@@ -15,51 +20,104 @@ class PluginLoader:
 
     @staticmethod
     def getConfigKey():
-        return "rpiDoor"
+        return "Pi_DoorOpener"
 
     @staticmethod
     def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        import Mods.DoorOpener.plugin as dp
-        return dp.DoorOpener(client, opts, logger, device_id)
+        return DoorOpener(client, opts, logger, device_id)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
         from Tools import ConsoleInputTools
+        print("Pins standartmäßig nach BCM schema (gpiozero angaben gestattet)")
 
-        rpin = ConsoleInputTools.get_number_input("Pin Nummer des Taster Relais ", 22)
-        delay = ConsoleInputTools.get_number_input("Wie viele ms soll das Relais gehalten werden?", 250)
-
-        apin = ConsoleInputTools.get_number_input("Pin Nummer des ALERT Signals", 33)
-        addr = ConsoleInputTools.get_number_input("Addresse des ADC", 0x49)
-        gain = ConsoleInputTools.get_number_input("GAIN für ADC", 1)
-        readings = ConsoleInputTools.get_number_input("Wie oft soll ADC gelesen werden, bevor aktion durchgeführt wird?", 2)
-
-        print("Jetzt kommt die Positions abfrage. \nWenn Kanal nicht bnutzt nur enter drücken.\n")
-        pos0 = ConsoleInputTools.get_number_input("Position für 1 Kanal", -1)
-        pos1 = ConsoleInputTools.get_number_input("Position für 2 Kanal", -1)
-        pos2 = ConsoleInputTools.get_number_input("Position für 3 Kanal", -1)
-        pos3 = ConsoleInputTools.get_number_input("Position für 4 Kanal", -1)
-
-        door_open_time = ConsoleInputTools.get_number_input("Wie lange braucht das Tor von zu bis auf oder umgekehrt maximal?\n>", 15)
-        door_open_retry = ConsoleInputTools.get_number_input("Wie oft soll versucht werden das Tor in die Position zu bringen?\n>", 3)
-        name = ConsoleInputTools.get_input("Wie heißt das Tor?", require_val=True)
-
-        conf["rpiDoor/relayPin"] = rpin
-        conf["rpiDoor/relayPulseLength"] = delay
-        conf["rpiDoor/Hall/ALERT_PIN"] = apin
-        conf["rpiDoor/Hall/ADC_ADDR"] = addr
-        conf["rpiDoor/Hall/GAIN"] = gain
-        conf["rpiDoor/Hall/adc_readings"] = readings
-        conf["rpiDoor/Hall/Channels_Position"] = [pos0, pos1, pos2, pos3]
-        conf["rpiDoor/Hall/max_move_time"] = door_open_time
-        conf["rpiDoor/Hall/max_move_retrys"] = door_open_retry
-        conf["rpiDoor/name"] = name
-
-        do_calib = ConsoleInputTools.get_bool_input("Kalibration jetzt starten?", True)
-        if do_calib:
-            PluginLoader.runCalibrationProcess(conf, logger)
+        conf["rpiDoor/unlockPin"] = ConsoleInputTools.get_input("Pinnummer der entsperrung ", 17)
+        conf["rpiDoor/relayPulseLength"] = ConsoleInputTools.get_number_input("Wie viele ms soll das Relais gehalten werden?", 250)
+        conf["rpiDoor/openedPin"] = ConsoleInputTools.get_input("Pinnummer für Offen/Geschloßen", 27)
+        conf["rpiDoor/closedPinHigh"] = ConsoleInputTools.get_bool_input("Tür zu = in high?")
+        conf["rpiDoor/name"] = ConsoleInputTools.get_input("Sichtbarer Name")
 
     @staticmethod
     def runCalibrationProcess(conf: conf.BasicConfig, logger:logging.Logger):
         from Mods.DoorOpener.calibrate import Calibrate
         Calibrate.run_calibration(conf, logger)
+
+class ExtendetEnums(enum.Enum):
+    CLOSED   = "Geschlossen"
+    OPEN     = "Geöffnet"
+    UNLOCKED = "Entsperrt"
+
+class OnOffEnum(enum.Enum):
+    ON  = "ON"
+    OFF = "OFF"
+
+class DoorOpener:
+
+    def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        self.__client = client
+        self.__logger = logger.getChild("PiDoorOpener")
+        self._config = opts
+        self._device_id = device_id
+        self._registered_callback_topics = []
+        self.input = None
+        self.out = None
+        self._config.get("rpiDoor/state/sw", default=OnOffEnum.OFF)
+        self._config.get("rpiDoor/state/ex", default=ExtendetEnums.CLOSED)
+        self._topic = None
+
+    def register(self):
+        self.__logger.debug("Regestriere Raspberry GPIO...")
+        from gpiozero.pins.native import NativeFactory
+        from gpiozero import Device
+
+        Device.pin_factory = NativeFactory()
+
+        self.input = gpiozero.Button(pin=self._config["rpiDoor/closedPinHigh"])
+        self.out   = gpiozero.LED(   pin=self._config["rpiDoor/unlockPin"])
+
+        self.input.when_activated   = lambda: self.InputHandler(True )
+        self.input.when_deactivated = lambda: self.InputHandler(False)
+
+        schedule.every(15).minutes.do(self.sendUpdate)
+
+        self.__logger.debug("Regestiere MQTT Topics")
+        unique_id = "sensor.doorOpener-{}.{}".format(self._devID, self._config["rpiDoor/name"].replace(" ", "_"))
+        self.topic = self._config.get_autodiscovery_topic(conf.autodisc.Component.SWITCH, self._config["rpiDoor/name"], None)
+        payload = self.topic.get_config_payload(self._config["rpiDoor/name"], None, unique_id=unique_id,
+                        json_attributes=True, value_template="{{ value_json.sw }}")
+        self.__client.publish(self.topic.config, payload=payload, qos=0, retain=True)
+        self.__client.will_set(self.topic.ava_topic, "offline", retain=True)
+        self.__client.publish(self.topic.ava_topic, "online", retain=True)
+
+        self.__client.message_callback_add(topic.command, self.on_message)
+        self._registered_callback_topics.append(topic.command)
+
+    def sendUpdate(self, fromHandler=False):
+        if not fromHandler:
+            if self._config["rpiDoor/state/ex"] == ExtendetEnums.UNLOCKED:
+                return
+            self.InputHandler(self.input.value)
+            return
+        ex = self._config["rpiDoor/state/ex"]
+        if ex == ExtendetEnums.UNLOCKED or ex == ExtendetEnums.OPEN:
+            self._config["rpiDoor/state/sw"] = OnOffEnum.ON
+        else
+            self._config["rpiDoor/state/sw"] = OnOffEnum.OFF
+        self.__client.publish(self.topic.state, payload=self._config["rpiDoor/state"])
+
+    def InputHandler(self, high):
+        # = true wenn tür zu = pin high ist
+        if high == self._config["rpiDoor/closedPinHigh"]:
+            #Tor ist zu
+            self._config["rpiDoor/state/ex"] = ExtendetEnums.CLOSED
+        else:
+            # Tor ist offen
+            self._config["rpiDoor/state/ex"] = ExtendetEnums.OPEN
+        self.sendUpdate(True)
+
+    def on_message(self, client, userdata, message: mclient.MQTTMessage):
+        msg = message.payload.decode('utf-8')
+        self.__logger.debug("on_message( {},{} )".format(message.topic, msg))
+        if msg == OnOffEnum.ON:
+            self.__logger.info("Tür wird entsperrt")
+            self.out.blink(n=1)
