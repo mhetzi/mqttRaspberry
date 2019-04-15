@@ -143,6 +143,9 @@ class RaspberryPiGpio:
                 return
         self.__logger.warning("Habe keinen Pin für message gefunden :(")
 
+    def sendStates(self):
+        self.send_updates()
+
     def stop(self):
         for reg in self._registered_callback_topics:
             self.__client.message_callback_remove(reg)

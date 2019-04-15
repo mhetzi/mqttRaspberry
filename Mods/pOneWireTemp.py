@@ -60,6 +60,9 @@ class OneWireTemp(threading.Thread):
         self.__doStop.set()
         self.join()
 
+    def sendStates(self):
+        self.send_update(True)
+
     def run(self):
         count = 0
         while not self.__doStop.wait(1.0):
@@ -81,13 +84,13 @@ class OneWireTemp(threading.Thread):
                     return round(int(tmp) / 1000, 2)
         return -1000
 
-    def send_update(self):
+    def send_update(self, force=False):
         for i in range(0, len(self._paths)):
             d = self._paths[i]
             new_temp = self.get_temperatur(d["p"])
             topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, d["n"], conf.autodisc.SensorDeviceClasses.TEMPERATURE)
 
-            if new_temp != self._prev_deg[i]:
+            if new_temp != self._prev_deg[i] or force:
                 if new_temp != -1000 and self._prev_deg == -1000:
                     self.__client.publish(topics.ava_topic, "online", retain=True)
                     self.__client.publish(topics.state, str(new_temp))

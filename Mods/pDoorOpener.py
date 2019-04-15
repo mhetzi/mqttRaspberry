@@ -100,6 +100,9 @@ class DoorOpener:
             self.__logger.exception("Register hat fehler verursacht!")
             raise e
 
+    def sendStates(self):
+        self.sendUpdate()
+
     def sendUpdate(self, fromHandler=False):
         if not fromHandler:
             self.InputHandler(self.input.value)

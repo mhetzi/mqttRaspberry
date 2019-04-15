@@ -114,6 +114,10 @@ class ShellSwitch:
         for reg in self._registered_callback_topics:
             self.__client.message_callback_remove(reg)
 
+    def sendStates(self):
+        for name in self._config.get("ShellSwitch/entrys", {}).keys():
+            self.exec_switch(name, self._config["ShellSwitch/entrys"][name]["wasOn"])
+
 
 class ShellSwitchConf:
     def __init__(self, conf: conf.BasicConfig):

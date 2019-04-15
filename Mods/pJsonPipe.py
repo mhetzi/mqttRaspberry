@@ -65,6 +65,7 @@ class JsonPipe(threading.Thread):
                         break
                     if data == self._lastData:
                         continue
+                    self._lastData = data
                     self.__logger.debug('Read: "{0}"'.format(data))
                     if data == "kill" and self._doExit:
                         return
@@ -73,3 +74,10 @@ class JsonPipe(threading.Thread):
                         self.__client.publish(d["t"], d["p"], d.get("r", False))
                     except json.decoder.JSONDecodeError:
                         self.__logger.error("Json konnte nicht dekodiert werden.")
+
+    def sendStates(self):
+        try:
+            d = json.loads(self._lastData)
+            self.__client.publish(d["t"], d["p"], d.get("r", False))
+        except json.decoder.JSONDecodeError:
+            self.__logger.error("Json konnte nicht dekodiert werden.")

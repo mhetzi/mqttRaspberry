@@ -93,6 +93,10 @@ class bhl1750:
                 self._threasholds[1] = 0.5
         self._logger.info("Threshold sind jetzt auf ({}, {})".format(self._threasholds[0], self._threasholds[1]))
 
+    def sendStates(self):
+        self._threasholds[1] = 0
+        self._threasholds[0] = 0
+        self.send_update()
 
     def send_update(self):
         if self.topic is not None:
