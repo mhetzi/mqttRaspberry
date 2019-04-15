@@ -180,6 +180,7 @@ class PluginManager:
         return client, my_name
 
     def reSendStates(self):
+        self.logger.info("Resend Topic empfangen. alles neu senden...")
         for x in self.configured_list.keys():
             try:
                 p = self.configured_list[x]
