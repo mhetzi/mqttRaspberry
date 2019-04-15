@@ -179,7 +179,7 @@ class PluginManager:
         self._client_name = my_name
         return client, my_name
 
-    def reSendStates(self):
+    def reSendStates(self, client, userdata, message: mclient.MQTTMessage):
         self.logger.info("Resend Topic empfangen. alles neu senden...")
         for x in self.configured_list.keys():
             try:
