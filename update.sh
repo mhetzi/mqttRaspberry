@@ -4,8 +4,8 @@ SELF=`basename $0`;
 
 echo "Wechsle ins Verzeichniss ($SCRIPTPATH) dieses Skripts"
 cd $SCRIPTPATH;
-#git reset --hard HEAD;
-git reset --hard testing;
+git reset --hard FETCH_HEAD;
+#git reset --hard testing;
 git pull git://xeon.lan/mqttRaspberry;
 exit $?
 
