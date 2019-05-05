@@ -17,8 +17,6 @@ from Mods.Weatherflow.UpdateTypes import (DeviceStatus, HubStatus,
                                           ObsAir, RainStart, RapidWind, Tools,
                                           updateType)
 from Tools.Config import BasicConfig
-import Tools
-
 
 class WeatherflowPlugin:
 
