@@ -17,9 +17,14 @@ from Mods.Weatherflow.UpdateTypes import (DeviceStatus, HubStatus,
                                           ObsAir, RainStart, RapidWind, Tools,
                                           updateType)
 from Tools.Config import BasicConfig
+import Tools
 
 
 class WeatherflowPlugin:
+
+    @staticmethod
+    def percentageMinMax(input, min, max):
+        return ((input - min) * 100) / (max - min)
 
     @staticmethod
     def reset_daily_rain(self):
@@ -109,7 +114,7 @@ class WeatherflowPlugin:
         self.register_new_sensor(serial_number, "Relative Luftfeuchte", "relative_humidity", "%", autodisc.SensorDeviceClasses.HUMIDITY, deviceInfo)
         self.register_new_sensor(serial_number, "Blitze", "lightning_count", "Stk.", autodisc.SensorDeviceClasses.GENERIC_SENSOR, deviceInfo)
         self.register_new_sensor(serial_number, "Durchschnittliche Blitz entfernung", "lightning_dist", "km", autodisc.SensorDeviceClasses.GENERIC_SENSOR, deviceInfo)
-        self.register_new_sensor(serial_number, "Batterie (AIR)", "battery", "V", autodisc.SensorDeviceClasses.BATTERY, deviceInfo,
+        self.register_new_sensor(serial_number, "Batterie (AIR)", "battery", "%", autodisc.SensorDeviceClasses.BATTERY, deviceInfo,
                                 value_template="{{ value_json.now }}", json_attributes=True)
 
         if self._config["Weatherflow/events"]:
@@ -138,7 +143,7 @@ class WeatherflowPlugin:
         self.register_new_sensor(serial_number, "Wind avg", "wind_average", "m/s", autodisc.SensorDeviceClasses.GENERIC_SENSOR, deviceInfo)
         self.register_new_sensor(serial_number, "Wind Min", "wind_lull", "m/s", autodisc.SensorDeviceClasses.GENERIC_SENSOR, deviceInfo)
         self.register_new_sensor(serial_number, "Wind Richtung", "wind_direction", "°", autodisc.SensorDeviceClasses.GENERIC_SENSOR, deviceInfo)
-        self.register_new_sensor(serial_number, "Batterie (SKY)", "battery_sky", "V", autodisc.SensorDeviceClasses.BATTERY, deviceInfo,
+        self.register_new_sensor(serial_number, "Batterie (SKY)", "battery_sky", "%", autodisc.SensorDeviceClasses.BATTERY, deviceInfo,
                                 value_template="{{ value_json.now }}", json_attributes=True)
         self.register_new_sensor(serial_number, "Sonnen einstrahlung", "solar_radiation", "w/m²", autodisc.SensorDeviceClasses.GENERIC_SENSOR, deviceInfo)
         self.register_new_sensor(serial_number, "Täglicher Regen", "local_day_rain_accumulation", "mm", autodisc.SensorDeviceClasses.GENERIC_SENSOR, deviceInfo)
@@ -309,9 +314,9 @@ class WeatherflowPlugin:
             self.update_sensor(update.serial_number, "lightning_last_nrg", "0", autodisc.SensorDeviceClasses.GENERIC_SENSOR)
 
         if self._sensor_errror == DeviceStatus.SensorStatus.OK:
-            battery_str = update.battery
+            battery_str = WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.94)
         elif self._sensor_errror == DeviceStatus.SensorStatus.AIR_LIGHTNING_DISTURBER:
-            battery_str = update.battery
+            battery_str = WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.94)
         elif self._sensor_errror == DeviceStatus.SensorStatus.AIR_LIGHTNING_FAILED:
             battery_str = "Blitzsensor ist ausgefallen"
         elif self._sensor_errror == DeviceStatus.SensorStatus.AIR_LIGHTNING_NOISE:
@@ -323,7 +328,7 @@ class WeatherflowPlugin:
         elif self._sensor_errror == DeviceStatus.SensorStatus.AIR_RH_FAILED:
             battery_str = "Luftfeuchtesensor ausgefallen"
         else:
-            battery_str = update.battery
+            battery_str = WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.94)
 
         if self._config.get("Weatherflow/{0}/minBat".format(update.serial_number), 10) > update.battery:
             self._config["Weatherflow/{0}/minBat".format(update.serial_number)] = update.battery
@@ -368,7 +373,7 @@ class WeatherflowPlugin:
         elif self._sensor_errror == DeviceStatus.SensorStatus.SKY_WIND_FAILED:
             battery_str = "Wind Sensor ist ausgefallen"
         else:
-            battery_str = str(update.battery)
+            battery_str = WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.94)
             self._logger.info("Reporting Battery {} because there are unknown errors.".format(update.battery))
 
         if update.rain_type != 0:
