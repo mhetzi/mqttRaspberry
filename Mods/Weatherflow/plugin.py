@@ -362,7 +362,7 @@ class WeatherflowPlugin:
             battery_str = "Hagel"
             self._logger.info("Reporting Battery as hail")
         elif self._sensor_errror == DeviceStatus.SensorStatus.OK:
-            battery_str = str(update.battery)
+            battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.95), 1)
             self._logger.info("Reporting Battery {} because there are no errors.".format(update.battery))
         elif self._sensor_errror == DeviceStatus.SensorStatus.SKY_LIGHT_UV_FAILED:
             battery_str = "UV Sensor ist ausgefallen"
