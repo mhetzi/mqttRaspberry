@@ -312,9 +312,9 @@ class WeatherflowPlugin:
             self.update_sensor(update.serial_number, "lightning_last_nrg", "0", autodisc.SensorDeviceClasses.GENERIC_SENSOR)
 
         if self._sensor_errror == DeviceStatus.SensorStatus.OK:
-            battery_str = WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.94)
+            battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.95), 1)
         elif self._sensor_errror == DeviceStatus.SensorStatus.AIR_LIGHTNING_DISTURBER:
-            battery_str = WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.94)
+            battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.95), 1)
         elif self._sensor_errror == DeviceStatus.SensorStatus.AIR_LIGHTNING_FAILED:
             battery_str = "Blitzsensor ist ausgefallen"
         elif self._sensor_errror == DeviceStatus.SensorStatus.AIR_LIGHTNING_NOISE:
@@ -326,7 +326,7 @@ class WeatherflowPlugin:
         elif self._sensor_errror == DeviceStatus.SensorStatus.AIR_RH_FAILED:
             battery_str = "Luftfeuchtesensor ausgefallen"
         else:
-            battery_str = WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.94)
+            battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.95), 1)
 
         if self._config.get("Weatherflow/{0}/minBat".format(update.serial_number), 10) > update.battery:
             self._config["Weatherflow/{0}/minBat".format(update.serial_number)] = update.battery
@@ -371,7 +371,7 @@ class WeatherflowPlugin:
         elif self._sensor_errror == DeviceStatus.SensorStatus.SKY_WIND_FAILED:
             battery_str = "Wind Sensor ist ausgefallen"
         else:
-            battery_str = WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.94)
+            battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.95), 1)
             self._logger.info("Reporting Battery {} because there are unknown errors.".format(update.battery))
 
         if update.rain_type != 0:
