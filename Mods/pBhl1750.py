@@ -37,6 +37,7 @@ class bhl1750:
     _dev_alt_last = 0
 
     _threasholds = [0,0]
+    __broken = False
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         self._client = client
@@ -45,9 +46,15 @@ class bhl1750:
         self._devID = device_id
         
         self._job_inst = []
-        self._bus = smbus.SMBus(self._conf["BHL1750/bus"])
+        try:
+            self._bus = smbus.SMBus(self._conf["BHL1750/bus"])
+        except:
+            self._logger.warning("SMBus wurde nicht gefunden")
+            self.__broken = True
 
     def register(self):
+        if self.__broken:
+            return;
         if self._conf["BHL1750/device"]:
             self._logger.info("Erzeuge Autodiscovery Config für Addresse 1")
             unique_id = "sensor.bht1750-{}.{}".format(self._devID, "addr")
@@ -99,6 +106,8 @@ class bhl1750:
         self.send_update()
 
     def send_update(self):
+        if self.__broken:
+            return
         if self.topic is not None:
             try:
                 lux = bhref.convertToNumber( self._bus.read_i2c_block_data(bhref.DEVICE, bhref.CONTINUOUS_HIGH_RES_MODE_2) )
