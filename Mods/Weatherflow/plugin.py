@@ -119,10 +119,13 @@ class WeatherflowPlugin:
             self.register_new_sensor(serial_number, "Blitz Entfernung", "lightning_last_dist", "km", autodisc.SensorDeviceClasses.GENERIC_SENSOR, deviceInfo)
             self.register_new_sensor(serial_number, "Blitz Energie", "lightning_last_nrg", "", autodisc.SensorDeviceClasses.GENERIC_SENSOR, deviceInfo)
             self.register_new_sensor(serial_number, "Es Blitzt", "es_blitzt", "", autodisc.BinarySensorDeviceClasses.POWER, deviceInfo)
+            self.register_new_sensor(serial_number, "Blitze in der Minute", "lightning_count_min", "Stk/Min", autodisc.SensorDeviceClasses.GENERIC_SENSOR, deviceInfo)
 
             self.update_sensor(serial_number, "lightning_last_dist", "0", autodisc.SensorDeviceClasses.GENERIC_SENSOR)
             self.update_sensor(serial_number, "lightning_last_nrg", "0", autodisc.SensorDeviceClasses.GENERIC_SENSOR)
             self.update_sensor(serial_number, "es_blitzt", 0, autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR)
+            self.update_sensor(serial_number, "lightning_count_min", 0, autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR)
+
 
     def register_new_sky(self, serial_number, upd: Obs_Sky.ObsSky):
         deviceInfo = autodisc.DeviceInfo()
@@ -171,7 +174,7 @@ class WeatherflowPlugin:
         if topic.config not in self._config.get("Weatherflow/reg_sensor", []):
             self._config["Weatherflow/reg_sensor"].append(topic.config)
 
-    def update_sensor(self, serial_number, name, value, device_class: autodisc.DeviceClass):  # IMPLEMET FERTIG MACHEN
+    def update_sensor(self, serial_number, name, value, device_class: autodisc.DeviceClass):
         topic = self._config.get_autodiscovery_topic(autodisc.Component.SENSOR, name, device_class, node_id=serial_number)
         self._client.publish(topic.state, value)
 
@@ -396,7 +399,6 @@ class WeatherflowPlugin:
         self._lightning_counter["count"] = 0
         if self._lightning_counter["init"] == 0 and self._lightning_counter["serial"] is not None:
             self._logger.info("Es Blitzt, Regestriere Blitze pro Minute zähler für {}".format(self._lightning_counter["serial"]))
-            self.register_new_sensor(self._lightning_counter["serial"], "Blitze in der Minute", "lightning_count_min", "Stk/Min", autodisc.SensorDeviceClasses.GENERIC_SENSOR)
             self._lightning_counter["init"] = 1
             self._lightning_counter["timer"] = threading.Timer(60, self.count_lightnings_per_minute)
             self._lightning_counter["timer"].start()
