@@ -338,7 +338,7 @@ class WeatherflowPlugin:
         battery_json = {
                         "min": self._config.get("Weatherflow/{0}/minBat".format(update.serial_number), 0),
                         "max": self._config.get("Weatherflow/{0}/maxBat".format(update.serial_number), 0),
-                        "now": battery_str
+                        "now": battery_str,
                         "volt": update.battery
                         }
         self.update_sensor(update.serial_number, "battery", json.dumps(battery_json), autodisc.SensorDeviceClasses.BATTERY)
