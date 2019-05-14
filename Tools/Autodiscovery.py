@@ -119,7 +119,10 @@ class Topics:
         if ava_topic is not None:
             p["availability_topic"] = ava_topic
         if self._component != Component.SENSOR and self._component != Component.BINARY_SENROR:
+            logging.getLogger("Launch").getChild("autodisc").debug("Command_topic [{}] wird gebraucht".format(self.command))
             p["command_topic"] = self.command
+        else:
+            logging.getLogger("Launch").getChild("autodisc").debug("Command_topic [{}] wird nicht gebraucht".format(self.command))
         if value_template is not None:
             p["value_template"] = value_template
         if json_attributes is True:
