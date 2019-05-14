@@ -100,7 +100,8 @@ class ShellSwitch:
             self.__client.publish(topics.config, conf_payload, retain=True)
             self.__client.subscribe(topics.command)
             self.__client.message_callback_add(topics.command, self.handle_switch)
-            self._config["ShellSwitch/reg_config_topics"].append(topics.config)
+            if topics.config not in self._config["ShellSwitch/reg_config_topics"]:
+                self._config["ShellSwitch/reg_config_topics"].append(topics.config)
             self._registered_callback_topics.append(topics.command)
             self._name_topic_map[topics.command] = name
             self._state_name_map[name] = topics.state

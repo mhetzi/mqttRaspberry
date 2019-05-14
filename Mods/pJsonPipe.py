@@ -55,13 +55,13 @@ class JsonPipe(threading.Thread):
                 raise
 
         while not self._doExit:
-            self.__logger.debug("Warte auf FIFO...")
+#            self.__logger.debug("Warte auf FIFO...")
             with open(self._config.get("JsonPipe/Path", None)) as fifo:
                 self.__logger.debug("FIFO geöffnet.")
                 while not self._doExit:
                     data = fifo.read()
                     if len(data) == 0:
-                        self.__logger.debug("FIFI gegenstelle geschlossen.")
+#                        self.__logger.debug("FIFI gegenstelle geschlossen.")
                         break
                     if data == self._lastData:
                         continue
