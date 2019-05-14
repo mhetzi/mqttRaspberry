@@ -51,8 +51,10 @@ class ShellSwitch:
                     self.__logger.info("{} wurde ausgeschaltet.".format(name))
                 switch["wasOn"] = on
             elif initKill and switch["init_command"] is not None:
+                self.__logger.info("Führe init command [{}] aus.".format(switch["init_command"]))
                 cp = subprocess.run(switch["init_command"], shell=True, check=True)
             elif not initKill and switch["clean_command"] is not None:
+                self.__logger.info("Führe clean command [{}] aus.".format(switch["clean_command"]))
                 cp = subprocess.run(switch["clean_command"], shell=True, check=True)
 
         except subprocess.CalledProcessError as e:
