@@ -48,13 +48,17 @@ class JsonPipe(threading.Thread):
             fifo.write("kill")
 
     def run(self):
-        try:
-            os.mkfifo(self._config.get("JsonPipe/Path", None))
-        except OSError as oe:
-            if oe.errno != errno.EEXIST:
-                raise
-
         while not self._doExit:
+            try:
+                os.mkfifo(self._config.get("JsonPipe/Path", None))
+            except OSError as oe:
+                if oe.errno != errno.EEXIST:
+                    os.remove(self._config.get("JsonPipe/Path", None))
+                    try:
+                        os.mkfifo(self._config.get("JsonPipe/Path", None))
+                    except OSError as oe:
+                        if oe.errno != errno.EEXIST:
+                            return
 #            self.__logger.debug("Warte auf FIFO...")
             with open(self._config.get("JsonPipe/Path", None)) as fifo:
 #                self.__logger.debug("FIFO geöffnet.")
