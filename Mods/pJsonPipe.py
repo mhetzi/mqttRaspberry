@@ -58,7 +58,7 @@ class JsonPipe(threading.Thread):
                         os.mkfifo(self._config.get("JsonPipe/Path", None))
                     except OSError as oe:
                         if oe.errno != errno.EEXIST:
-                            return
+                            self.__logger.info("Namedpipe konnte nicht erstellt werden")
 #            self.__logger.debug("Warte auf FIFO...")
             with open(self._config.get("JsonPipe/Path", None)) as fifo:
 #                self.__logger.debug("FIFO geöffnet.")
@@ -78,6 +78,8 @@ class JsonPipe(threading.Thread):
                         self.__client.publish(d["t"], d["p"], d.get("r", False))
                     except json.decoder.JSONDecodeError:
                         self.__logger.error("Json konnte nicht dekodiert werden.")
+        os.remove(self._config.get("JsonPipe/Path", None))
+        self.__logger.info("Lese Thread stirbt gerade")
 
     def sendStates(self):
         try:
