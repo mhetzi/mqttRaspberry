@@ -191,7 +191,7 @@ class PluginManager:
                 self.logger.exception("Modul unterstützt sendStates() nicht!")
 
     def connect_callback(self, client, userdata, flags, rc):
-        if rc == 0 and:
+        if rc == 0:
             self.is_connected = True
             self.logger.info("Verbunden, regestriere Plugins...")
             self.register_mods()
