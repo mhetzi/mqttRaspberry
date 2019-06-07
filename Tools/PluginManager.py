@@ -175,6 +175,7 @@ class PluginManager:
         client.enable_logger(self.logger.getChild("mqtt"))
         client.on_connect = self.connect_callback
         client.connect(cc.host, port=cc.port)
+        client.on_disconnect = self.disconnect_callback
         self._client = client
         self._client_name = my_name
         return client, my_name
@@ -189,6 +190,10 @@ class PluginManager:
                 pass
             except Exception as x:
                 self.logger.exception("Modul unterstützt sendStates() nicht!")
+
+    def disconnect_callback(self, client, userdata, rc):
+        self.logger.info("Verbindung getrennt")
+        self.is_connected = False
 
     def connect_callback(self, client, userdata, flags, rc):
         if rc == 0:
