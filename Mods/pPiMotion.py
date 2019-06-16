@@ -30,8 +30,9 @@ class PluginLoader:
         print("")
         conf["PiMotion/motion/recordPre"] = ConsoleInputTools.get_number_input("Sekunden vor Bwegung aufnehmen", 1)
         conf["PiMotion/motion/recordPost"] = ConsoleInputTools.get_number_input("Sekunden nach Bwegung aufnehmen", 1)
+        print()
+        conf["PiMotion/motion/sensorName"] = ConsoleInputTools.get_input("Bewegungsmelder Name")
 
-# HTTP MJPEG Testen
 # WebSocket HotBlock Streming machen
 
 # HotBlock deadblock

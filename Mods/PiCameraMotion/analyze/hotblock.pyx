@@ -31,12 +31,12 @@ cdef retBlock chotBlock(np.ndarray[BLOCK, ndim=2] arr, np.int16_t rows, np.int16
             b = arr[r, c]
             if b.sad <= minNoise:
                 continue
-            if hotest.sad < b.sad:
+            if hotest.b.sad < b.sad:
                 hotest.b.x = b.x
                 hotest.b.y = b.y
                 hotest.b.sad = b.sad
             if b.sad > minNoise:
-                hotest.count += 1
+                hotest.c += 1
     return hotest
 
 def hotBlock(a, np.int16_t rows, np.int16_t cols, np.int16_t minNoise):

@@ -54,7 +54,7 @@ class bhl1750:
 
     def register(self):
         if self.__broken:
-            return;
+            return
         if self._conf["BHL1750/device"]:
             self._logger.info("Erzeuge Autodiscovery Config für Addresse 1")
             unique_id = "sensor.bht1750-{}.{}".format(self._devID, "addr")

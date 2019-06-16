@@ -14,9 +14,15 @@ import Mods.PiCameraMotion.analyze.hotblock
 
 class Analyzer(cama.PiAnalysisOutput):
     motion_call = None
+    motion_data_call = None
     logger = None
     processed = 0
     states = {"motion_frames": 0, "still_frames": 0, "noise_count": 0, "hotest": []}
+    old_states = None
+    minNoise = 0
+    framesToNoMotion = 0
+    frameToTriggerMotion = 0
+
 
     def __init__(self, camera, size=None):
         super(Analyzer, self).__init__(camera, size)
@@ -36,11 +42,27 @@ class Analyzer(cama.PiAnalysisOutput):
 
     def analyze(self, a: cama.motion_dtype):
         self.cythonHotBlock(a)
+        if callable(self.motion_data_call) and self.old_states != self.states:
+            self.motion_data_call(self.states)
+            self.old_states = self.states.copy()
+        if callable(self.motion_call):
+            if self.states["motion_frames"] >= self.framesToNoMotion:
+                self.states["motion_frames"] = self.framesToNoMotion
+                self.states["still_frames"] = 0
+                self.motion_call(True, self.states)
+            elif self.states["still_frames"] >= self.framesToNoMotion:
+                self.states["still_frames"] = self.framesToNoMotion
+                self.states["motion_frames"] = 0
+                self.motion_call(False, self.states)
     
     def cythonHotBlock(self, a):
-        hottestBlock = Mods.PiCameraMotion.analyze.hotblock.hotBlock(a, self.rows, self.cols)
-        self.logger.info("(x,y,val,count) = (%d,%d,%d,%d) ", hottestBlock[0], hottestBlock[1], hottestBlock[2], hottestBlock[3])
-        self.logger.debug(self.states)
+        hottestBlock = Mods.PiCameraMotion.analyze.hotblock.hotBlock(a, self.rows, self.cols, self.minNoise)
+        if hottestBlock[3] >= self.minNoise: 
+            self.logger.info("(x,y,val,count) = (%d,%d,%d,%d) ", hottestBlock[0], hottestBlock[1], hottestBlock[2], hottestBlock[3])
+            self.logger.debug(self.states)
+            self.states["motion_frames"] += 1
+        else:
+            self.states["still_frames"] += 1
         self.processed += 1
         self.states["hotest"] = [hottestBlock[0], hottestBlock[1], hottestBlock[2]]
         self.states["noise_count"] = hottestBlock[3]
