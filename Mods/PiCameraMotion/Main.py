@@ -19,6 +19,7 @@ import Mods.PiCameraMotion.etc as etc
 import Mods.PiCameraMotion.http as httpc
 import pyximport; pyximport.install()
 import Mods.PiCameraMotion.analyzers as analyzers
+import Mods.PiCameraMotion.rtsp as rtsp
 
 class PiMotionMain(threading.Thread):
 
@@ -54,7 +55,7 @@ class PiMotionMain(threading.Thread):
             with analyzers.Analyzer(camera) as anal:
                 anal.motion_call = self.motion
                 anal.logger = self.__logger.getChild("Analyzer")
-                camera.start_recording(self._circularStream, format='h264', motion_output=anal)
+                camera.start_recording(self._circularStream, format='h264', motion_output=anal, quantization=23)
 
                 if self._config.get("PiMotion/http/enabled", False):
                     http_out = httpc.StreamingOutput()
@@ -64,8 +65,12 @@ class PiMotionMain(threading.Thread):
                     )
                     server = httpc.StreamingServer(address, httpc.makeStreamingHandler(http_out))
                     server.start()
-                    camera.start_recording(self._webStream, format='mjpeg', splitter_port=2)
+                    camera.start_recording(http_out, format='mjpeg', splitter_port=2)
                 # Und jetzt einfach warten
+                if self._config.get("PiMotion/rtsp/enabled", True):
+                    rtsp_server = rtsp.generateRtspServer(self._circularStream)
+                    rtsp_server.runServer()
+
                 while not self._doExit:
                     try:
                         camera.wait_recording(5)
@@ -81,6 +86,6 @@ class PiMotionMain(threading.Thread):
 
     def motion(self):
         if self._inMotion:
-            return
-        return
+            self.__logger.info("Motion")
+        self.__logger.info("No Motion")
         

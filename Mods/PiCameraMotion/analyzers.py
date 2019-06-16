@@ -16,6 +16,7 @@ class Analyzer(cama.PiAnalysisOutput):
     motion_call = None
     logger = None
     processed = 0
+    states = {"motion_frames": 0, "still_frames": 0, "noise_count": 0, "hotest" = []}
 
     def __init__(self, camera, size=None):
         super(Analyzer, self).__init__(camera, size)
@@ -38,8 +39,11 @@ class Analyzer(cama.PiAnalysisOutput):
     
     def cythonHotBlock(self, a):
         hottestBlock = Mods.PiCameraMotion.analyze.hotblock.hotBlock(a, self.rows, self.cols)
-        self.logger.info("(x,y,val) = (%d,%d,%d) ", hottestBlock[0], hottestBlock[1], hottestBlock[2])
+        self.logger.info("(x,y,val,count) = (%d,%d,%d,%d) ", hottestBlock[0], hottestBlock[1], hottestBlock[2], hottestBlock[3])
+        self.logger.debug(self.states)
         self.processed += 1
+        self.states["hotest"] = [hottestBlock[0], hottestBlock[1], hottestBlock[2]]
+        self.states["noise_count"] = hottestBlock[3]
 
     def hotBlock(self, a):
         hottestBlock = [0,0,0]

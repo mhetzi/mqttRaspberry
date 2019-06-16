@@ -26,14 +26,14 @@
         },
         {
             "name": "Python: Module",
-            "type": "python",
+            "type": "python3",
             "request": "launch",
             "module": "enter-your-module-name-here",
             "console": "integratedTerminal"
         },
         {
             "name": "Python: Django",
-            "type": "python",
+            "type": "python3",
             "request": "launch",
             "program": "${workspaceFolder}/manage.py",
             "console": "integratedTerminal",
@@ -46,7 +46,7 @@
         },
         {
             "name": "Python: Flask",
-            "type": "python",
+            "type": "python3",
             "request": "launch",
             "module": "flask",
             "env": {
@@ -61,7 +61,7 @@
         },
         {
             "name": "Python: Current File (External Terminal)",
-            "type": "python",
+            "type": "python3",
             "request": "launch",
             "program": "${file}",
             "console": "externalTerminal"
