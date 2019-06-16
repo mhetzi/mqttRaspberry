@@ -16,7 +16,7 @@ class Analyzer(cama.PiAnalysisOutput):
     motion_call = None
     logger = None
     processed = 0
-    states = {"motion_frames": 0, "still_frames": 0, "noise_count": 0, "hotest" = []}
+    states = {"motion_frames": 0, "still_frames": 0, "noise_count": 0, "hotest": []}
 
     def __init__(self, camera, size=None):
         super(Analyzer, self).__init__(camera, size)
