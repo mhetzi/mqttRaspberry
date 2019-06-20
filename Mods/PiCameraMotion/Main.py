@@ -22,6 +22,7 @@ import Mods.PiCameraMotion.analyzers as analyzers
 import Mods.PiCameraMotion.rtsp as rtsp
 import Tools.PluginManager as pm
 import json
+import datetime as dt
 
 class PiMotionMain(threading.Thread):
 
@@ -35,7 +36,7 @@ class PiMotionMain(threading.Thread):
     _rtsp_split = None
     _jsonOutput = None
     topic = None
-    _lastState = {"motion": 0}
+    _lastState = {"motion": 0, "x": 0, "y": 0, "val": 0, "c": 0}
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         threading.Thread.__init__(self)
@@ -49,6 +50,7 @@ class PiMotionMain(threading.Thread):
         self.setName("PiCamera")
         self.__logger.debug("PiMotion.register()")
         self._doExit = False
+        self._camera = None
 
     def register(self):
         # Setup MQTT zeug
@@ -81,10 +83,14 @@ class PiMotionMain(threading.Thread):
     def run(self):
         self.__logger.debug("PiMotion.run()")
         with cam.PiCamera(clock_mode='raw', framerate=self._config.get("PiMotion/camera/fps", 23)) as camera:
+            self._camera = camera
             # Init Kamera
             camera.resolution = (self._config["PiMotion/camera/width"], self._config["PiMotion/camera/height"])
             camera.video_denoise = self._config.get("PiMotion/camera/denoise", True)
             self.__logger.debug("Kamera erstellt")
+
+            camera.annotate_background = cam.Color('black')
+            camera.annotate_text = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
             with analyzers.Analyzer(camera) as anal:
                 self.__logger.debug("Analyzer erstellt")
@@ -151,16 +157,30 @@ class PiMotionMain(threading.Thread):
 
                 while not self._doExit:
                     try:
-                        camera.wait_recording(5)
-                        pps = anal.processed / 5
+                        camera.wait_recording(2)
+                        pps = anal.processed / 2
                         anal.processed = 0
                         self.__logger.debug("Pro Sekunde verarbeitet: %d", pps)
+                        self.update_anotation(aps=pps)
+
                     except:
                         self.__logger.exception("Kamera Fehler")
                         exit(-1)
         server.server_close()
         camera.stop_recording(splitter_port=2)
         camera.stop_recording()
+        self._camera = None
+
+    def update_anotation(self, aps=0):
+        if self._camera is not None:
+            text1 = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            txt_motion = "Bewegung" if self._inMotion else "."
+
+            self._camera.annotate_text = text1 + " {} {}APS {} {} {} {}".format(
+                txt_motion, aps,
+                self._lastState["x"], self._lastState["y"], self._lastState["val"], self._lastState["c"]
+            )
+
 
     def motion(self, motion:bool, data:dict):
         if motion == self._inMotion:
@@ -175,8 +195,9 @@ class PiMotionMain(threading.Thread):
     def motion_data(self, data:dict):
         # x y val count
         self._lastState = {"motion": 1 if self._inMotion else 0, "x": data["hotest"][0],
-            "y": data["hotest"][1], "val": data["hotest"][2], "x": data["count"][3]}
+            "y": data["hotest"][1], "val": data["hotest"][2], "c": data["count"][3]}
         self._jsonOutput.write(self._lastState)
+        self.update_anotation()
         self.sendStates()
 
     def sendStates(self):
