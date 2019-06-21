@@ -175,11 +175,13 @@ class PiMotionMain(threading.Thread):
         if self._camera is not None:
             text1 = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             txt_motion = "Bewegung" if self._inMotion else "."
+            
+            self._camera.annotate_text = text1 + " " + txt_motion
 
-            self._camera.annotate_text = text1 + " {} {}APS {} {} {} {}".format(
-                txt_motion, aps,
-                self._lastState["x"], self._lastState["y"], self._lastState["val"], self._lastState["c"]
-            )
+            #self._camera.annotate_text = text1 + " {} {}APS {} {} {} {}".format(
+            #    txt_motion, aps,
+            #    self._lastState["x"], self._lastState["y"], self._lastState["val"], self._lastState["c"]
+            #)
 
 
     def motion(self, motion:bool, data:dict):
@@ -198,6 +200,7 @@ class PiMotionMain(threading.Thread):
         self._lastState = {"motion": 1 if self._inMotion else 0, "x": data["hotest"][0],
             "y": data["hotest"][1], "val": data["hotest"][2], "c": data["noise_count"]}
         self._jsonOutput.write(self._lastState)
-        self.update_anotation()
+        #self.update_anotation()
+    
     def sendStates(self):
         self.__client.publish(self.topic.state, json.dumps(self._lastState))
