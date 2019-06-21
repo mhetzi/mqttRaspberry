@@ -42,7 +42,7 @@ class Analyzer(cama.PiAnalysisOutput):
 
     def analyze(self, a: cama.motion_dtype):
         self.cythonHotBlock(a)
-        if callable(self.motion_data_call) and self.old_states != self.states:
+        if callable(self.motion_data_call):
             self.motion_data_call(self.states)
             self.old_states = self.states.copy()
         if callable(self.motion_call):
@@ -58,7 +58,7 @@ class Analyzer(cama.PiAnalysisOutput):
     def cythonHotBlock(self, a):
         hottestBlock = Mods.PiCameraMotion.analyze.hotblock.hotBlock(a, self.rows, self.cols, self.minNoise)
         if hottestBlock[3] >= self.minNoise: 
-            self.logger.info("(x,y,val,count) = (%d,%d,%d,%d) ", hottestBlock[0], hottestBlock[1], hottestBlock[2], hottestBlock[3])
+            #self.logger.info("(x,y,val,count) = (%d,%d,%d,%d) ", hottestBlock[0], hottestBlock[1], hottestBlock[2], hottestBlock[3])
             self.logger.debug(self.states)
             self.states["motion_frames"] += 1
         else:
@@ -84,7 +84,7 @@ class Analyzer(cama.PiAnalysisOutput):
                     #print("H", end="")
                 #print(hottness, end=" ")
             #print("")
-        self.logger.info("(x,y,val) = (%d,%d,%d) ", hottestBlock[0],hottestBlock[1],hottestBlock[2])
+        #self.logger.info("(x,y,val) = (%d,%d,%d) ", hottestBlock[0],hottestBlock[1],hottestBlock[2])
         self.processed += 1
 
 
