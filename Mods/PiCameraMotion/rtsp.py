@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# dependencies apt install libgstrtspserver-1.0-dev libgstrtspserver-1.0-0 gstreamer1.0-plugins-* python3-numpy cython3 make cmake
 try:
     import picamera as cam
     import picamera.array as cama

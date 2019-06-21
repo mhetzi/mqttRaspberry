@@ -24,14 +24,22 @@ class PluginLoader:
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
         from Tools import ConsoleInputTools
-        conf["PiMotion/camera/width"] = ConsoleInputTools.get_number_input("Resolution width", 640)
-        conf["PiMotion/camera/height"] = ConsoleInputTools.get_number_input("Resolution height", 480)
-        conf["PiMotion/camera/fps"] = ConsoleInputTools.get_number_input("Framerate", 25)
+        conf["PiMotion/camera/width"] = ConsoleInputTools.get_number_input("Resolution width ", 640)
+        conf["PiMotion/camera/height"] = ConsoleInputTools.get_number_input("Resolution height ", 480)
+        conf["PiMotion/camera/fps"] = ConsoleInputTools.get_number_input("Framerate ", 25)
+        comf["PiMotion/camera/denoise"] = ConsoleInputTools.get_bool_input("Denoise Video? ")
         print("")
-        conf["PiMotion/motion/recordPre"] = ConsoleInputTools.get_number_input("Sekunden vor Bwegung aufnehmen", 1)
-        conf["PiMotion/motion/recordPost"] = ConsoleInputTools.get_number_input("Sekunden nach Bwegung aufnehmen", 1)
+        conf["PiMotion/motion/recordPre"] = ConsoleInputTools.get_number_input("Sekunden vor Bwegung aufnehmen ", 1)
+        conf["PiMotion/motion/recordPost"] = ConsoleInputTools.get_number_input("Sekunden nach Bwegung aufnehmen ", 1)
         print()
-        conf["PiMotion/motion/sensorName"] = ConsoleInputTools.get_input("Bewegungsmelder Name")
+        conf["PiMotion/motion/sensorName"] = ConsoleInputTools.get_input("Bewegungsmelder Name ")
+        conf["PiMotion/motion/motion_frames"] = ConsoleInputTools.get_number_input("Frames bis Bewegung gemeldet wird ")
+        conf["PiMotion/motion/still_frames"] = ConsoleInputTools.get_number_input("Frames bis keine Bewegung mehr gemeldet wird ")
+        conf["PiMotion/motion/minNoise"] = ConsoleInputTools.get_number_input("Mindestens diesen Noise Wert ereichen ")
+        print()
+        conf["PiMotion/rtsp/enabled"] = ConsoleInputTools.get_bool_input("RTSP Server aktivieren? ")
+        conf["PiMotion/http/enabled"] = ConsoleInputTools.get_bool_input("HTTP Server aktivieren? ")
+        
 
 # WebSocket HotBlock Streming machen
 
