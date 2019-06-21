@@ -26,17 +26,17 @@ import datetime as dt
 
 class PiMotionMain(threading.Thread):
 
-    _motionStream = etc.NullOutput()
-    _webStream = etc.NullOutput()
+    _motionStream   = etc.NullOutput( )
+    _webStream      = etc.NullOutput( )
     _circularStream = None
-    _inMotion = False
-    _pluginManager = None
-    _rtsp_server = None
-    _http_server = None
-    _rtsp_split = None
-    _jsonOutput = None
-    topic = None
-    _lastState = {"motion": 0, "x": 0, "y": 0, "val": 0, "c": 0}
+    _inMotion       = None
+    _pluginManager  = None
+    _rtsp_server    = None
+    _http_server    = None
+    _rtsp_split     = None
+    _jsonOutput     = None
+    topic           = None
+    _lastState      = { "motion": 0, "x": 0, "y": 0, "val": 0, "c": 0 }
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         threading.Thread.__init__(self)
@@ -94,8 +94,8 @@ class PiMotionMain(threading.Thread):
 
             with analyzers.Analyzer(camera) as anal:
                 self.__logger.debug("Analyzer erstellt")
-                anal.motion_call = self.motion
-                anal.motion_data_call = self.motion_data
+                anal.motion_call = lambda motion, data: self.motion(motion, data)
+                anal.motion_data_call = lambda data: self.motion_data(data)
                 anal.frameToTriggerMotion = self._config.get("PiMotion/motion/motion_frames", 4)
                 anal.framesToNoMotion = self._config.get("PiMotion/motion/still_frames", 4)
                 anal.minNoise = self._config.get("PiMotion/motion/minNoise", 1000)
@@ -191,14 +191,13 @@ class PiMotionMain(threading.Thread):
         self.__logger.info("No Motion")
         self._inMotion = False
         self.motion_data(data)
+        self.sendStates()
     
     def motion_data(self, data:dict):
         # x y val count
         self._lastState = {"motion": 1 if self._inMotion else 0, "x": data["hotest"][0],
-            "y": data["hotest"][1], "val": data["hotest"][2], "c": data["count"][3]}
+            "y": data["hotest"][1], "val": data["hotest"][2], "c": data["noise_count"]}
         self._jsonOutput.write(self._lastState)
         self.update_anotation()
-        self.sendStates()
-
     def sendStates(self):
         self.__client.publish(self.topic.state, json.dumps(self._lastState))

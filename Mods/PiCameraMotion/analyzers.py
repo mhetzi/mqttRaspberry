@@ -13,8 +13,6 @@ import pyximport; pyximport.install()
 import Mods.PiCameraMotion.analyze.hotblock
 
 class Analyzer(cama.PiAnalysisOutput):
-    motion_call = None
-    motion_data_call = None
     logger = None
     processed = 0
     states = {"motion_frames": 0, "still_frames": 0, "noise_count": 0, "hotest": []}
@@ -23,6 +21,11 @@ class Analyzer(cama.PiAnalysisOutput):
     framesToNoMotion = 0
     frameToTriggerMotion = 0
 
+    def motion_call(self, motion:bool, data:dict):
+        pass
+
+    def motion_data_call(self, data:dict):
+        pass
 
     def __init__(self, camera, size=None):
         super(Analyzer, self).__init__(camera, size)
@@ -42,10 +45,12 @@ class Analyzer(cama.PiAnalysisOutput):
 
     def analyze(self, a: cama.motion_dtype):
         self.cythonHotBlock(a)
-        if callable(self.motion_data_call):
+        try:
             self.motion_data_call(self.states)
             self.old_states = self.states.copy()
-        if callable(self.motion_call):
+        except Exception as e:
+            self.logger.exception("Motion data call Exception: {}".format(str(e)))
+        try:
             if self.states["motion_frames"] >= self.framesToNoMotion:
                 self.states["motion_frames"] = self.framesToNoMotion
                 self.states["still_frames"] = 0
@@ -54,6 +59,8 @@ class Analyzer(cama.PiAnalysisOutput):
                 self.states["still_frames"] = self.framesToNoMotion
                 self.states["motion_frames"] = 0
                 self.motion_call(False, self.states)
+        except Exception as e:
+            self.logger.exception("Motion call Exception: {}".format(str(e)))
     
     def cythonHotBlock(self, a):
         hottestBlock = Mods.PiCameraMotion.analyze.hotblock.hotBlock(a, self.rows, self.cols, self.minNoise)
