@@ -69,16 +69,14 @@ class StreamingPictureOutput(object):
         self.condition = Condition()
 
     def write(self, buf):
-        if buf.startswith(b'\xff\xd8\xff'):
-            # New frame, copy the existing buffer's content and notify all
-            # clients it's available
-            self.buffer.truncate()
-            with self.condition:
-                self.frame = self.buffer.getvalue()
-                self.condition.notify_all()
-            self.buffer.seek(0)
         return self.buffer.write(buf)
-
+    
+    def flush(self):
+        self.buffer.truncate()
+        with self.condition:
+            self.frame = self.buffer.getvalue()
+            self.condition.notify_all()
+        self.buffer.seek(0)
 
 def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput, pic: StreamingPictureOutput):
     class StreamingHandler(server.BaseHTTPRequestHandler):
@@ -123,9 +121,6 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput, pic
                     pic.talkback()
                     frame = None
                     with pic.condition:
-                        pic.condition.wait()
-                        time.sleep(0.25)
-                        pic.talkback()
                         pic.condition.wait()
                         frame = pic.frame
                     self.send_header('Age', 0)
