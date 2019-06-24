@@ -184,6 +184,7 @@ class CameraSplitIO(threading.Thread):
             self.logger.info("Öffne {} um Aufnahme zu speichern".format(path))
             stream = open(path, "wb")
         new_splitter = CameraSplitIO(self._camera, self._splitter_port)
+        new_splitter.logger = self.logger
         new_splitter.initAndRun(self._io, file=stream, parent=self)
         return new_splitter
 

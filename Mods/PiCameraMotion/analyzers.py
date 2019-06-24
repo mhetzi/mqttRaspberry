@@ -46,8 +46,9 @@ class Analyzer(cama.PiAnalysisOutput):
     def analyze(self, a: cama.motion_dtype):
         self.cythonHotBlock(a)
         try:
-            self.motion_data_call(self.states)
-            self.old_states = self.states.copy()
+            if self.states["noise_count"] >= self.minNoise:
+                self.motion_data_call(self.states)
+                self.old_states = self.states.copy()
         except Exception as e:
             self.logger.exception("Motion data call Exception: {}".format(str(e)))
         try:

@@ -95,8 +95,6 @@ class PiMotionMain(threading.Thread):
 
             with analyzers.Analyzer(camera) as anal:
                 self.__logger.debug("Analyzer erstellt")
-                anal.motion_call = lambda motion, data: self.motion(motion, data)
-                anal.motion_data_call = lambda data: self.motion_data(data)
                 anal.frameToTriggerMotion = self._config.get("PiMotion/motion/motion_frames", 4)
                 anal.framesToNoMotion = self._config.get("PiMotion/motion/still_frames", 4)
                 anal.minNoise = self._config.get("PiMotion/motion/minNoise", 1000)
@@ -159,14 +157,18 @@ class PiMotionMain(threading.Thread):
                     self._http_server = server
                 # Und jetzt einfach warten
 
+                firstFrames = True
                 while not self._doExit:
                     try:
-                        camera.wait_recording(2)
-                        pps = anal.processed / 2
+                        camera.wait_recording(5)
+                        pps = anal.processed / 5
                         anal.processed = 0
                         self.__logger.debug("Pro Sekunde verarbeitet: %d", pps)
                         self.update_anotation(aps=pps)
-
+                        if firstFrames:
+                            anal.motion_call = lambda motion, data: self.motion(motion, data)
+                            anal.motion_data_call = lambda data: self.motion_data(data)
+                            firstFrames = False
                     except:
                         self.__logger.exception("Kamera Fehler")
                         exit(-1)
@@ -188,12 +190,12 @@ class PiMotionMain(threading.Thread):
 
 
     def motion(self, motion:bool, data:dict):
-        if motion == self._inMotion:
+        if motion is self._inMotion:
             return
         if motion:
             if self._config.get("PiMotion/record/enabled",True):
                 path = self._config.get("PiMotion/record/path","~/Videos")
-                path = "{}/{}/.h264".format(path, dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                path = "{}/{}.h264".format(path, dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                 self._rtsp_recorder = self._rtsp_split.recordTo(path=path)
             self.__logger.info("Motion")
             self._inMotion = True
