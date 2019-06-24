@@ -23,6 +23,7 @@ import io
 import threading
 import time
 import queue
+import subprocess
 
 Gst.init(None)
 
@@ -36,6 +37,8 @@ class CameraSplitIO(threading.Thread):
     _oldAppend = None
     _io = None
     _splitter_port = None
+    _endRecording = False
+    _myParent = None
 
     def __init__(self, camera: cam.PiCamera, splitter_port=1):
         threading.Thread.__init__(self)
@@ -93,9 +96,9 @@ class CameraSplitIO(threading.Thread):
                     pass
         self._oldAppend(item)
 
-    def _redirectPackages(self, io: cams.PiCameraCircularIO, file:io.BufferedIOBase):
+    def _redirectPackages(self, io: cams.PiCameraCircularIO, file):
         self.logger.debug("Überschreibe append methode")
-        self._oldAppend = io._data.append
+        self._oldAppend = io._data.append if self._myParent is None else self._myParent.append 
         self._io = io
         io._data.append = self.append
         if file is not None:
@@ -103,20 +106,42 @@ class CameraSplitIO(threading.Thread):
             self.file = file
             self._reopen = False
 
-    def initAndRun(self, cameraStream: cams.PiCameraCircularIO, file=None):
+    def initAndRun(self, cameraStream: cams.PiCameraCircularIO, file=None, parent=None):
+        self.logger = self.logger.getChild("RTSP")  if file is None else self.logger.getChild("Record")
+        self._myParent = parent
         self._redirectPackages(cameraStream, file)
-        self.setName("RTSP_queue")
+        self.setName("cam_RTSP_queue" if file is None else "cam_file_queue")
         self.setDaemon(False)
         self.start()
+        if parent:
+            try:
+                with self.lock:
+                    save_pos = self.tell()
+                    try:
+                        pos = self._find_all(camf.PiVideoFrameType.sps_header)
+                        if pos is not None:
+                            self.seek(pos)
+                            while True:
+                                buf = self.read1()
+                                if not buf:
+                                    break
+                                self._queue.put(buf)
+                    finally:
+                        self.seek(save_pos)
+            except:
+                pass
 
     def shutdown(self):
         self._closed = True
         self.logger.info("Beende Queue")
         self.join(6)
-        if self.is_alive():
+        if self.is_alive() and self._reopen:
             self.logger.warning("Queue still alive")
             with open("/tmp/motion-gst-pipe", mode="rb") as f:
                 pass
+        elif self.is_alive() and not self._reopen:
+            self.file.flush()
+            self.file.close()
         self.join()
         self.logger.info("Queue beendet")
 
@@ -145,61 +170,32 @@ class CameraSplitIO(threading.Thread):
                     self.logger.warning("In der queue war ein None Object!")
             except queue.Empty:
                 pass
-        self.logger.debug("Resore append method")
-        self._io._data.append = self._oldAppend
+        self.logger.debug("Restore append method")
+        if self._myParent is None:
+            self._io._data.append = self._oldAppend
+        else:
+            self._myParent.append = self._oldAppend
 
-
-    """ def fill_rtsp_stream(self):
-        had_sps = False
-        while not self.closed:
-            with self.io.lock:
-                self.logger.debug("self.io.lock locked")
-                save_pos = self.io.tell()
-                self.logger.debug("saving position {} for later".format(save_pos))
-                try:
-                    if not had_sps:
-                        self.logger.debug("try to find SPS frame")
-                        pos = self.io._find_all(cam.PiVideoFrameType.sps_header)
-                        if pos is not None:
-                            had_sps = True
-                            self.logger.debug("SPS found")
-                        else:
-                            self.logger.debug("No SPS found buf size is " + self.io.size + " pos is " + self.io._pos)
-                            self.io.seek(save_pos)
-                            return
-                    else:
-                        pos = self.io._find_all(None)
-                    # Copy chunks efficiently from the position found
-                    if pos is not None:
-                        self.logger.debug("Seek to {}".format(pos))
-                        self.io.seek(pos)
-                        while True:
-                            buf = self.io.read1()
-                            if not buf:
-                                self.logger.debug("no more data")
-                                break
-                            try:
-                                self.file.write(buf)
-                            except BrokenPipeError:
-                                self.logger.debug("Pipe broken restore pos to {}".format(save_pos))
-                                self.io.seek(save_pos)
-                                return
-                    else:
-                        self.logger.debug("pos is None")
-                finally:
-                    self.logger.debug("end restore pos to {}".format(save_pos))
-                    self.io.seek(save_pos)
-            time.sleep(0.95)
-     """    
+    def recordTo(self, path=None, stream=None):
+        if path is None and stream is None:
+            self.logger.error("Pfad und Stream ist None!")
+            return
+        if path is not None and stream is None:
+            self.logger.info("Öffne {} um Aufnahme zu speichern".format(path))
+            stream = open(path, "wb")
+        new_splitter = CameraSplitIO(self._camera, self._splitter_port)
+        new_splitter.initAndRun(self._io, file=stream, parent=self)
+        return new_splitter
 
 class GstRtspPython:
 
-    def __init__(self, framerate):
+    def __init__(self, framerate, camName=""):
         self.__ml = None
         self.__srv = None
         self.__fac = None
         self.logger = None
         self._fps = framerate
+        self._camName = camName
 
     def runServer(self):
         self.logger.info("Server wird gestartet")
@@ -211,7 +207,7 @@ class GstRtspPython:
         self.__fac.set_shared(True)
         self.__fac.set_buffer_size((17000000 * 1 // 8) / 2) # Bitrate * Sekunden // 8 
         self.__fac.set_latency(250)
-        self.__fac.set_launch('( filesrc location=/tmp/motion-gst-pipe do-timestamp=true ! video/x-h264, framerate={}/1 ! h264parse ! rtph264pay name=pay0 pt=96 )'.format(self._fps))
+        self.__fac.set_launch('( filesrc location=/tmp/motion-gst-pipe do-timestamp=true ! video/x-h264, framerate={}/1 ! h264parse ! clockoverlay halignment=right valignment=bottom text="{}" shaded-background=true font-desc="Sans, 24" ! rtph264pay name=pay0 pt=96 )'.format(self._fps, self._camName))
         mounts.add_factory("/h264", self.__fac)
         self.__srv.attach(None)
         self.__ml.run()

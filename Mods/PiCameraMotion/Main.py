@@ -37,6 +37,7 @@ class PiMotionMain(threading.Thread):
     _jsonOutput     = None
     topic           = None
     _lastState      = { "motion": 0, "x": 0, "y": 0, "val": 0, "c": 0 }
+    _rtsp_recorder  = None
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         threading.Thread.__init__(self)
@@ -107,10 +108,13 @@ class PiMotionMain(threading.Thread):
                     self.__logger.debug("Erstelle CameraSplitIO")
                     rtsp_split = rtsp.CameraSplitIO(camera)
                     self._rtsp_split = rtsp_split
-                    rtsp_split.logger = self.__logger.getChild("RTSP")
+                    rtsp_split.logger = self.__logger
                     rtsp_split.initAndRun(self._circularStream, file=None)
                     self.__logger.info("Aktiviere RTSP...")
-                    rtsp_server = rtsp.GstRtspPython(self._config.get("PiMotion/camera/fps", 23))
+                    rtsp_server = rtsp.GstRtspPython(
+                        self._config.get("PiMotion/camera/fps", 23),
+                        self._config["PiMotion/motion/sensorName"]
+                    )
                     rtsp_server.logger = self.__logger.getChild("RTSP_srv")
                     self.__logger.info("Starte RTSP...")
 
@@ -173,10 +177,9 @@ class PiMotionMain(threading.Thread):
 
     def update_anotation(self, aps=0):
         if self._camera is not None:
-            text1 = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             txt_motion = "Bewegung" if self._inMotion else "."
             
-            self._camera.annotate_text = text1 + " " + txt_motion
+            self._camera.annotate_text = txt_motion
 
             #self._camera.annotate_text = text1 + " {} {}APS {} {} {} {}".format(
             #    txt_motion, aps,
@@ -188,19 +191,26 @@ class PiMotionMain(threading.Thread):
         if motion == self._inMotion:
             return
         if motion:
+            if self._config.get("PiMotion/record/enabled",True):
+                path = self._config.get("PiMotion/record/path","~/Videos")
+                path = "{}/{}/.h264".format(path, dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                self._rtsp_recorder = self._rtsp_split.recordTo(path=path)
             self.__logger.info("Motion")
             self._inMotion = True
-        self.__logger.info("No Motion")
-        self._inMotion = False
+        else:
+            self.__logger.info("No Motion")
+            self._inMotion = False
+            if self._rtsp_recorder is not None:
+                self._rtsp_recorder.shutdown()
         self.motion_data(data)
-        self.sendStates()
     
     def motion_data(self, data:dict):
         # x y val count
         self._lastState = {"motion": 1 if self._inMotion else 0, "x": data["hotest"][0],
             "y": data["hotest"][1], "val": data["hotest"][2], "c": data["noise_count"]}
         self._jsonOutput.write(self._lastState)
-        #self.update_anotation()
+        self.update_anotation()
+        self.sendStates()
     
     def sendStates(self):
         self.__client.publish(self.topic.state, json.dumps(self._lastState))
