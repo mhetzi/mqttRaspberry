@@ -11,25 +11,36 @@ class ScanDelegate(ble.DefaultDelegate):
 
     def handleDiscovery(self, dev: ble.ScanEntry, isNewDev, isNewData):
         if isNewDev:
+            print("== BEGIN DEVICE == ")
             print ("Discovered device", dev.addr, dev.rssi, dev.getValue(ble.ScanEntry.COMPLETE_LOCAL_NAME), dev.TX_POWER, "public_addr" if dev.addrType == ble.ScanEntry.PUBLIC_TARGET_ADDRESS else "random_addr" )
-            print (dev.getScanData())
+            for tup in dev.getScanData():
+                print ("{}: {} [{}]".format(tup[0], tup[2], tup[1]))
+            print("=== END DEVICE ===")
         elif isNewData:
+            print("== BEGIN DEVICE == ")
             print ("Received new data from", dev.addr, dev.rssi, dev.getValue(ble.ScanEntry.COMPLETE_LOCAL_NAME), dev.TX_POWER, dev.dataTags)
+            for (adtype, desc, value) in dev.getScanData():
+                print ("  %s = %s" % (desc, value))
+            print("=== END DEVICE === ")
 
     def handleNotification(self, cHandle, data):
-        pass
+        print ("== NOTIFICATION BEGIN ==")
+        print (cHandle)
+        print (data)
+        print ("=== NOTIFICATION END ===")
+        
 
 
 def test():
-    scanner = ble.Scanner(1).withDelegate(ScanDelegate())
-    devices = scanner.scan(10.0)
+    scanner = ble.Scanner(0).withDelegate(ScanDelegate())
+    """devices = scanner.scan(10.0)
 
     for dev in devices:
         print("Device %s (%s), RSSI=%d dB" % (dev.addr, dev.addrType, dev.rssi))
         for (adtype, desc, value) in dev.getScanData():
             print("  %s = %s" % (desc, value))
 
-    scanner.clear()
+    scanner.clear()"""
     print("Continous scanning...")
     try:
         scanner.start()

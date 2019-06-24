@@ -20,8 +20,15 @@ PAGE="""\
 <title>picamera MJPEG streaming demo</title>
 </head>
 <body>
-<h1>PiCamera MJPEG Streaming Demo</h1>
+<h1>PiCamera Plugin</h1>
+<p>
+<a href="calibrate.run">Minimalen Block Noise ermitteln</a>
+<a href="stream.mjpg">Stream in Vollbild</a>
+<a href="snap.jpg">Snapshot erstellen</a>
+<a href="info.json">Debug JSON abrufen</a>
+<p>
 <img src="stream.mjpg" width="640" height="480" />
+<p>
 <object data="info.json" />
 </body>
 </html>
@@ -80,6 +87,9 @@ class StreamingPictureOutput(object):
 
 def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput, pic: StreamingPictureOutput):
     class StreamingHandler(server.BaseHTTPRequestHandler):
+        def meassure_call(self):
+            logging.warning("meassure_call nicht überladen")
+
         def do_GET(self):
             if self.path == '/':
                 self.send_response(301)
@@ -157,6 +167,17 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput, pic
                     logging.warning(
                         'HTTP Client %s entfernt: %s',
                         self.client_address, str(e))
+            elif self.path == "/calibrate.run":
+                self.send_response(200)
+                self.send_header('Age', 0)
+                self.send_header('Cache-Control', 'no-cache, private')
+                self.send_header('Pragma', 'no-cache')
+                self.send_header('Content-Type', 'multipart/x-mixed-replace; boundary=NEW_JSON_DATA')
+                self.end_headers()
+                self.wfile.write(b'OK!')
+                self.wfile.write(b'\r\n')
+                if self.meassure_call is not None:
+                    self.meassure_call()
             else:
                 self.send_error(404)
                 self.end_headers()

@@ -208,7 +208,7 @@ class GstRtspPython:
         self.__fac.set_shared(True)
         self.__fac.set_buffer_size((17000000 * 1 // 8) / 2) # Bitrate * Sekunden // 8 
         self.__fac.set_latency(250)
-        self.__fac.set_launch('( filesrc location=/tmp/motion-gst-pipe do-timestamp=true ! video/x-h264, framerate={}/1 ! h264parse ! clockoverlay halignment=right valignment=bottom text="{}" shaded-background=true font-desc="Sans, 24" ! rtph264pay name=pay0 pt=96 )'.format(self._fps, self._camName))
+        self.__fac.set_launch('( filesrc location=/tmp/motion-gst-pipe do-timestamp=true ! video/x-h264, framerate={}/1 ! h264parse ! rtph264pay name=pay0 pt=96 )'.format(self._fps))
         mounts.add_factory("/h264", self.__fac)
         self.__srv.attach(None)
         self.__ml.run()

@@ -38,6 +38,8 @@ class PiMotionMain(threading.Thread):
     topic           = None
     _lastState      = { "motion": 0, "x": 0, "y": 0, "val": 0, "c": 0 }
     _rtsp_recorder  = None
+    _analyzer       = None
+    _postRecordTimer = None
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         threading.Thread.__init__(self)
@@ -93,12 +95,15 @@ class PiMotionMain(threading.Thread):
             camera.annotate_background = cam.Color('black')
             camera.annotate_text = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-            with analyzers.Analyzer(camera) as anal:
+            with analyzers.Analyzer(camera, logger=self.__logger.getChild("Analyzer")) as anal:
                 self.__logger.debug("Analyzer erstellt")
                 anal.frameToTriggerMotion = self._config.get("PiMotion/motion/motion_frames", 4)
                 anal.framesToNoMotion = self._config.get("PiMotion/motion/still_frames", 4)
-                anal.minNoise = self._config.get("PiMotion/motion/minNoise", 1000)
-                anal.logger = self.__logger.getChild("Analyzer")
+                anal.blockMaxNoise = self._config.get("PiMotion/motion/blockMinNoise", 0)
+                anal.countMinNoise = self._config.get("PiMotion/motion/frameMinNoise", 0)
+                anal.motion_call = lambda motion, data, mes: self.motion(motion, data, mes)
+                anal.motion_data_call = lambda data: self.motion_data(data)
+                self._analyzer = anal
 
                 self._circularStream = cam.PiCameraCircularIO(camera, seconds=self._config["PiMotion/motion/recordPre"])
 
@@ -147,8 +152,9 @@ class PiMotionMain(threading.Thread):
                         self._config.get("PiMotion/http/addr","0.0.0.0"),
                         self._config.get("PiMotion/http/port",8083)
                     )
-
-                    server = httpc.StreamingServer(address, httpc.makeStreamingHandler(http_out, self._jsonOutput, pic_out))
+                    streamingHandle = httpc.makeStreamingHandler(http_out, self._jsonOutput, pic_out)
+                    server = httpc.StreamingServer(address, streamingHandle)
+                    streamingHandle.meassure_call = lambda: self.meassure_minimal_blocknoise()
                     camera.start_recording(http_out, format='mjpeg', splitter_port=2)
                     server.logger = self.__logger.getChild("HTTP_srv")
                     t = threading.Thread(name="http_server", target=server.run)
@@ -166,12 +172,16 @@ class PiMotionMain(threading.Thread):
                         self.__logger.debug("Pro Sekunde verarbeitet: %d", pps)
                         self.update_anotation(aps=pps)
                         if firstFrames:
-                            anal.motion_call = lambda motion, data: self.motion(motion, data)
-                            anal.motion_data_call = lambda data: self.motion_data(data)
+                            def first_run():
+                                self.__logger.info("Stream wird sich normalisiert haben. Queue wird angeschlossen...")
+                                anal.run_queue( )
+                            t = threading.Thread(target=first_run)
+                            t.run()
                             firstFrames = False
                     except:
                         self.__logger.exception("Kamera Fehler")
                         exit(-1)
+                anal.stop_queue()
         server.server_close()
         camera.stop_recording(splitter_port=2)
         camera.stop_recording()
@@ -188,23 +198,37 @@ class PiMotionMain(threading.Thread):
             #    self._lastState["x"], self._lastState["y"], self._lastState["val"], self._lastState["c"]
             #)
 
+    def meassure_minimal_blocknoise(self):
+        self.__logger.info("Starte neue Kalibrierung...")
+        self._analyzer._calibration_running = True
 
-    def motion(self, motion:bool, data:dict):
-        if motion is self._inMotion:
-            return
+    def stop_record(self):
+        if self._rtsp_recorder is not None:
+            self._rtsp_recorder.shutdown()
+
+    def motion(self, motion:bool, data:dict, wasMeassureing:bool):
+        if wasMeassureing:
+            self._config["PiMotion/motion/blockMinNoise"] = self._analyzer.blockMaxNoise
+            self._config["PiMotion/motion/frameMinNoise"] = self._analyzer.countMinNoise
         if motion:
+            self.__logger.info("Motion")
             if self._config.get("PiMotion/record/enabled",True):
                 path = self._config.get("PiMotion/record/path","~/Videos")
                 path = "{}/{}.h264".format(path, dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-                self._rtsp_recorder = self._rtsp_split.recordTo(path=path)
-            self.__logger.info("Motion")
-            self._inMotion = True
+                if self._postRecordTimer is None:
+                    self._rtsp_recorder = self._rtsp_split.recordTo(path=path)
+                else:
+                    self._postRecordTimer.cancel()
+                    self._postRecordTimer = None
         else:
             self.__logger.info("No Motion")
-            self._inMotion = False
-            if self._rtsp_recorder is not None:
-                self._rtsp_recorder.shutdown()
+            if self._postRecordTimer is not None:
+                self._postRecordTimer.cancel()
+                self._postRecordTimer = None
+            self._postRecordTimer = threading.Timer(interval=self._config.get("PiMotion/motion/recordPost", 1), function=self.stop_record)
+            self._postRecordTimer.start()
         self.motion_data(data)
+        self._inMotion = motion
     
     def motion_data(self, data:dict):
         # x y val count
@@ -212,7 +236,8 @@ class PiMotionMain(threading.Thread):
             "y": data["hotest"][1], "val": data["hotest"][2], "c": data["noise_count"]}
         self._jsonOutput.write(self._lastState)
         self.update_anotation()
-        self.sendStates()
+        if self._analyzer is not None and not self._analyzer._calibration_running:
+            self.sendStates()
     
     def sendStates(self):
         self.__client.publish(self.topic.state, json.dumps(self._lastState))
