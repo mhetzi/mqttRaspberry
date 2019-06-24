@@ -109,7 +109,7 @@ class Analyzer(cama.PiAnalysisOutput):
                     self.logger.debug("still_frame {} von {}".format( self.states["still_frames"], self.framesToNoMotion))
             else:
                 self.states["motion_frames"] += 1
-                self.states["still_frames"] = 0
+                self.logger.debug("Bewegung! {} von {}".format(self.states["motion_frames"], self.frameToTriggerMotion))
             self.processed += 1
             self.states["hotest"] = [hottestBlock[0], hottestBlock[1], hottestBlock[2]]
             self.states["noise_count"] = hottestBlock[3]

@@ -60,7 +60,7 @@ class PiMotionMain(threading.Thread):
         sensorName = self._config["PiMotion/motion/sensorName"]
         uid = "binary_sensor.piMotion-{}-{}".format(self._device_id, sensorName)
         self.topic = self._config.get_autodiscovery_topic(conf.autodisc.Component.BINARY_SENROR, sensorName, conf.autodisc.BinarySensorDeviceClasses.MOTION)
-        payload = self.topic.get_config_payload(sensorName, "", unique_id=uid, value_template="{{ value_json.motion }}")
+        payload = self.topic.get_config_payload(sensorName, "", unique_id=uid, value_template="{{ value_json.motion }}", json_attributes=True)
         if (self.topic.config is not None):
             self.__client.publish(self.topic.config, payload=payload, qos=0, retain=True)
         
@@ -80,6 +80,8 @@ class PiMotionMain(threading.Thread):
             self._http_server.stop()
         if self._rtsp_split is not None:
             self._rtsp_split.shutdown()
+        if self._analyzer is not None:
+            self._analyzer.stop_queue()
         self.__client.publish(self.topic.ava_topic, "offline", retain=True)
         
 
@@ -170,12 +172,12 @@ class PiMotionMain(threading.Thread):
                         pps = anal.processed / 5
                         anal.processed = 0
                         self.__logger.debug("Pro Sekunde verarbeitet: %d", pps)
-                        self.update_anotation(aps=pps)
                         if firstFrames:
                             def first_run():
                                 self.__logger.info("Stream wird sich normalisiert haben. Queue wird angeschlossen...")
                                 anal.run_queue( )
                             t = threading.Thread(target=first_run)
+                            t.setDaemon(True)
                             t.run()
                             firstFrames = False
                     except:
