@@ -82,6 +82,7 @@ class PiMotionMain(threading.Thread):
             self._rtsp_split.shutdown()
         if self._analyzer is not None:
             self._analyzer.stop_queue()
+        self.stop_record()
         self.__client.publish(self.topic.ava_topic, "offline", retain=True)
         
 
@@ -156,7 +157,7 @@ class PiMotionMain(threading.Thread):
                     )
                     streamingHandle = httpc.makeStreamingHandler(http_out, self._jsonOutput, pic_out)
                     server = httpc.StreamingServer(address, streamingHandle)
-                    streamingHandle.meassure_call = lambda: self.meassure_minimal_blocknoise()
+                    streamingHandle.meassure_call = lambda s: self.meassure_minimal_blocknoise()
                     camera.start_recording(http_out, format='mjpeg', splitter_port=2)
                     server.logger = self.__logger.getChild("HTTP_srv")
                     t = threading.Thread(name="http_server", target=server.run)
@@ -184,9 +185,18 @@ class PiMotionMain(threading.Thread):
                         self.__logger.exception("Kamera Fehler")
                         exit(-1)
                 anal.stop_queue()
-        server.server_close()
-        camera.stop_recording(splitter_port=2)
-        camera.stop_recording()
+        try:
+            server.stop()
+        except:
+            pass
+        try:
+            camera.stop_recording(splitter_port=2)
+        except:
+            pass
+        try:
+            camera.stop_recording()
+        except:
+            pass
         self._camera = None
 
     def update_anotation(self, aps=0):
@@ -202,11 +212,15 @@ class PiMotionMain(threading.Thread):
 
     def meassure_minimal_blocknoise(self):
         self.__logger.info("Starte neue Kalibrierung...")
+        self._analyzer.states["still_frames"] = 0
         self._analyzer._calibration_running = True
+        self._analyzer.framesToNoMotion *= 10
 
     def stop_record(self):
         if self._rtsp_recorder is not None:
             self._rtsp_recorder.shutdown()
+            self._rtsp_recorder = None
+        self._postRecordTimer = None
 
     def motion(self, motion:bool, data:dict, wasMeassureing:bool):
         if wasMeassureing:
@@ -222,13 +236,16 @@ class PiMotionMain(threading.Thread):
                 else:
                     self._postRecordTimer.cancel()
                     self._postRecordTimer = None
+                    self.__logger.debug("Aufname timer wird zurückgesetzt")
         else:
             self.__logger.info("No Motion")
             if self._postRecordTimer is not None:
                 self._postRecordTimer.cancel()
                 self._postRecordTimer = None
+                self.__logger.debug("Aufname timer wird zurückgesetzt")
             self._postRecordTimer = threading.Timer(interval=self._config.get("PiMotion/motion/recordPost", 1), function=self.stop_record)
             self._postRecordTimer.start()
+            self.__logger.debug("Aufnahme wird in {} Sekunden beendet.".format(self._config.get("PiMotion/motion/recordPost", 1)))
         self.motion_data(data)
         self._inMotion = motion
     

@@ -63,17 +63,18 @@ class Analyzer(cama.PiAnalysisOutput):
     def thread_queue_reader(self):
         import random
         import math
-        for i in range(5):
+        for _ in range(6):
             try:
                 self._queue.get_nowait()
             except queue.Empty:
                 self.logger.debug("Queue ist leer")
         self.logger.debug("QueueReader läuft")
+        if self.blockMaxNoise < 0 and self.countMinNoise < 0:
+            self._calibration_running = True
+            self.blockMaxNoise = 0
+            self.framesToNoMotion *= 10
         while self.__thread_do_run:
             hottestBlock = self._queue.get()
-            if self.blockMaxNoise < 0 and self.countMinNoise < 0:
-                self._calibration_running = True
-                self.blockMaxNoise = 0
             if self._calibration_running:
                 if self.countMinNoise <= hottestBlock[3]:
                     if self.states["motion_frames"] >= self.frameToTriggerMotion:
@@ -88,9 +89,9 @@ class Analyzer(cama.PiAnalysisOutput):
                         self.logger.info("Kalibriere derzeit bei {} +countMinNoise".format(self.countMinNoise))
                     else:
                         self.states["motion_frames"] += 1
-                if hottestBlock[2] >= self.blockMaxNoise and self.states["motion_frames"] >= self.frameToTriggerMotion: 
+                if hottestBlock[2] >= self.blockMaxNoise and self.states["motion_frames"] >= self.frameToTriggerMotion:
                     #self.logger.info("(x,y,val,count) = (%d,%d,%d,%d) ", hottestBlock[0], hottestBlock[1], hottestBlock[2], hottestBlock[3])
-                    if self._calibration_running:
+                    if self.states["motion_frames"] >= self.frameToTriggerMotion:
                         add = math.floor( (hottestBlock[2] - self.blockMaxNoise ) / 5 )
                         self.blockMaxNoise += add if add >= 2 else 2
                         if random.randrange(0, 100) < 25:
@@ -123,27 +124,32 @@ class Analyzer(cama.PiAnalysisOutput):
                     pass
                 self._calibration_running = False
                 self.logger.info("Die ermittelten Werte block {} count {}".format(self.blockMaxNoise, self.countMinNoise))
-
-            try:
-                if self.states["noise_count"] >= self.countMinNoise or self.states["hotest"][2] > self.blockMaxNoise:
-                    self.motion_data_call(self.states)
-            except Exception as e:
-                self.logger.exception("Motion data call Exception: {}".format(str(e)))
-            try:
-                if self.states["motion_frames"] >= self.frameToTriggerMotion and not self.__motion_triggered:
-                    self.logger.debug("Trigger Motion")
-                    self.states["still_frames"] = 0
-                    self.motion_call(True, self.states, False)
-                    self.logger.debug("motion_call called")
-                    self.__motion_triggered = True
-                elif self.states["still_frames"] >= self.framesToNoMotion and self.__motion_triggered:
-                    self.logger.debug("Detrigger Motion")
-                    self.states["motion_frames"] = 0
-                    self.motion_call(False, self.states, False)
-                    self.logger.debug("motion_call called")
-                    self.__motion_triggered = False
-            except Exception as e:
-                self.logger.exception("Motion call Exception: {}".format(str(e)))
+                self.framesToNoMotion = self.framesToNoMotion / 10
+            elif not self._calibration_running:
+                try:
+                    if self.states["noise_count"] >= self.countMinNoise or self.states["hotest"][2] > self.blockMaxNoise:
+                        self.motion_data_call(self.states)
+                except Exception as e:
+                    self.logger.exception("Motion data call Exception: {}".format(str(e)))
+                try:
+                    if self.states["motion_frames"] >= self.frameToTriggerMotion and not self.__motion_triggered:
+                        self.logger.debug("Trigger Motion")
+                        self.states["still_frames"] = 0
+                        self.states["motion_frames"] = 0
+                        self.motion_call(True, self.states, False)
+                        self.logger.debug("motion_call called")
+                        self.__motion_triggered = True
+                    elif self.states["motion_frames"] >= self.frameToTriggerMotion and self.__motion_triggered:
+                        self.states["still_frames"] = 0
+                        self.states["motion_frames"] = 0
+                    elif self.states["still_frames"] >= self.framesToNoMotion and self.__motion_triggered:
+                        self.logger.debug("Detrigger Motion")
+                        self.states["motion_frames"] = 0
+                        self.motion_call(False, self.states, False)
+                        self.logger.debug("motion_call called")
+                        self.__motion_triggered = False
+                except Exception as e:
+                    self.logger.exception("Motion call Exception: {}".format(str(e)))
         self.logger.debug("QueueReader geht schlafe (für immer)")
 
     def hotBlock(self, a):

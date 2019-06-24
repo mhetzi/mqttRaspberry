@@ -17,10 +17,10 @@ except ImportError:
 PAGE="""\
 <html>
 <head>
-<title>picamera MJPEG streaming demo</title>
+<title>PiCamera Plugin</title>
 </head>
 <body>
-<h1>PiCamera Plugin</h1>
+<h1>mqtt PiCamera Plugin</h1>
 <p>
 <a href="calibrate.run">Minimalen Block Noise ermitteln</a>
 <a href="stream.mjpg">Stream in Vollbild</a>
@@ -67,8 +67,15 @@ class StreamingJsonOutput(object):
 
 class StreamingPictureOutput(object):
 
+    requested = False
+
     def talkback(self):
         pass
+
+    def do_talkback(self):
+        if not self.requested:
+            self.requested = True
+            self.talkback()
 
     def __init__(self):
         self.frame = None
@@ -83,6 +90,7 @@ class StreamingPictureOutput(object):
         with self.condition:
             self.frame = self.buffer.getvalue()
             self.condition.notify_all()
+            self.requested = False
         self.buffer.seek(0)
 
 def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput, pic: StreamingPictureOutput):
@@ -128,7 +136,7 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput, pic
             elif self.path == '/snap.jpg':
                 self.send_response(200)
                 try:
-                    pic.talkback()
+                    pic.do_talkback()
                     frame = None
                     with pic.condition:
                         pic.condition.wait()

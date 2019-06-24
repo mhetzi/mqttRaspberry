@@ -176,13 +176,13 @@ class CameraSplitIO(threading.Thread):
         else:
             self._myParent.append = self._oldAppend
 
-    def recordTo(self, path=None, stream=None):
+    def recordTo(self, path=None, stream=None, preRecordSeconds=1):
         if path is None and stream is None:
             self.logger.error("Pfad und Stream ist None!")
             return
         if path is not None and stream is None:
             self.logger.info("Öffne {} um Aufnahme zu speichern".format(path))
-            stream = open(path, "wb")
+            stream = open(path, "wb", buffering=(17000000 * (preRecordSeconds+1) // 8 ))
         new_splitter = CameraSplitIO(self._camera, self._splitter_port)
         new_splitter.logger = self.logger
         new_splitter.initAndRun(self._io, file=stream, parent=self)
