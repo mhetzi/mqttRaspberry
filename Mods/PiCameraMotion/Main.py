@@ -23,6 +23,7 @@ import Mods.PiCameraMotion.rtsp as rtsp
 import Tools.PluginManager as pm
 import json
 import datetime as dt
+import pathlib
 
 class PiMotionMain(threading.Thread):
 
@@ -54,6 +55,12 @@ class PiMotionMain(threading.Thread):
         self.__logger.debug("PiMotion.register()")
         self._doExit = False
         self._camera = None
+
+        path = self._config.get("PiMotion/record/path","~/Videos")
+        if not path.endswith("/"):
+            path += "/"
+        path = "{}/aufnahmen/".format(path)
+        pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
     def register(self):
         # Setup MQTT zeug
@@ -230,7 +237,9 @@ class PiMotionMain(threading.Thread):
             self.__logger.info("Motion")
             if self._config.get("PiMotion/record/enabled",True):
                 path = self._config.get("PiMotion/record/path","~/Videos")
-                path = "{}/{}.h264".format(path, dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                if not path.endswith("/"):
+                    path += "/"
+                path = "{}/aufnahmen/{}.h264".format(path, dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                 if self._postRecordTimer is None:
                     self._rtsp_recorder = self._rtsp_split.recordTo(path=path)
                 else:
