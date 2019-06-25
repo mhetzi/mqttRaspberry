@@ -75,34 +75,7 @@ class Analyzer(cama.PiAnalysisOutput):
             self.framesToNoMotion *= 10
         while self.__thread_do_run:
             hottestBlock = self._queue.get()
-            if self._calibration_running:
-                if self.countMinNoise <= hottestBlock[3]:
-                    if self.states["motion_frames"] >= self.frameToTriggerMotion:
-                        add = math.floor( (hottestBlock[3] - self.blockMaxNoise ) / 1.25 )
-                        self.countMinNoise += add if add >= 2 else 2
-                        if random.randrange(0, 100) < 25:
-                            self.blockMaxNoise -= 35
-                            if self.blockMaxNoise < 0:
-                                self.blockMaxNoise = 0
-                        self.states["still_frames"] = 0
-                        self.states["motion_frames"] = 0
-                        self.logger.info("Kalibriere derzeit bei {} +countMinNoise".format(self.countMinNoise))
-                    else:
-                        self.states["motion_frames"] += 1
-                if hottestBlock[2] >= self.blockMaxNoise and self.states["motion_frames"] >= self.frameToTriggerMotion:
-                    #self.logger.info("(x,y,val,count) = (%d,%d,%d,%d) ", hottestBlock[0], hottestBlock[1], hottestBlock[2], hottestBlock[3])
-                    if self.states["motion_frames"] >= self.frameToTriggerMotion:
-                        add = math.floor( (hottestBlock[2] - self.blockMaxNoise ) / 5 )
-                        self.blockMaxNoise += add if add >= 2 else 2
-                        if random.randrange(0, 100) < 25:
-                            self.countMinNoise -= 2
-                            if self.countMinNoise < 0:
-                                self.countMinNoise = 0
-                        self.states["still_frames"] = 0
-                        self.states["motion_frames"] = 0
-                        self.logger.info("Kalibriere derzeit bei {} +blockNoise".format(self.blockMaxNoise))
-                    else:
-                        self.states["motion_frames"] += 1
+
             if self.countMinNoise > hottestBlock[3] and hottestBlock[2] < self.blockMaxNoise:
                 self.states["still_frames"] += 1
                 self.states["motion_frames"] = 0
@@ -111,6 +84,27 @@ class Analyzer(cama.PiAnalysisOutput):
             else:
                 self.states["motion_frames"] += 1
                 self.logger.debug("Bewegung! {} von {}".format(self.states["motion_frames"], self.frameToTriggerMotion))
+                if self.countMinNoise <= hottestBlock[3] and self.states["motion_frames"] >= self.frameToTriggerMotion and self._calibration_running:
+                    add = math.floor( (hottestBlock[3] - self.blockMaxNoise ) / 1.25 )
+                    self.countMinNoise += add if add >= 2 else 2
+                    if random.randrange(0, 100) < 25:
+                        self.blockMaxNoise -= 35
+                        if self.blockMaxNoise < 0:
+                            self.blockMaxNoise = 0
+                    self.states["still_frames"] = 0
+                    self.states["motion_frames"] = 0
+                    self.logger.info("Kalibriere derzeit bei {} +countMinNoise".format(self.countMinNoise))
+                if hottestBlock[2] >= self.blockMaxNoise and self.states["motion_frames"] >= self.frameToTriggerMotion and self._calibration_running:
+                    add = math.floor( (hottestBlock[2] - self.blockMaxNoise ) / 5 )
+                    self.blockMaxNoise += add if add >= 2 else 2
+                    if random.randrange(0, 100) < 25:
+                        self.countMinNoise -= 2
+                        if self.countMinNoise < 0:
+                            self.countMinNoise = 0
+                    self.states["still_frames"] = 0
+                    self.states["motion_frames"] = 0
+                    self.logger.info("Kalibriere derzeit bei {} +blockNoise".format(self.blockMaxNoise))
+            
             self.processed += 1
             self.states["hotest"] = [hottestBlock[0], hottestBlock[1], hottestBlock[2]]
             self.states["noise_count"] = hottestBlock[3]
