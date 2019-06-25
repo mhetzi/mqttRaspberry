@@ -27,19 +27,20 @@ import pathlib
 
 class PiMotionMain(threading.Thread):
 
-    _motionStream   = etc.NullOutput( )
-    _webStream      = etc.NullOutput( )
-    _circularStream = None
-    _inMotion       = None
-    _pluginManager  = None
-    _rtsp_server    = None
-    _http_server    = None
-    _rtsp_split     = None
-    _jsonOutput     = None
-    topic           = None
-    _lastState      = { "motion": 0, "x": 0, "y": 0, "val": 0, "c": 0 }
-    _rtsp_recorder  = None
-    _analyzer       = None
+    _motionStream    = etc.NullOutput( )
+    _webStream       = etc.NullOutput( )
+    _circularStream  = None
+    _inMotion        = None
+    _pluginManager   = None
+    _rtsp_server     = None
+    _http_server     = None
+    _rtsp_split      = None
+    _jsonOutput      = None
+    _motion_topic    = None
+    _do_record_topic = None
+    _lastState       = { "motion": 0, "x": 0, "y": 0, "val": 0, "c": 0 }
+    _rtsp_recorder   = None
+    _analyzer        = None
     _postRecordTimer = None
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
@@ -62,17 +63,54 @@ class PiMotionMain(threading.Thread):
         path = "{}/aufnahmen/".format(path)
         pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
+    def set_do_record(self, recording:bool):
+        self.__logger.info("Config Wert aufnehmen wird auf {} gesetzt".format(recording))
+        self._config["PiMotion/record/enabled"] = recording
+        self.__client.publish(self._do_record_topic.state, payload=b'ON' if recording else b'OFF')
+
+    def on_message(self, client, userdata, message: mclient.MQTTMessage):
+        if self._do_record_topic.command == message.topic:
+            if message.payload.decode('utf-8') == "ON":
+                self.set_do_record(True)
+            elif message.payload.decode('utf-8') == "OFF":
+                self.set_do_record(False)
+
     def register(self):
-        # Setup MQTT zeug
+        # Setup MQTT motion binary_sensor
         sensorName = self._config["PiMotion/motion/sensorName"]
-        uid = "binary_sensor.piMotion-{}-{}".format(self._device_id, sensorName)
-        self.topic = self._config.get_autodiscovery_topic(conf.autodisc.Component.BINARY_SENROR, sensorName, conf.autodisc.BinarySensorDeviceClasses.MOTION)
-        payload = self.topic.get_config_payload(sensorName, "", unique_id=uid, value_template="{{ value_json.motion }}", json_attributes=True)
-        if (self.topic.config is not None):
-            self.__client.publish(self.topic.config, payload=payload, qos=0, retain=True)
-        
-        self.__client.publish(self.topic.ava_topic, "online", retain=True)
-        self.__client.will_set(self.topic.ava_topic, "offline", retain=True)
+        uid_motion = "binary_sensor.piMotion-{}-{}".format(self._device_id, sensorName)
+        self._motion_topic = self._config.get_autodiscovery_topic(
+            conf.autodisc.Component.BINARY_SENROR,
+            sensorName,
+            conf.autodisc.BinarySensorDeviceClasses.MOTION
+        )
+        motion_payload = self._motion_topic.get_config_payload(sensorName, "", unique_id=uid_motion, value_template="{{ value_json.motion }}", json_attributes=True)
+        if self._motion_topic.config is not None:
+            self.__client.publish(self._motion_topic.config, payload=motion_payload, qos=0, retain=True)
+        self.__client.publish(self._motion_topic.ava_topic, "online", retain=True)
+        self.__client.will_set(self._motion_topic.ava_topic, "offline", retain=True)
+
+        # Setup MQTT recording switch
+        switchName    = "{} Aufnehmen".format(sensorName)
+        uid_do_record = "switch.piMotion-{}-{}".format(self._device_id, switchName.replace(" ", "_"))
+        self._do_record_topic = self._config.get_autodiscovery_topic(
+            conf.autodisc.Component.SWITCH,
+            switchName,
+            conf.autodisc.SensorDeviceClasses.GENERIC_SENSOR
+        )
+        do_record_payload = self._do_record_topic.get_config_payload(
+            switchName,
+            "",
+            unique_id=uid_do_record
+        )
+        if self._do_record_topic is not None:
+            self.__client.publish(self._do_record_topic.config, payload=do_record_payload, qos=0, retain=True)
+        self.__client.publish(self._do_record_topic.ava_topic, "online", retain=True)
+        self.__client.will_set(self._do_record_topic.ava_topic, "offline", retain=True)
+        self.__client.subscribe(self._do_record_topic.command)
+        self.__client.message_callback_add(self._do_record_topic.command, self.on_message)
+        self.set_do_record(self._config.get("PiMotion/record/enabled", True))
+
         # Starte thread
         self.start()
 
@@ -90,7 +128,7 @@ class PiMotionMain(threading.Thread):
         if self._analyzer is not None:
             self._analyzer.stop_queue()
         self.stop_record()
-        self.__client.publish(self.topic.ava_topic, "offline", retain=True)
+        self.__client.publish(self._motion_topic.ava_topic, "offline", retain=True)
         
 
     def run(self):
@@ -255,8 +293,9 @@ class PiMotionMain(threading.Thread):
             self._postRecordTimer = threading.Timer(interval=self._config.get("PiMotion/motion/recordPost", 1), function=self.stop_record)
             self._postRecordTimer.start()
             self.__logger.debug("Aufnahme wird in {} Sekunden beendet.".format(self._config.get("PiMotion/motion/recordPost", 1)))
-        self.motion_data(data)
+        
         self._inMotion = motion
+        self.motion_data(data)
     
     def motion_data(self, data:dict):
         # x y val count
@@ -268,4 +307,4 @@ class PiMotionMain(threading.Thread):
             self.sendStates()
     
     def sendStates(self):
-        self.__client.publish(self.topic.state, json.dumps(self._lastState))
+        self.__client.publish(self._motion_topic.state, json.dumps(self._lastState))
