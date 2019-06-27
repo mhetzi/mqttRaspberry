@@ -65,6 +65,19 @@
             "request": "launch",
             "program": "${file}",
             "console": "externalTerminal"
+        },
+        {
+            "name": "Python Attach (Remote Debug doorrasp.lan)",
+            "type": "python",
+            "request": "attach",
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}",  // You may also manually specify the directory containing your source code.
+                    "remoteRoot": "~/progs/" // Linux example; adjust as necessary for your OS and situation.
+                }
+            ],
+            "port": 3000,                   // Set to the remote port.
+            "host": "1.2.3.4"               // Set to your remote host's public IP address.
         }
     ]
 }

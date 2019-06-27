@@ -103,6 +103,11 @@ class Launcher:
         try:
             self.pm.needed_plugins()
             self.mqtt_client, deviceID = self.pm.start_mqtt_client()
+            try:
+                import ptvsd
+                ptvsd.enable_attach(address=("0.0.0.0", 3000)) 
+            except:
+                self._log.info("Remote Debugging (ptvsd) nicht verfügbar")
             self.pm.enable_mods()
             self.mqtt_client.loop_start()
             self.mqtt_client._thread.join()
