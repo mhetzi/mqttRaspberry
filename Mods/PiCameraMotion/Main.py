@@ -24,6 +24,7 @@ import Tools.PluginManager as pm
 import json
 import datetime as dt
 import pathlib
+from PIL import Image
 
 class PiMotionMain(threading.Thread):
 
@@ -61,6 +62,12 @@ class PiMotionMain(threading.Thread):
         if not path.endswith("/"):
             path += "/"
         path = "{}/aufnahmen/".format(path)
+        pathlib.Path(path).mkdir(parents=True, exist_ok=True)
+
+        path = self._config.get("PiMotion/record/path","~/Videos")
+        if not path.endswith("/"):
+            path += "/"
+        path = "{}/magnitude/".format(path)
         pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
     def set_do_record(self, recording:bool):
@@ -125,11 +132,15 @@ class PiMotionMain(threading.Thread):
             self._http_server.stop()
         if self._rtsp_split is not None:
             self._rtsp_split.shutdown()
-        if self._analyzer is not None:
-            self._analyzer.stop_queue()
         self.stop_record()
         self.__client.publish(self._motion_topic.ava_topic, "offline", retain=True)
         
+        if self._analyzer is not None:
+            self._analyzer.stop_queue()
+            data, enable, build = self._analyzer.get_blockmask_enabled()
+            self._config["PiMotion/blockMask/mask_data" ] = data
+            self._config["PiMotion/blockMask/enable"    ] = enable
+            self._config["PiMotion/blockMask/do_rebuild"] = build
 
     def run(self):
         self.__logger.debug("PiMotion.run()")
@@ -151,6 +162,12 @@ class PiMotionMain(threading.Thread):
                 anal.countMinNoise = self._config.get("PiMotion/motion/frameMinNoise", 0)
                 anal.motion_call = lambda motion, data, mes: self.motion(motion, data, mes)
                 anal.motion_data_call = lambda data: self.motion_data(data)
+                anal.enable_blockmask(
+                    self._config.get("PiMotion/blockMask/mask_data", None),
+                    self._config.get("PiMotion/blockMask/enable", False),
+                    self._config.get("PiMotion/blockMask/do_rebuild", False)
+                )
+                anal.pil_magnitude_save_call = lambda data: self.pil_magnitude_save_call(data)
                 self._analyzer = anal
 
                 self._circularStream = cam.PiCameraCircularIO(camera, seconds=self._config["PiMotion/motion/recordPre"])
@@ -308,3 +325,12 @@ class PiMotionMain(threading.Thread):
     
     def sendStates(self):
         self.__client.publish(self._motion_topic.state, json.dumps(self._lastState))
+
+    def pil_magnitude_save_call(self, img:Image.Image):
+        path = self._config.get("PiMotion/record/path","~/Videos")
+        if not path.endswith("/"):
+            path += "/"
+        path = "{}/magnitude/{}.png".format(path, dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        print('Writing %s' % path)
+        img.save(path)
+        

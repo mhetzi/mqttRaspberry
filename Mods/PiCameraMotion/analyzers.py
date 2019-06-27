@@ -13,6 +13,9 @@ import pyximport; pyximport.install()
 import Mods.PiCameraMotion.analyze.hotblock
 import queue
 import threading
+import random
+import math
+from PIL import Image
 
 class Analyzer(cama.PiAnalysisOutput):
     processed = 0
@@ -27,12 +30,16 @@ class Analyzer(cama.PiAnalysisOutput):
     __max_ermittelt = False
     __min_ermittelt = False
     __motion_triggered = False
+    __block_mask       = {"enabled": False, "mask": None, "isBuilding": False, "cObj": None}
 
     def motion_call(self, motion:bool, data:dict, wasMeassureing:bool):
         self.logger.error("motion_call nicht überschrieben!")
 
     def motion_data_call(self, data:dict):
         self.logger.error("motion_data_call nicht überschrieben!")
+
+    def pil_magnitude_save_call(self, img:Image.Image):
+        self.logger.error("pil_magnitude_save_call nicht überschrieben")
 
     def __init__(self, camera, size=None, logger=None):
         super(Analyzer, self).__init__(camera, size)
@@ -54,15 +61,93 @@ class Analyzer(cama.PiAnalysisOutput):
         return result
 
     def analyze(self, a: cama.motion_dtype):
-        hottestBlock = Mods.PiCameraMotion.analyze.hotblock.hotBlock(a, self.rows, self.cols, self.blockMaxNoise)
+        cMask = None
+        if self.__block_mask["enabled"] and self.__block_mask["cObj"] is not None:
+            cMask = self.__block_mask["cObj"]
+        hottestBlock = Mods.PiCameraMotion.analyze.hotblock.hotBlock(a, self.rows, self.cols, self.blockMaxNoise, cMask)
         try:
-            self._queue.put_nowait(hottestBlock)
+            self._queue.put_nowait((hottestBlock, a))
         except queue.Full:
             self.logger.debug("Queue ist voll")
+
+    def __calibrate(self, hottestBlock:dict):
+        if self.countMinNoise <= hottestBlock[3] and self.states["motion_frames"] >= self.frameToTriggerMotion:
+            add = math.floor( (hottestBlock[3] - self.blockMaxNoise ) / 1.25 )
+            self.countMinNoise += add if add >= 2 else 2
+            if random.randrange(0, 100) < 25:
+                self.blockMaxNoise -= 35
+                if self.blockMaxNoise < 0:
+                    self.blockMaxNoise = 0
+            self.states["still_frames"] = 0
+            self.states["motion_frames"] = 0
+            self.logger.info("Kalibriere derzeit bei {} +countMinNoise".format(self.countMinNoise))
+        if hottestBlock[2] >= self.blockMaxNoise and self.states["motion_frames"] >= self.frameToTriggerMotion:
+            add = math.floor( (hottestBlock[2] - self.blockMaxNoise ) / 5 )
+            self.blockMaxNoise += add if add >= 2 else 2
+            if random.randrange(0, 100) < 25:
+                self.countMinNoise -= 2
+                if self.countMinNoise < 0:
+                    self.countMinNoise = 0
+            self.states["still_frames"] = 0
+            self.states["motion_frames"] = 0
+            self.logger.info("Kalibriere derzeit bei {} +blockNoise".format(self.blockMaxNoise))
+
+    def __prepare_block_mask_data(self):
+        if self.rows is None or self.cols is None:
+            return False
+        if self.__block_mask["mask"] is None:
+            self.logger.debug("Build Mask dict")
+            self.__block_mask["mask"] = []
+            for r in range(self.rows):
+                col = []
+                for c in range(self.cols):
+                    col.append(0)
+                self.__block_mask["mask"].append(col)
+            self.__block_mask["cObj"] = Mods.PiCameraMotion.analyze.hotblock.init_block_mask(self.rows, self.cols)
+            return True
+        elif self.__block_mask["mask"] is not None and self.__block_mask["cObj"] is None:
+            try:
+                if not isinstance(self.__block_mask["mask"], list):
+                    self.logger.warning("Mask Object ist von Typ {} sollte aber list sein".format(type(self.__block_mask["mask"])))
+                    raise TypeError()
+                self.__block_mask["cObj"] = Mods.PiCameraMotion.analyze.hotblock.build_block_mask(
+                    self.__block_mask["mask"],
+                    self.rows,
+                    self.cols
+                )
+                return True
+            except TypeError as e:
+                self.__block_mask["mask"] = None
+                self.__block_mask["cObj"] = None
+                self.logger.warning("TypeError( {} ) on build_block_mask resetting...".format(str(e)))
+                return False
+        return True
+
+    def __build_block_mask(self, hottestBlock):
+        if not self.__prepare_block_mask_data():
+            self.logger.warning("__prepare_block_mask_data error.")
+            return
+        x = hottestBlock[0]
+        y = hottestBlock[1]
+        sad = hottestBlock[2]
+        if self.__block_mask["mask"][x][y] < sad:
+            self.__block_mask["mask"][x][y] = sad
+            self.logger.debug("x: {}, y: {} auf minimal {} gesetzt".format(x, y, sad))
+            self.__block_mask["cObj"] = Mods.PiCameraMotion.analyze.hotblock.update_block_mask(hottestBlock[4], self.__block_mask["cObj"])
+
+    def enable_blockmask(self, mask, on=True, build_new=False):
+        if mask is not None:
+            self.__block_mask["mask"] = mask
+        else:
+            self.__block_mask["mask"] = []
+        self.__block_mask["enabled"] = on
+        self.__block_mask["isBuilding"] = build_new
+        self.__prepare_block_mask_data()
     
+    def get_blockmask_enabled(self):
+        return self.__block_mask["enabled"], self.__block_mask["mask"], self.__block_mask["isBuilding"]
+
     def thread_queue_reader(self):
-        import random
-        import math
         for _ in range(6):
             try:
                 self._queue.get_nowait()
@@ -73,45 +158,28 @@ class Analyzer(cama.PiAnalysisOutput):
             self._calibration_running = True
             self.blockMaxNoise = 0
             self.framesToNoMotion *= 10
-        while self.__thread_do_run:
-            hottestBlock = self._queue.get()
 
+        while self.__thread_do_run:
+            hottestBlock, a = self._queue.get()
             if self.countMinNoise > hottestBlock[3] and hottestBlock[2] < self.blockMaxNoise:
                 self.states["still_frames"] += 1
                 self.states["motion_frames"] = 0
                 if self._calibration_running:
                     self.logger.debug("still_frame {} von {}".format( self.states["still_frames"], self.framesToNoMotion))
+
             else:
                 self.states["motion_frames"] += 1
                 self.logger.debug("Bewegung! {} von {}".format(self.states["motion_frames"], self.frameToTriggerMotion))
-                if self.countMinNoise <= hottestBlock[3] and self.states["motion_frames"] >= self.frameToTriggerMotion and self._calibration_running:
-                    add = math.floor( (hottestBlock[3] - self.blockMaxNoise ) / 1.25 )
-                    self.countMinNoise += add if add >= 2 else 2
-                    if random.randrange(0, 100) < 25:
-                        self.blockMaxNoise -= 35
-                        if self.blockMaxNoise < 0:
-                            self.blockMaxNoise = 0
-                    self.states["still_frames"] = 0
-                    self.states["motion_frames"] = 0
-                    self.logger.info("Kalibriere derzeit bei {} +countMinNoise".format(self.countMinNoise))
-                if hottestBlock[2] >= self.blockMaxNoise and self.states["motion_frames"] >= self.frameToTriggerMotion and self._calibration_running:
-                    add = math.floor( (hottestBlock[2] - self.blockMaxNoise ) / 5 )
-                    self.blockMaxNoise += add if add >= 2 else 2
-                    if random.randrange(0, 100) < 25:
-                        self.countMinNoise -= 2
-                        if self.countMinNoise < 0:
-                            self.countMinNoise = 0
-                    self.states["still_frames"] = 0
-                    self.states["motion_frames"] = 0
-                    self.logger.info("Kalibriere derzeit bei {} +blockNoise".format(self.blockMaxNoise))
-            
+                if self._calibration_running:
+                    self.__calibrate(hottestBlock)               
+                if self.__block_mask["isBuilding"]:
+                    self.__build_block_mask(hottestBlock)
+
             self.processed += 1
             self.states["hotest"] = [hottestBlock[0], hottestBlock[1], hottestBlock[2]]
             self.states["noise_count"] = hottestBlock[3]
 
             if self._calibration_running and self.states["still_frames"] > self.framesToNoMotion:
-                #import math
-                #self.blockMaxNoise = math.ceil(self.blockMaxNoise / 100 * 130)
                 try:
                     self.motion_call(False, self.states, True)
                 except:
@@ -126,6 +194,13 @@ class Analyzer(cama.PiAnalysisOutput):
                 except Exception as e:
                     self.logger.exception("Motion data call Exception: {}".format(str(e)))
                 try:
+                    if self.states["motion_frames"] >= self.frameToTriggerMotion:
+                        data = np.sqrt(
+                            np.square(a['x'].astype(np.float)) +
+                            np.square(a['y'].astype(np.float))
+                        ).clip(0, 255).astype(np.uint8)
+                        img = Image.fromarray(data)
+                        self.pil_magnitude_save_call(img)
                     if self.states["motion_frames"] >= self.frameToTriggerMotion and not self.__motion_triggered:
                         self.logger.debug("Trigger Motion")
                         self.states["still_frames"] = 0
@@ -146,26 +221,6 @@ class Analyzer(cama.PiAnalysisOutput):
                     self.logger.exception("Motion call Exception: {}".format(str(e)))
         self.logger.debug("QueueReader geht schlafe (für immer)")
 
-    def hotBlock(self, a):
-        hottestBlock = [0,0,0]
-        #print("   Columns    ")
-        #print( list(range(0, len(a[0]))) )
-        rows = len(a)
-        for x in range(0, rows):
-            row = a[x]
-            cols = len(row)
-            #print(x, end = ": ")
-            for y in range(0, cols):
-                col = row[y]
-                hottness = col[2]
-                if hottestBlock[2] < hottness:
-                    hottestBlock = [x,y,hottness]
-                    #print("H", end="")
-                #print(hottness, end=" ")
-            #print("")
-        #self.logger.info("(x,y,val) = (%d,%d,%d) ", hottestBlock[0],hottestBlock[1],hottestBlock[2])
-        self.processed += 1
-
     def run_queue(self):
         self.logger.debug("Queue Thread wird erstellt...")
         self._thread = threading.Thread(target=lambda: self.thread_queue_reader(), name="Analyzer Thread")
@@ -174,15 +229,3 @@ class Analyzer(cama.PiAnalysisOutput):
 
     def stop_queue(self):
         self.__thread_do_run = False
-
-    def getTotalChanged(self, a):
-        added = 0
-        x = np.square(a['x'].astype(np.float))
-        for xx in x:
-            for xxx in xx:
-                added += xxx
-        y = np.square(a['y'].astype(np.float))
-        for yy in y:
-            for yyy in yy:
-                added += yyy
-        self.logger.info("Changed: %d", added)
