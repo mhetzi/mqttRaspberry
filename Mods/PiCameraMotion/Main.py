@@ -326,11 +326,15 @@ class PiMotionMain(threading.Thread):
     def sendStates(self):
         self.__client.publish(self._motion_topic.state, json.dumps(self._lastState))
 
-    def pil_magnitude_save_call(self, img:Image.Image):
-        path = self._config.get("PiMotion/record/path","~/Videos")
-        if not path.endswith("/"):
-            path += "/"
-        path = "{}/magnitude/{}.png".format(path, dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        print('Writing %s' % path)
-        img.save(path)
+    def pil_magnitude_save_call(self, img:Image.Image, runsInThread=False):
+        if runsInThread:
+            path = self._config.get("PiMotion/record/path","~/Videos")
+            if not path.endswith("/"):
+                path += "/"
+            path = "{}/magnitude/{}.png".format(path, dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            print('Writing %s' % path)
+            img.save(path)
+            return
+        t = threading.Thread(target=lambda: self.pil_magnitude_save_call(img, runsInThread=True), name="MagSave")
+        t.start()
         

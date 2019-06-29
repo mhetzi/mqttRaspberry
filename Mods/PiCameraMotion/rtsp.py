@@ -134,7 +134,7 @@ class CameraSplitIO(threading.Thread):
     def shutdown(self):
         self._closed = True
         self.logger.info("Beende Queue")
-        self.join(6)
+        self.join(3)
         if self.is_alive() and self._reopen:
             self.logger.warning("Queue still alive")
             with open("/tmp/motion-gst-pipe", mode="rb") as f:

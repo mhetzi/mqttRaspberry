@@ -6,7 +6,7 @@
     "configurations": [
         {
             "name": "Python: Current File (Integrated Terminal)",
-            "type": "python3",
+            "type": "python",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal"
@@ -32,34 +32,6 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "Python: Django",
-            "type": "python3",
-            "request": "launch",
-            "program": "${workspaceFolder}/manage.py",
-            "console": "integratedTerminal",
-            "args": [
-                "runserver",
-                "--noreload",
-                "--nothreading"
-            ],
-            "django": true
-        },
-        {
-            "name": "Python: Flask",
-            "type": "python3",
-            "request": "launch",
-            "module": "flask",
-            "env": {
-                "FLASK_APP": "app.py"
-            },
-            "args": [
-                "run",
-                "--no-debugger",
-                "--no-reload"
-            ],
-            "jinja": true
-        },
-        {
             "name": "Python: Current File (External Terminal)",
             "type": "python3",
             "request": "launch",
@@ -73,11 +45,24 @@
             "pathMappings": [
                 {
                     "localRoot": "${workspaceFolder}",  // You may also manually specify the directory containing your source code.
-                    "remoteRoot": "~/progs/" // Linux example; adjust as necessary for your OS and situation.
+                    "remoteRoot": "./" // Linux example; adjust as necessary for your OS and situation.
                 }
             ],
             "port": 3000,                   // Set to the remote port.
-            "host": "1.2.3.4"               // Set to your remote host's public IP address.
+            "host": "192.168.55.66"               // Set to your remote host's public IP address.
+        },
+        {
+            "name": "Python Attach (Remote Debug ReservePi1.lan)",
+            "type": "python",
+            "request": "attach",
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}",  // You may also manually specify the directory containing your source code.
+                    "remoteRoot": "./" // Linux example; adjust as necessary for your OS and situation.
+                }
+            ],
+            "port": 3000,                   // Set to the remote port.
+            "host": "192.168.55.74"               // Set to your remote host's public IP address.
         }
     ]
 }

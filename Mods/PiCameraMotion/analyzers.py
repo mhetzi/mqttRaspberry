@@ -202,12 +202,12 @@ class Analyzer(cama.PiAnalysisOutput):
                         img = Image.fromarray(data)
                         self.pil_magnitude_save_call(img)
                     if self.states["motion_frames"] >= self.frameToTriggerMotion and not self.__motion_triggered:
+                        self.__motion_triggered = True
                         self.logger.debug("Trigger Motion")
                         self.states["still_frames"] = 0
                         self.states["motion_frames"] = 0
                         self.motion_call(True, self.states, False)
                         self.logger.debug("motion_call called")
-                        self.__motion_triggered = True
                     elif self.states["motion_frames"] >= self.frameToTriggerMotion and self.__motion_triggered:
                         self.states["still_frames"] = 0
                         self.states["motion_frames"] = 0
