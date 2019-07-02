@@ -199,7 +199,7 @@ class Launcher:
 
         self.reload_event.set()
 
-        while self.reload_event.wait(30):
+        while self.reload_event.wait(15):
             self.reload_event.clear()
             if self.reload:
                 self.reload = False

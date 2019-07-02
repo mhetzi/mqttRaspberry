@@ -15,13 +15,15 @@ import queue
 import threading
 import random
 import math
-from PIL import Image
+from PIL import Image, ImageDraw
 
 class Analyzer(cama.PiAnalysisOutput):
     processed = 0
     states = {"motion_frames": 0, "still_frames": 0, "noise_count": 0, "hotest": []}
+    __old_States = None
     blockMaxNoise = 0
     countMinNoise = 0
+    countMaxNoise = -1
     framesToNoMotion = 0
     frameToTriggerMotion = 0
     _calibration_running = False
@@ -38,7 +40,7 @@ class Analyzer(cama.PiAnalysisOutput):
     def motion_data_call(self, data:dict):
         self.logger.error("motion_data_call nicht überschrieben!")
 
-    def pil_magnitude_save_call(self, img:Image.Image):
+    def pil_magnitude_save_call(self, img:Image.Image, data:dict):
         self.logger.error("pil_magnitude_save_call nicht überschrieben")
 
     def __init__(self, camera, size=None, logger=None):
@@ -161,12 +163,15 @@ class Analyzer(cama.PiAnalysisOutput):
 
         while self.__thread_do_run:
             hottestBlock, a = self._queue.get()
-            if self.countMinNoise > hottestBlock[3] and hottestBlock[2] < self.blockMaxNoise:
+            self.processed += 1
+            self.states["hotest"] = [hottestBlock[0], hottestBlock[1], hottestBlock[2]]
+            self.states["noise_count"] = hottestBlock[3]
+            self.states["object"] = hottestBlock
+            if self.countMinNoise > hottestBlock[3] and self.countMaxNoise > hottestBlock[3] and hottestBlock[2] < self.blockMaxNoise:
                 self.states["still_frames"] += 1
                 self.states["motion_frames"] = 0
                 if self._calibration_running:
                     self.logger.debug("still_frame {} von {}".format( self.states["still_frames"], self.framesToNoMotion))
-
             else:
                 self.states["motion_frames"] += 1
                 self.logger.debug("Bewegung! {} von {}".format(self.states["motion_frames"], self.frameToTriggerMotion))
@@ -174,10 +179,14 @@ class Analyzer(cama.PiAnalysisOutput):
                     self.__calibrate(hottestBlock)               
                 if self.__block_mask["isBuilding"]:
                     self.__build_block_mask(hottestBlock)
-
-            self.processed += 1
-            self.states["hotest"] = [hottestBlock[0], hottestBlock[1], hottestBlock[2]]
-            self.states["noise_count"] = hottestBlock[3]
+                try:
+                    if self.states["motion_frames"] >= self.frameToTriggerMotion and not self.__motion_triggered:
+                        self.pil_magnitude_save_call(a, self.__old_States)
+                        self.pil_magnitude_save_call(a, self.states)
+                    else:
+                        self.__old_States = self.states.copy()
+                except:
+                    pass
 
             if self._calibration_running and self.states["still_frames"] > self.framesToNoMotion:
                 try:
@@ -194,13 +203,6 @@ class Analyzer(cama.PiAnalysisOutput):
                 except Exception as e:
                     self.logger.exception("Motion data call Exception: {}".format(str(e)))
                 try:
-                    if self.states["motion_frames"] >= self.frameToTriggerMotion:
-                        data = np.sqrt(
-                            np.square(a['x'].astype(np.float)) +
-                            np.square(a['y'].astype(np.float))
-                        ).clip(0, 255).astype(np.uint8)
-                        img = Image.fromarray(data)
-                        self.pil_magnitude_save_call(img)
                     if self.states["motion_frames"] >= self.frameToTriggerMotion and not self.__motion_triggered:
                         self.__motion_triggered = True
                         self.logger.debug("Trigger Motion")

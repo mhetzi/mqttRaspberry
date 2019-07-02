@@ -24,7 +24,8 @@ import Tools.PluginManager as pm
 import json
 import datetime as dt
 import pathlib
-from PIL import Image
+import queue
+from PIL import Image, ImageDraw, ImageFont
 
 class PiMotionMain(threading.Thread):
 
@@ -43,6 +44,8 @@ class PiMotionMain(threading.Thread):
     _rtsp_recorder   = None
     _analyzer        = None
     _postRecordTimer = None
+    _pilQueue        = None
+    _pilThread       = None
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         threading.Thread.__init__(self)
@@ -69,6 +72,13 @@ class PiMotionMain(threading.Thread):
             path += "/"
         path = "{}/magnitude/".format(path)
         pathlib.Path(path).mkdir(parents=True, exist_ok=True)
+        self._image_font = ImageFont.truetype(
+            font=self._config.get("PiMotion/font","/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+            size=24,
+            encoding="unic"    
+        )
+
+        self._pilQueue = queue.Queue(20)
 
     def set_do_record(self, recording:bool):
         self.__logger.info("Config Wert aufnehmen wird auf {} gesetzt".format(recording))
@@ -120,6 +130,8 @@ class PiMotionMain(threading.Thread):
 
         # Starte thread
         self.start()
+        self._pilThread = threading.Thread(target=self.pil_magnitude_save, name="MagSave")
+        self._pilThread.start()
 
     def set_pluginManager(self, p: pm.PluginManager):
         self._pluginManager = p
@@ -141,6 +153,13 @@ class PiMotionMain(threading.Thread):
             self._config["PiMotion/blockMask/mask_data" ] = data
             self._config["PiMotion/blockMask/enable"    ] = enable
             self._config["PiMotion/blockMask/do_rebuild"] = build
+        
+        if self._pilQueue is not None and self._pilThread is not None:
+            self.__logger.info("Stoppe PIL queue...")
+            qu = self._pilQueue
+            qu.put((None, None))
+            self._pilThread.join()
+            self._pilQueue = None
 
     def run(self):
         self.__logger.debug("PiMotion.run()")
@@ -160,6 +179,7 @@ class PiMotionMain(threading.Thread):
                 anal.framesToNoMotion = self._config.get("PiMotion/motion/still_frames", 4)
                 anal.blockMaxNoise = self._config.get("PiMotion/motion/blockMinNoise", 0)
                 anal.countMinNoise = self._config.get("PiMotion/motion/frameMinNoise", 0)
+                anal.countMaxNoise = self._config.get("PiMotion/motion/frameMaxNoise", 0)
                 anal.motion_call = lambda motion, data, mes: self.motion(motion, data, mes)
                 anal.motion_data_call = lambda data: self.motion_data(data)
                 anal.enable_blockmask(
@@ -167,7 +187,7 @@ class PiMotionMain(threading.Thread):
                     self._config.get("PiMotion/blockMask/enable", False),
                     self._config.get("PiMotion/blockMask/do_rebuild", False)
                 )
-                anal.pil_magnitude_save_call = lambda data: self.pil_magnitude_save_call(data)
+                anal.pil_magnitude_save_call = lambda img, data: self.pil_magnitude_save_call(img, data)
                 self._analyzer = anal
 
                 self._circularStream = cam.PiCameraCircularIO(camera, seconds=self._config["PiMotion/motion/recordPre"])
@@ -326,15 +346,40 @@ class PiMotionMain(threading.Thread):
     def sendStates(self):
         self.__client.publish(self._motion_topic.state, json.dumps(self._lastState))
 
-    def pil_magnitude_save_call(self, img:Image.Image, runsInThread=False):
-        if runsInThread:
+    def pil_magnitude_save_call(self, d, data:dict):
+        if self._pilQueue is not None:
+            try:
+                self._pilQueue.put_nowait( (d, data) )
+            except queue.Full:
+                pass
+    
+    def pil_magnitude_save(self):
+        while True:
+            a, data = self._pilQueue.get()
+            if a is None and data is None:
+                self.__logger.warning("PIL Magnitude Save Thread wird beendet")
+                return
+            d = np.sqrt(
+                np.square(a['x'].astype(np.float)) +
+                np.square(a['y'].astype(np.float))
+            ).clip(0, 255).astype(np.uint8)
+            Bimg = Image.fromarray(d)
+            img = Image.new("RGB", Bimg.size)
+            img.paste(img)
+            ig = ImageDraw.Draw(img)
+            self.__logger.debug(data)
+            ig.point(
+                [ (data["object"][4]["row"], data["object"][4]["col"]) ],
+                fill=(255,0,0,200)
+            )
             path = self._config.get("PiMotion/record/path","~/Videos")
             if not path.endswith("/"):
                 path += "/"
             path = "{}/magnitude/{}.png".format(path, dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             print('Writing %s' % path)
+            img = img.resize( (self._config["PiMotion/camera/width"], self._config["PiMotion/camera/height"]) )
+            draw = ImageDraw.Draw(img)
+            draw.text( (10,10), "X: {} Y: {} VAL: {} C: {}".format(data["hotest"][0], data["hotest"][1], data["hotest"][2], data["noise_count"]),
+                fill=(255,0,0,200), font=self._image_font)
             img.save(path)
-            return
-        t = threading.Thread(target=lambda: self.pil_magnitude_save_call(img, runsInThread=True), name="MagSave")
-        t.start()
         

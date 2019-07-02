@@ -9,3 +9,7 @@ Mein Python Skript um verschiedene sensoren auf MQTT zu puschen
  * JsonPipe   Erstelle eine named_pipe, andere programme/Skripte können so etwas auf MQTT pushen
  * DoorOpener Tür öffner (Wie bei Wohnungshäusern) Entsperren und öffnungsstatus via Taster bestimmen
  * BHL1750    Helligkeitssensor (Lux)
+
+
+ **Dependencies:**
+ python3-schedule python3-paho-mqtt

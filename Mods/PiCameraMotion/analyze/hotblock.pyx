@@ -11,6 +11,8 @@ ctypedef sBLOCK BLOCK
 
 cdef packed struct rBLOCK:
     BLOCK b
+    np.int16_t row
+    np.int16_t col
     np.uint16_t c
 
 ctypedef rBLOCK retBlock
@@ -23,6 +25,8 @@ cdef retBlock chotBlock(np.ndarray[BLOCK, ndim=2] arr, np.int16_t rows, np.int16
     hotest.b.y = 0
     hotest.b.sad = 0
     hotest.c = 0
+    hotest.row = 0
+    hotest.col = 0
     cdef np.int16_t r
     cdef np.int16_t c
     cdef BLOCK b
@@ -35,6 +39,8 @@ cdef retBlock chotBlock(np.ndarray[BLOCK, ndim=2] arr, np.int16_t rows, np.int16
                 hotest.b.x = b.x
                 hotest.b.y = b.y
                 hotest.b.sad = b.sad
+                hotest.col = c
+                hotest.row = r
             if b.sad > minNoise:
                 hotest.c += 1
     return hotest

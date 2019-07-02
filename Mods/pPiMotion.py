@@ -6,7 +6,6 @@ import logging
 import os
 import errno
 import json
-
 import Mods.PiCameraMotion as pcm
 import Mods.PiCameraMotion.Main as pcma
 
@@ -18,6 +17,7 @@ class PluginLoader:
 
     @staticmethod
     def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        
         plugin = pcma.PiMotionMain(client, opts, logger, device_id)
         return plugin
 
@@ -27,7 +27,7 @@ class PluginLoader:
         conf["PiMotion/camera/width"] = ConsoleInputTools.get_number_input("Resolution width ", 640)
         conf["PiMotion/camera/height"] = ConsoleInputTools.get_number_input("Resolution height ", 480)
         conf["PiMotion/camera/fps"] = ConsoleInputTools.get_number_input("Framerate ", 25)
-        comf["PiMotion/camera/denoise"] = ConsoleInputTools.get_bool_input("Denoise Video? ")
+        conf["PiMotion/camera/denoise"] = ConsoleInputTools.get_bool_input("Denoise Video? ")
         print("")
         conf["PiMotion/motion/recordPre"] = ConsoleInputTools.get_number_input("Sekunden vor Bwegung aufnehmen ", 1)
         conf["PiMotion/motion/recordPost"] = ConsoleInputTools.get_number_input("Sekunden nach Bwegung aufnehmen ", 1)
