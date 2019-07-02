@@ -70,10 +70,11 @@ class StreamingPictureOutput(object):
     requested = False
 
     def talkback(self):
-        pass
+        raise NotImplementedError()
 
-    def do_talkback(self):
-        if not self.requested:
+    def do_talkback(self, force=False):
+        if not self.requested or force:
+            print("do_talkback({}): wasRequested: {}".format(force, self.requested))
             self.requested = True
             self.talkback()
 
@@ -134,13 +135,17 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput, pic
                         'HTTP Client %s entfernt: %s',
                         self.client_address, str(e))
             elif self.path == '/snap.jpg':
-                self.send_response(200)
                 try:
                     pic.do_talkback()
                     frame = None
                     with pic.condition:
-                        pic.condition.wait()
+                        if not pic.condition.wait(timeout=30):
+                            pic.do_talkback(force=True)
+                            if not pic.condition.wait(timeout=30):
+                                self.send_response(500)
+                                return
                         frame = pic.frame
+                    self.send_response(200)
                     self.send_header('Age', 0)
                     self.send_header('Cache-Control', 'no-cache, private')
                     self.send_header('Pragma', 'no-cache')
