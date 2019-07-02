@@ -6,6 +6,7 @@ import logging
 import socketserver
 from threading import Condition
 from http import server
+import urllib
 import threading
 import time
 
@@ -33,6 +34,8 @@ PAGE="""\
 </body>
 </html>
 """
+
+SETTINGS=u"<html><head><title>PiCamera Plugin Settings</title></head><body><h1>mqtt PiCamera Plugin Settings</h1><p><form action=\"/updateMotion.data\" method=\"get\">  Über Blockanzahl <input type=\"number\" name=\"maxCount\" value=\"{}\"> ignorieren<br>  Minimale Blockanzahl <input type=\"number\" name=\"minCount\" value=\"{}\"><br>  Minimaler Veränderungswert <input type=\"number\" name=\"minBlock\" value=\"{}\"><br>  Bilder bis zur Bewegungserkennung <input type=\"number\" name=\"mF\" value=\"{}\"><br>  Bilder ohne Bewegung <input type=\"number\" name=\"sF\" value=\"{}\"><br>  <input type=\"submit\" value=\"Übernehmen\"></form>"
 
 class StreamingOutput(object):
     def __init__(self):
@@ -98,6 +101,10 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput, pic
     class StreamingHandler(server.BaseHTTPRequestHandler):
         def meassure_call(self):
             logging.warning("meassure_call nicht überladen")
+        
+        def fill_setting_html(self, html:str):
+            logging.warning("fill_setting_html nicht überladen")
+            return html
 
         def do_GET(self):
             if self.path == '/':
@@ -191,6 +198,24 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput, pic
                 self.wfile.write(b'\r\n')
                 if self.meassure_call is not None:
                     self.meassure_call()
+            elif self.path.startswith("/updateMotion.data"):
+                data = self.path.replace("/updateMotion.data?", "")
+                data = urllib.parse.parse_qs(data)
+                if len(data) < 1:
+                    self.send_response(500, "Keine Parameter!")
+                    return
+                self.send_response(200)
+                print("Habe von Client {} bekommen.".format(data))
+            elif self.path == "/settings.html":
+                print("Generiere SETTINGS:")
+                content = self.fill_setting_html(SETTINGS)
+                content = content.encode('utf-8')
+                self.send_response(200) 
+                self.send_header('Age', 0)
+                self.send_header('Content-Type', 'text/html')
+                self.send_header('Content-Length', len(content))
+                self.end_headers()
+                self.wfile.write(content)
             else:
                 self.send_error(404)
                 self.end_headers()

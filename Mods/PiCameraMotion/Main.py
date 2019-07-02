@@ -162,6 +162,8 @@ class PiMotionMain(threading.Thread):
             self._pilQueue = None
 
     def run(self):
+        import time
+        time.sleep(5)
         self.__logger.debug("PiMotion.run()")
         with cam.PiCamera(clock_mode='raw', framerate=self._config.get("PiMotion/camera/fps", 23)) as camera:
             self._camera = camera
@@ -237,15 +239,18 @@ class PiMotionMain(threading.Thread):
                         self._config.get("PiMotion/http/addr","0.0.0.0"),
                         self._config.get("PiMotion/http/port",8083)
                     )
-                    streamingHandle = httpc.makeStreamingHandler(http_out, self._jsonOutput, pic_out)
-                    server = httpc.StreamingServer(address, streamingHandle)
-                    streamingHandle.meassure_call = lambda s: self.meassure_minimal_blocknoise()
+                    streamingHandle                   = httpc.makeStreamingHandler(http_out, self._jsonOutput, pic_out)
+                    streamingHandle.meassure_call     = lambda s: self.meassure_minimal_blocknoise()
+                    streamingHandle.fill_setting_html = lambda s, html: self.fill_settings_html(html)
+
+                    server            = httpc.StreamingServer(address, streamingHandle)
+                    server.logger     = self.__logger.getChild("HTTP_srv")
+                    self._http_server = server
+
                     camera.start_recording(http_out, format='mjpeg', splitter_port=2)
-                    server.logger = self.__logger.getChild("HTTP_srv")
                     t = threading.Thread(name="http_server", target=server.run)
                     self.__logger.info("Starte HTTP...")
                     t.start()
-                    self._http_server = server
                 # Und jetzt einfach warten
 
                 firstFrames = True
@@ -383,3 +388,6 @@ class PiMotionMain(threading.Thread):
                 fill=(255,0,0,200), font=self._image_font)
             img.save(path)
         
+    def fill_settings_html(self, html:str):
+        html = html.format(self._analyzer.countMaxNoise, self._analyzer.countMinNoise, self._analyzer.blockMaxNoise, self._analyzer.frameToTriggerMotion, self._analyzer.framesToNoMotion)
+        return html
