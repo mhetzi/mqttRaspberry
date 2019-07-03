@@ -45,6 +45,7 @@ class CameraSplitIO(threading.Thread):
         self._camera = camera
         self._queue = queue.Queue(5)
         self._splitter_port = splitter_port
+        self.lock = threading.Lock()
 
     def open_named_pipe(self):
         self.init_named_pipe(False)
@@ -78,16 +79,17 @@ class CameraSplitIO(threading.Thread):
             self.logger.debug("frame timestamp is None")
         else:
             if not self._hadSPS:
-                if frame.frame_type == camf.PiVideoFrameType.sps_header:
-                    try:
-                        self._queue.put_nowait(item)
-                        self._hadSPS = True
-                    except queue.Full:
+                with self.lock:
+                    if frame.frame_type == camf.PiVideoFrameType.sps_header:
                         try:
-                            while True:
-                                self._queue.get_nowait()
-                        except queue.Empty:
-                            pass
+                            self._queue.put_nowait(item)
+                            self._hadSPS = True
+                        except queue.Full:
+                            try:
+                                while True:
+                                    self._queue.get_nowait()
+                            except queue.Empty:
+                                pass
             else:
                 try:
                     self._queue.put_nowait(item)
@@ -113,7 +115,7 @@ class CameraSplitIO(threading.Thread):
         self.setName("cam_RTSP_queue" if file is None else "cam_file_queue")
         self.setDaemon(False)
         self.start()
-        if parent:
+        if parent is not None:
             try:
                 with self.lock:
                     save_pos = self.tell()
