@@ -4,11 +4,20 @@ import logging
 import enum
 import json
 
-import gpiozero
 import paho.mqtt.client as mclient
 import schedule
 
 import Tools.Config as conf
+
+try:
+    import gpiozero
+except ImportError as ie:
+    try:
+        import Tools.error as err
+        err.try_install_package('gpiozero', throw=ie, ask=True)
+    except err.RestartError:
+        import gpiozero
+
 
 # Platine Belegung
 # Taster Pin_22 GPIO_25

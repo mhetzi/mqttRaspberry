@@ -1,18 +1,35 @@
 # -*- coding: utf-8 -*-
 import logging
 from pathlib import Path
-import paho.mqtt.client as mclient
+
 import Tools.Config as tc
 import threading
-import schedule
 import time
+import pkgutil
+import sys
+import Tools.error as err
+
+try:
+    import paho.mqtt.client as mclient
+except ImportError as ie:
+    try:
+        err.try_install_package('paho.mqtt', throw=ie, ask=False)
+    except err.RestartError:
+        import paho.mqtt.client as mclient
+try:
+    import schedule
+except ImportError as ie:
+    try:
+        err.try_install_package('schedule', throw=ie, ask=False)
+    except err.RestartError:
+        import schedule
 
 class PluginManager:
 
     needed_list = []
     configured_list = {}
     is_connected = False
-    scheduler_event = None
+    scheduler_event = None 
 
     def run_scheduler_continuously(self, interval=1):
         """Continuously run, while executing pending jobs at each elapsed

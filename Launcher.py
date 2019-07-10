@@ -145,6 +145,7 @@ class Launcher:
 
         door_hall_calib_mode = False
         conf_all_mods = False
+        systemd = False
 
         while True:
             try:
@@ -158,15 +159,16 @@ class Launcher:
         for opt, arg in opts:
             if opt == "-c" or opt == "--config":
                 configPath = arg
-            elif opt == "-s" or opt == "--system":
-                self._ch.setFormatter(logging.Formatter('%%(name)s - %(levelname)s - %(message)s'))
+            elif opt == "-s" or opt == "--systemd":
+                self._ch.setFormatter(logging.Formatter('%(name)s - %(levelname)s - %(message)s'))
+                systemd = True
             elif opt == "--no-reload":
                 auto_reload_config = False
             elif opt == "-?" or opt == "-h" or opt == "help":
                 self._log.info("""
                                         ============ HILFE ============
                     -c --config             Konfigurations Datei angeben (Standartpfad ~/.config/mqttra.config)
-                    -s --system             Verändert die logger Formatierung damit sie zu systemd passt
+                    -s --systemd            Verändert die logger Formatierung damit sie zu systemd passt
                     --no-reload             Neuladen des Server bei externen änderungen der Konfigurationsdatei ausschalten
                     -? -h --help            Diese Nachricht anzeigen
                     --door-hall-calibnoise  Noise Level von dem Halleffekt Sensor von Raspberry Tor ermitteln

@@ -415,7 +415,7 @@ class PiMotionMain(threading.Thread):
             ig = ImageDraw.Draw(img)
             self.__logger.debug(data)
             ig.point(
-                [(data["object"][4]["row"], data["object"][4]["col"])],
+                [(data["object"][4]["col"], data["object"][4]["row"])],
                 fill=(255, 0, 0, 200)
             )
             path = self._config.get("PiMotion/record/path", "~/Videos")

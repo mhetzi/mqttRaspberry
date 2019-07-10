@@ -1,0 +1,16 @@
+[Unit]
+Description=MQTTscripts
+
+[Service]
+TimeoutStartSec=0
+ExecStartPre=/opt/mqttScripts/data/update.sh
+ExecStart=/opt/mqttScripts/data/Launcher.py --systemd --config /opt/mqttScripts/config/mqttra.config
+TimeoutStopSec=10s
+Restart=always
+Type=idle
+User=%i
+WorkingDirectory=/opt/mqttScripts/config
+
+[Install]
+WantedBy=multi-user.target
+

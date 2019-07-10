@@ -1,12 +1,18 @@
 # -*- coding: utf-8 -*-
-
-from gpiozero import LED
 import paho.mqtt.client as mclient
 from Tools import Config, Pin, Autodiscovery, ConsoleInputTools
 import logging
 import time
 import schedule
 
+try:
+    import gpiozero
+except ImportError as ie:
+    try:
+        import Tools.error as err
+        err.try_install_package('gpiozero', throw=ie, ask=True)
+    except err.RestartError:
+        import gpiozero
 
 class PluginLoader:
     @staticmethod

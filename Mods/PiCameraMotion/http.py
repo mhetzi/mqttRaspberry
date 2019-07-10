@@ -27,6 +27,7 @@ PAGE = """\
 <a href="stream.mjpg">Stream in Vollbild</a>
 <a href="snap.jpg">Snapshot erstellen</a>
 <a href="info.json">Debug JSON abrufen</a>
+<a href="settings.html">Einstellungen</a>
 <p>
 <img src="stream.mjpg" width="640" height="480" />
 <p>
