@@ -361,12 +361,20 @@ class WeatherflowPlugin:
         self.update_sensor(update.serial_number, "local_day_rain_accumulation", round(self._config["Weatherflow/daily_rain"], 1), autodisc.SensorDeviceClasses.GENERIC_SENSOR)
         self.update_sensor(update.serial_number, "local_hour_rain_accumulation", self._config["Weatherflow/hourly_rain"], autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR)
         self.update_is_windy(update.serial_number, True, update.wind_avg, update.wind_direction)
-
+        
+        charging_str = "discharging"
         if update.rain_type is not None and update.rain_type == "hail":
             battery_str = "Hagel"
             self._logger.info("Reporting Battery as hail")
         elif self._sensor_errror == DeviceStatus.SensorStatus.OK:
             battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.95), 1)
+            if update.battery > 3.32:
+                self._config["Weatherflow/sky_solar_module"] = True
+            if self._config.get("Weatherflow/sky_solar_module", False):
+                battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2.5, 3.3), 1)
+                if battery_str > 100.0:
+                    battery_str = 100
+                    charging_str = "charging"
             self._logger.info("Reporting Battery {} because there are no errors.".format(update.battery))
         elif self._sensor_errror == DeviceStatus.SensorStatus.SKY_LIGHT_UV_FAILED:
             battery_str = "UV Sensor ist ausgefallen"
@@ -391,7 +399,8 @@ class WeatherflowPlugin:
                         "min": self._config.get("Weatherflow/{0}/minBat".format(update.serial_number), 0),
                         "max": self._config.get("Weatherflow/{0}/maxBat".format(update.serial_number), 0),
                         "now": battery_str,
-                        "volt": update.battery
+                        "volt": update.battery,
+                        "charging state": charging_str
                         }
         self.update_sensor(update.serial_number, "battery_sky", json.dumps(battery_json), autodisc.SensorDeviceClasses.BATTERY)
 
