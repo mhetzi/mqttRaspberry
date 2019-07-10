@@ -16,11 +16,11 @@ then
         read -p "virtualenvironments nicht installiert. Installieren? " -n 1 -r
         if [[ $REPLY =~ ^[YyJj]$ ]]
         then
-            sudo bash -c "python3 -m pip install virtualenv"
+            sudo bash -c "sudo apt update; sudo apt install python3-pip python3-dev libatlas-base-dev libjpeg9-dev -y; python3 -m pip install virtualenv"
         fi
     fi
     echo "Erselle VENV"
-    python3 -m virtualenv venv
+    python3 -m virtualenv venv --system-site-packages --clear
     echo "Aktivieren venv"
     source venv/bin/activate
     python3 -m pip install pip-review

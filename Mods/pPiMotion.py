@@ -7,16 +7,6 @@ import os
 import errno
 import json
 
-try:
-    import picamera
-except ImportError as ie:
-    try:
-        import Tools.error as err
-        err.try_install_package('picamera', throw=ie, ask=True)
-    except err.RestartError:
-        import picamera
-
-import Mods.PiCameraMotion as pcm
 import Mods.PiCameraMotion.Main as pcma
 
 class PluginLoader:

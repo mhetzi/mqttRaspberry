@@ -1,19 +1,15 @@
 # -*- coding: utf-8 -*-
 
-from PIL import Image, ImageDraw, ImageFont
 import queue
 import pathlib
 import datetime as dt
 import json
 import Tools.PluginManager as pm
-import Mods.PiCameraMotion.rtsp as rtsp
-import Mods.PiCameraMotion.analyzers as analyzers
 import paho.mqtt.client as mclient
 
 import Tools.Config as conf
 import logging
 
-import numpy as np
 try:
     import picamera as cam
     import picamera.array as cama
@@ -21,13 +17,48 @@ except ImportError:
     import Mods.referenz.picamera.picamera as cam
     import Mods.referenz.picamera.picamera.array as cama
 
+try:
+    from PIL import Image, ImageDraw, ImageFont
+except ImportError as ie:
+    try:
+        import Tools.error as err
+        err.try_install_package('pillow', throw=ie, ask=True)
+    except err.RestartError:
+        from PIL import Image, ImageDraw, ImageFont
+try:
+    import numpy as np
+except ImportError as ie:
+    try:
+        import Tools.error as err
+        err.try_install_package('numpy', throw=ie, ask=True)
+    except err.RestartError:
+        import numpy
 
 import threading
 import Mods.PiCameraMotion.etc as etc
 import Mods.PiCameraMotion.http as httpc
-import pyximport
+
+import Mods.PiCameraMotion.rtsp as rtsp
+import Mods.PiCameraMotion.analyzers as analyzers
+try:
+    import pyximport
+except ImportError as ie:
+    try:
+        import Tools.error as err
+        err.try_install_package('cython', throw=ie, ask=True)
+    except err.RestartError:
+        import pyximport
+
 pyximport.install()
 
+try:
+    import picamera
+except ImportError as ie:
+    try:
+        import Tools.error as err
+        err.try_install_package('picamera[array]', throw=ie, ask=True)
+    except err.RestartError:
+        import picamera
 
 class PiMotionMain(threading.Thread):
 

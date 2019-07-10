@@ -4,8 +4,14 @@
 
 import time
 import datetime
-from beacontools import BeaconScanner, EddystoneTLMFrame, EddystoneFilter
-
+try:
+    from beacontools import BeaconScanner, EddystoneTLMFrame, EddystoneFilter
+except ImportError as ie:
+    try:
+        import Tools.error as err
+        err.try_install_package('beacontools', throw=ie, ask=True)
+    except err.RestartError:
+        import beacontools
 import paho.mqtt.client as mclient
 import Tools.Config as conf
 import logging

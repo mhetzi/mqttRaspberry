@@ -8,7 +8,14 @@ import threading
 
 import schedule
 
-import smbus
+try:
+    import smbus
+except ImportError as ie:
+    try:
+        import Tools.error as err
+        err.try_install_package('smbus', throw=ie, ask=True)
+    except err.RestartError:
+        import smbus
 import Mods.referenz.bh1750 as bhref
 
 class PluginLoader:
