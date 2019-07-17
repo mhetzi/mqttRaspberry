@@ -1,5 +1,12 @@
 # -*- coding: utf-8 -*-
-from gpiozero import LED, Button
+try:
+    from gpiozero import LED, Button
+except ImportError as ie:
+    try:
+        import Tools.error as err
+        err.try_install_package('gpiozero', throw=ie, ask=True)
+    except err.RestartError:
+        from gpiozero import LED, Button
 import enum
 import time
 
@@ -27,7 +34,7 @@ class Pin:
             init = None
 
         if direction == PinDirection.IN:
-            self._underlying = Button(pin=pin, pull_up=None)
+            self._underlying = Button(pin=pin, pull_up=None, active_state=True)
         elif direction == PinDirection.OUT:
             self._underlying = LED(pin=pin, active_high=True, initial_value=init)
         elif direction == PinDirection.IN_PULL_LOW:
@@ -51,7 +58,7 @@ class Pin:
         self._pulse_width = delay
 
     def pulse(self, delay_ms=250):
-        self._underlying.blink( on_time=delay_ms/1000, off_time=1, n=1, background=False)
+        self._underlying.blink( on_time=delay_ms/1000, off_time=delay_ms/1000, n=1, background=False)
 
     def input(self) -> bool:
         if self._direction == PinDirection.OUT:

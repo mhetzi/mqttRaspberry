@@ -97,6 +97,10 @@ class Topics:
             "state_topic": self.state
         }
 
+        if self._component == Component.COVER:
+            p["position_topic"] = self.state
+            del p["state_topic"]
+
         if self._component == Component.SENSOR and not isinstance(self._dev_class, BinarySensorDeviceClasses):
             p["unit_of_measurement"] = measurement_unit
 
