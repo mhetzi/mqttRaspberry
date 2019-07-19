@@ -3,8 +3,8 @@ Description=MQTTscripts
 
 [Service]
 TimeoutStartSec=0
-ExecStartPre=/opt/mqttScripts/data/update.sh
-ExecStart=/opt/mqttScripts/data/Launcher.py --systemd --config /opt/mqttScripts/config/mqttra.config
+ExecStartPre=/bin/bash -c "source /opt/mqttScripts/venv/bin/activate/; /opt/mqttScripts/data/update.sh"
+ExecStart=/bin/bash -c "source /opt/mqttScripts/venv/bin/activate/; /opt/mqttScripts/data/Launcher.py --systemd --config /opt/mqttScripts/config/mqttra.config"
 TimeoutStopSec=10s
 Restart=always
 Type=idle
