@@ -11,11 +11,13 @@ except ImportError:
     import Mods.referenz.picamera.picamera.streams as cams
     import Mods.referenz.picamera.picamera.array as cama
     import Mods.referenz.picamera.picamera.frames as camf
-
-import gi
-gi.require_version("Gst", "1.0")
-gi.require_version('GstBase', '1.0')
-gi.require_version('GstRtspServer', '1.0')
+try:
+    import gi
+    gi.require_version("Gst", "1.0")
+    gi.require_version('GstBase', '1.0')
+    gi.require_version('GstRtspServer', '1.0')
+except ValueError:
+    raise ImportError()
 
 from gi.repository import GObject, Gst, GstBase, GstRtspServer
 import os
