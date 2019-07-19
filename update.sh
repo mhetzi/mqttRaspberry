@@ -47,7 +47,7 @@ pullSuccess=$?
 if [[ $hasVenvInstalled -eq 0 ]]; then
     echo "update pip"
     source ../venv/bin/activate
-    pip-review -a
+    pip-review -a --user
 fi
 
 exit $pullSuccess
