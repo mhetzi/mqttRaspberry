@@ -33,7 +33,7 @@ class Launcher:
                 gitVerProc = subprocess.run(["git", "rev-parse", "--short", "HEAD"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 gitVer = gitVerProc.stdout.decode('utf-8').replace("\n","")
             except:
-                self._log.exception("Git ver")
+                self._log.exception("Kein Git gefunden")
             try:
                 osReleaseFile = open("/etc/os-release", "r")
                 osReleaseBuffer = osReleaseFile.read()
@@ -53,7 +53,7 @@ class Launcher:
                 MACs.append(serial)
                 devInf.pi_serial = serial
             except:
-                self._log.exception("rpiModel")
+                self._log.exception("Kein Raspberry Pi Model")
             try:
                 ip_link_proc = subprocess.run(["ip", "link"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 for MAC in re.findall("..:..:..:..:..:..", ip_link_proc.stdout.decode('utf-8')):
@@ -183,6 +183,12 @@ class Launcher:
 
         self.config = tc.config_factory(configPath, logger=self._log, do_load=True, filesystem_listen=auto_reload_config)
         self.build_std_device_info()
+
+        try:
+            import Tools.error as err
+            err.set_system_mode(systemd)
+        except:
+            pass
 
         if door_hall_calib_mode:
             self._log.info("Ermittle noise für Halleffekt Sensor (Raspberry Tor)...")

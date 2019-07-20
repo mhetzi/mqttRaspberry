@@ -7,6 +7,7 @@ python3 -c "import sys, pkgutil; sys.exit(0 if pkgutil.find_loader('virtualenv')
 hasVenvInstalled=$?;
 
 echo "Virtalenv installed? $hasVenvInstalled"
+echo "Parameter übergeben: $1"
 if [ "$1" == "install" ]
 then
     echo $1
@@ -36,18 +37,47 @@ then
     exit 0
 fi
 
+update() {
+    #git reset --hard testing;
+    git pull git://xeon.lan/mqttRaspberry;
+    git reset --hard origin/master;
+    git pull git://xeon.lan/mqttRaspberry;
+    local pullSuccess=$?
+
+    if [[ $hasVenvInstalled -eq 0 ]]; then
+        echo "update pip"
+        source /opt/mqttScripts/venv/bin/activate
+        pip-review -a --user
+    fi
+    return $pullSuccess
+}
+
 echo "Wechsle ins Verzeichniss ($SCRIPTPATH) dieses Skripts"
 cd $SCRIPTPATH;
-#git reset --hard testing;
-git pull git://xeon.lan/mqttRaspberry;
-git reset --hard origin/master;
-git pull git://xeon.lan/mqttRaspberry;
-pullSuccess=$?
-
-if [[ $hasVenvInstalled -eq 0 ]]; then
-    echo "update pip"
-    source ../venv/bin/activate
-    pip-review -a --user
+if [ "$1" == "update" ]
+then
+    update
+    pullSuccess=$?
+    exit $pullSuccess
 fi
 
-exit $pullSuccess
+if [ "$1" == "update-full" ]
+then
+    #git reset --hard testing;
+    update
+    pullSuccess=$?
+    sudo cp ./mqttScript@.service /etc/systemd/system/ -v
+    sudo systemctl daemon-reload
+    exit $pullSuccess
+fi
+
+
+if [ "$1" == "run-service" ]
+then
+    #git reset --hard testing;
+    source /opt/mqttScripts/venv/bin/activate
+    ./Launcher.py --systemd --config /opt/mqttScripts/config/mqttra.config
+    exit $?
+fi
+
+update
