@@ -9,6 +9,7 @@ import paho.mqtt.client as mclient
 
 import Tools.Config as conf
 import logging
+import io
 
 try:
     import picamera as cam
@@ -79,6 +80,7 @@ class PiMotionMain(threading.Thread):
     _postRecordTimer = None
     _pilQueue = None
     _pilThread = None
+    _picOut = None
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         threading.Thread.__init__(self)
@@ -298,6 +300,7 @@ class PiMotionMain(threading.Thread):
                         t.setDaemon(False)
                         t.start()
                     pic_out.talkback = spawn_capture_thread
+                    self._picOut = pic_out
                     self._jsonOutput = httpc.StreamingJsonOutput()
                     address = (
                         self._config.get("PiMotion/http/addr", "0.0.0.0"),
@@ -437,6 +440,19 @@ class PiMotionMain(threading.Thread):
             if a is None and data is None:
                 self.__logger.warning("PIL Magnitude Save Thread wird beendet")
                 return
+            self._picOut.do_talkback()
+            frame = None
+            with self._picOut.condition:
+                if self._picOut.condition.wait(timeout=30):
+                    frame = self._picOut.frame
+            background = None
+            try:
+                if frame is not None:
+                    background = Image.open(io.BytesIO(frame))
+                else:
+                    self.__logger.warning("Snapshot is None")
+            except IOError:
+                self.__logger.warning("Snapshot IOError")
             d = np.sqrt(
                 np.square(a['x'].astype(np.float)) +
                 np.square(a['y'].astype(np.float))
@@ -455,7 +471,13 @@ class PiMotionMain(threading.Thread):
             path = "{}/magnitude/{}.png".format(
                 path, dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             print('Writing %s' % path)
-            #img = img.resize( (self._config["PiMotion/camera/width"], self._config["PiMotion/camera/height"]) )
+            if background is not None:
+                self.__logger.debug("Habe Snapshot. Vermische Bilder...")
+                img = img.resize( (self._config["PiMotion/camera/width"], self._config["PiMotion/camera/height"]) )
+                foreground = img.convert("RGBA")
+                background = background.convert("RGBA")
+                img = Image.blend(background, foreground, 0.5)
+            
             draw = ImageDraw.Draw(img)
             draw.text((0, 0), "X: {} Y: {} VAL: {} C: {}".format(data["hotest"][0], data["hotest"][1], data["hotest"][2], data["noise_count"]),
                       fill=(255, 255, 0, 155), font=self._image_font)
