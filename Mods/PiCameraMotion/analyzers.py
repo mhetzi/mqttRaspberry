@@ -189,8 +189,8 @@ class Analyzer(cama.PiAnalysisOutput):
                         self.states["still_frames"], self.framesToNoMotion))
             else:
                 self.states["motion_frames"] += 1
-                self.logger.debug("Bewegung! {} von {}".format(
-                    self.states["motion_frames"], self.frameToTriggerMotion))
+                #self.logger.debug("Bewegung! {} von {}".format(
+                #    self.states["motion_frames"], self.frameToTriggerMotion))
                 if self._calibration_running:
                     self.__calibrate(hottestBlock)
                 if self.__block_mask["isBuilding"]:
