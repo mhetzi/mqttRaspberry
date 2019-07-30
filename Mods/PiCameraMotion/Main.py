@@ -385,6 +385,7 @@ class PiMotionMain(threading.Thread):
         if wasMeassureing:
             self._config["PiMotion/motion/blockMinNoise"] = self._analyzer.blockMaxNoise
             self._config["PiMotion/motion/frameMinNoise"] = self._analyzer.countMinNoise
+            self._config.save()
         if motion:
             self.__logger.info("Motion")
             if self._config.get("PiMotion/record/enabled", True):
