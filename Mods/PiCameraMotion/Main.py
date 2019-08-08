@@ -80,7 +80,7 @@ class PiMotionMain(threading.Thread):
     _postRecordTimer = None
     _pilQueue = None
     _pilThread = None
-    _picOut = None
+    _http_out = None
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         threading.Thread.__init__(self)
@@ -114,7 +114,7 @@ class PiMotionMain(threading.Thread):
             encoding="unic"
         )
 
-        self._pilQueue = queue.Queue(20)
+        self._pilQueue = queue.Queue(2)
 
     def set_do_record(self, recording: bool):
         self.__logger.info(
@@ -226,7 +226,7 @@ class PiMotionMain(threading.Thread):
 
             camera.annotate_background = cam.Color('black')
             camera.annotate_text = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
+            
             with analyzers.Analyzer(camera, logger=self.__logger.getChild("Analyzer")) as anal:
                 self.__logger.debug("Analyzer erstellt")
                 anal.frameToTriggerMotion = self._config.get(
@@ -284,30 +284,14 @@ class PiMotionMain(threading.Thread):
                 if self._config.get("PiMotion/http/enabled", False):
                     self.__logger.info("Aktiviere HTTP...")
                     http_out = httpc.StreamingOutput()
-                    pic_out = httpc.StreamingPictureOutput()
+                    self._http_out = http_out
 
-                    def capture_pic():
-                        self.__logger.info(
-                            "Snapshot [Threaded] wird angefertigt...")
-                        camera.capture(
-                            pic_out, use_video_port=True, format="jpeg")
-
-                    def spawn_capture_thread():
-                        self.__logger.info(
-                            "Erstelle thread für capture snapshot...")
-                        t = threading.Thread(target=capture_pic)
-                        t.setName("capture_snapshot")
-                        t.setDaemon(False)
-                        t.start()
-                    pic_out.talkback = spawn_capture_thread
-                    self._picOut = pic_out
                     self._jsonOutput = httpc.StreamingJsonOutput()
                     address = (
                         self._config.get("PiMotion/http/addr", "0.0.0.0"),
                         self._config.get("PiMotion/http/port", 8083)
-                    )
-                    streamingHandle = httpc.makeStreamingHandler(
-                        http_out, self._jsonOutput, pic_out)
+                    )   
+                    streamingHandle = httpc.makeStreamingHandler(http_out, self._jsonOutput)
                     streamingHandle.meassure_call = lambda s: self.meassure_minimal_blocknoise()
                     streamingHandle.fill_setting_html = lambda s, html: self.fill_settings_html(
                         html)
@@ -441,11 +425,9 @@ class PiMotionMain(threading.Thread):
             if a is None and data is None:
                 self.__logger.warning("PIL Magnitude Save Thread wird beendet")
                 return
-            self._picOut.do_talkback()
             frame = None
-            with self._picOut.condition:
-                if self._picOut.condition.wait(timeout=30):
-                    frame = self._picOut.frame
+            with self._http_out.condition:
+                frame = self._http_out.frame
             background = None
             try:
                 if frame is not None:

@@ -53,7 +53,7 @@ class Analyzer(cama.PiAnalysisOutput):
         self.rows = None
         self.logger = logger
         self.logger.debug("Queue wird erstellt...")
-        self._queue = queue.Queue(5)
+        self._queue = queue.Queue(2)
 
     def write(self, b):
         result = super(Analyzer, self).write(b)

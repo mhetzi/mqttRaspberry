@@ -46,7 +46,7 @@ class CameraSplitIO(threading.Thread):
     def __init__(self, camera: cam.PiCamera, splitter_port=1):
         threading.Thread.__init__(self)
         self._camera = camera
-        self._queue = queue.Queue(5)
+        self._queue = queue.Queue(2)
         self._splitter_port = splitter_port
         self.lock = threading.Lock()
 

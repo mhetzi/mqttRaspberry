@@ -103,7 +103,7 @@ class StreamingPictureOutput(object):
         self.buffer.seek(0)
 
 
-def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput, pic: StreamingPictureOutput):
+def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
     class StreamingHandler(server.BaseHTTPRequestHandler):
         def meassure_call(self):
             logging.warning("meassure_call nicht überladen")
@@ -153,15 +153,9 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput, pic
                         self.client_address, str(e))
             elif self.path == '/snap.jpg':
                 try:
-                    pic.do_talkback()
                     frame = None
-                    with pic.condition:
-                        if not pic.condition.wait(timeout=30):
-                            pic.do_talkback(force=True)
-                            if not pic.condition.wait(timeout=30):
-                                self.send_response(500)
-                                return
-                        frame = pic.frame
+                    with output.condition:
+                        frame = output.frame
                     self.send_response(200)
                     self.send_header('Age', 0)
                     self.send_header('Cache-Control', 'no-cache, private')
