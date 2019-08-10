@@ -29,6 +29,7 @@ class Plugin:
     is_moving = False
     do_move   = False
     moves_since = None
+    current_job = None
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         from gpiozero.pins.native import NativeFactory
@@ -44,8 +45,8 @@ class Plugin:
             "mitte": Pin.Pin(opts["PiGarageSwitches/pins/mitte"]   , Pin.PinDirection.IN),
             "offen": Pin.Pin(opts["PiGarageSwitches/pins/offen"]   , Pin.PinDirection.IN),
             "stop" : Pin.Pin(opts["PiGarageSwitches/pins/stop"]    , Pin.PinDirection.IN),
-            "relais": Pin.Pin(opts["PiGarageSwitches/relayPin"], Pin.PinDirection.OUT),
-            "res": Pin.Pin(opts["PiGarageSwitches/pins/sperren"] , Pin.PinDirection.IN)
+            "relais": Pin.Pin(opts["PiGarageSwitches/relayPin"]    , Pin.PinDirection.OUT),
+            "res": Pin.Pin(opts["PiGarageSwitches/pins/sperren"]   , Pin.PinDirection.IN)
         }
         self._device_id = device_id
         
@@ -163,7 +164,6 @@ class Plugin:
         elif self._is_ho:
             pos = 75
         self.current_pos = pos
-        self.move_to()
         payload_js = {
             "position": pos,
             "offen": self._is_open,
@@ -175,9 +175,12 @@ class Plugin:
         }
         payload = json.dumps(payload_js)
         self.__client.publish(self.topic.state, payload=payload)
+        self.move_to()
 
     def stop(self):
         schedule.cancel_job(self._schedJob)
+        if self.current_job is not None:
+            schedule.cancel_job(self.current_job)
 
     def pulseRelay(self):
         self._pins["relais"].pulse(self._config.get("PiGarageSwitches/relayPulseLength", 250))
@@ -191,19 +194,28 @@ class Plugin:
         if checker is not None:
             self.__logger.info("Checker ist da, brich den JOB ab")
             schedule.cancel_job(checker)
+            self.current_job = None
             if attempt >= self._config["PiGarageSwitches/Hall/max_move_retrys"]:
                 self.do_move = False
                 self.is_moving = False
                 return
             if self.target_pos != self.current_pos:
-                self.do_move = True
-                self.is_moving = False
-        if self.do_move and not self.is_moving and not self.STOP:
+                self.__logger.debug("Checker ({}) ist nicht auf Position ({}) setze do_move".format(self.target_pos, self.current_pos))
+                if self.target_pos == 50 and (self.current_pos == 25 or self.current_pos == 75):
+                    self.__logger.debug("Bin doch auf position... ")
+                    self.do_move = False
+                    self.is_moving = False
+                else:
+                    self.do_move = True
+                    self.is_moving = False
+        if self.do_move and not self.is_moving and not self.STOP and self.current_job is None:
+            self.is_moving = True
             self.__logger.info("Bewege mich nicht, soll aber. Schalte...")
             self.pulseRelay()
-            self.is_moving = True
-            job = schedule.every(self._config["PiGarageSwitches/Hall/max_move_time"]).seconds
-            job.do(self.move_to, attempt=attempt+1, checker=job)
+            if self.current_job is None:
+                job = schedule.every(self._config["PiGarageSwitches/Hall/max_move_time"]).seconds
+                job.do(self.move_to, attempt=attempt+1, checker=job)
+                self.current_job = job
         if self.target_pos == self.current_pos and self.current_pos != 0 and self.current_pos != 100:
             self.__logger.info("Bin auf position. Schalte um zum stehen zu kommen.")
             self.pulseRelay()
@@ -211,6 +223,10 @@ class Plugin:
             self.is_moving = False
             self.do_move = False
             self.__logger.info("Bin auf fester Position.")
+            if self.current_job is not None:
+                self.__logger.debug("Cancel Checker -> pos stimmt")
+                schedule.cancel_job(self.current_job)
+                self.current_job = None
         
 
     def on_message(self, client, userdata, message: mclient.MQTTMessage):
@@ -222,8 +238,14 @@ class Plugin:
             self.move_to(0)
         elif payload == "STOP":
             self.stop_handler(None, True)
-
-
+        else:
+            i = int(payload)
+            if i > 0 and i < 55:
+                i = 50
+            elif i > 54:
+                i = 100
+            self.move_to(i)
+                
 
 class PluginLoader:
 

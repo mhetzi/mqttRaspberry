@@ -100,6 +100,7 @@ class Topics:
         if self._component == Component.COVER:
             p["position_topic"] = self.state
             del p["state_topic"]
+            p["set_position_topic"] = self.command
 
         if self._component == Component.SENSOR and not isinstance(self._dev_class, BinarySensorDeviceClasses):
             p["unit_of_measurement"] = measurement_unit
