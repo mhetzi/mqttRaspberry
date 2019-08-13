@@ -378,7 +378,7 @@ class PiMotionMain(threading.Thread):
                     path += "/"
                 path = "{}/aufnahmen/{}.h264".format(
                     path, dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-                if self._postRecordTimer is None:
+                if self._postRecordTimer is None and self._rtsp_recorder is None:
                     self._rtsp_recorder = self._rtsp_split.recordTo(path=path)
                 else:
                     self._postRecordTimer.cancel()

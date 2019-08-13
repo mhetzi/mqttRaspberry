@@ -91,7 +91,9 @@ class CameraSplitIO(threading.Thread):
                             try:
                                 self.logger.debug("queue.Full on append()")
                             except queue.Empty:
-                                pass
+                                if self._myParent is not None and not self.is_alive():
+                                    self.logger.warning("Recorder here. Lebe ja gar nicht mehr! Shutdown wird wiederholt...")
+                                    self.shutdown()
             else:
                 try:
                     self._queue.put_nowait(item)
@@ -156,6 +158,11 @@ class CameraSplitIO(threading.Thread):
         self.logger.info("Queue beendet")
         if not self._hadSPS:
             self.logger.error("Hatte kein SPS Frame!")
+        self.logger.debug("Restore append method")
+        if self._myParent is None:
+            self._io._data.append = self._oldAppend
+        else:
+            self._myParent.append = self._oldAppend
 
     def run(self):
         if self.file is None:
@@ -183,11 +190,6 @@ class CameraSplitIO(threading.Thread):
                     self.logger.warning("In der queue war ein None Object!")
             except queue.Empty:
                 pass
-        self.logger.debug("Restore append method")
-        if self._myParent is None:
-            self._io._data.append = self._oldAppend
-        else:
-            self._myParent.append = self._oldAppend
 
     def recordTo(self, path=None, stream=None, preRecordSeconds=1):
         if path is None and stream is None:
