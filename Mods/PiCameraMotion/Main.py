@@ -472,13 +472,15 @@ class PiMotionMain(threading.Thread):
         cv = self._camera.color_effects
         if cv is None:
             cv = (-1,-1)
-        html = html.format(self._analyzer.countMaxNoise,
+        html = html.format(
+                self._analyzer.countMaxNoise,
                 self._analyzer.countMinNoise,
                 self._analyzer.blockMinNoise,
                 self._analyzer.frameToTriggerMotion,
                 self._analyzer.framesToNoMotion,
                 self._camera.shutter_speed,
                 self._camera.exposure_speed,
+                self._camera.exposure_mode,
                 cv[0], cv[1],
                 self._camera.iso
             )

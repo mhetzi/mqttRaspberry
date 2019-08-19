@@ -8,8 +8,9 @@ hasVenvInstalled=$?;
 
 echo "Virtalenv installed? $hasVenvInstalled"
 echo "Parameter übergeben: $1"
-if [ "$1" == "install" ]
-then
+
+
+install() {
     echo $1
     sudo bash -c "mkdir -p /opt/mqttScripts/config/ ; chown $username /opt/mqttScripts/ -Rv;"
     cd /opt/mqttScripts/
@@ -35,7 +36,8 @@ then
     fi
     
     exit 0
-fi
+}
+    
 
 update() {
     #git reset --hard testing;
@@ -86,6 +88,19 @@ then
     source /opt/mqttScripts/venv/bin/activate
     ./Launcher.py --config /opt/mqttScripts/config/mqttra.config --configure
     exit $?
+fi
+
+
+if [ "$1" == "install" ]
+then
+    install;
+fi
+
+if [ "$1" == "reinstall" ]
+then
+    cd /opt/mqttScripts/
+    rm -rfv data venv
+    install;
 fi
 
 update

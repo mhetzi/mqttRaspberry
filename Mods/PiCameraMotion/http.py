@@ -15,7 +15,7 @@ try:
 except ImportError:
     import simplejson as json
 
-PAGE = """\
+PAGE = u"""\
 <html>
 <head>
 <title>PiCamera Plugin</title>
@@ -36,20 +36,22 @@ PAGE = """\
 </html>
 """
 
-SETTINGS = u"""<html><head><title>PiCamera Plugin Settings</title></head><body><h1>mqtt PiCamera Plugin Settings</h1><p>
+SETTINGS = u"""\
+<html><head><title>PiCamera Plugin Settings</title></head><body><h1>mqtt PiCamera Plugin Settings</h1><p>
 <form action="/updateMotion.data" method="get">  Ueber Blockanzahl
 <input type="number" name="maxCount" value="{}"> ignorieren<br>  Minimale Blockanzahl
 <input type="number" name="minCount" value="{}"><br>  Minimaler Veränderungswert
 <input type="number" name="minBlock" value="{}"><br>Bilder bis zur Bewegungserkennung
 <input type="number" name="mF" value="{}"><br>  Bilder ohne Bewegung
-<input type="number" name="sF" value="{}"><br>  Bilder  Bewegung
-<input type="number" name="shutter" value="{}"><br> Shutterspeed
-<input type="number" name="exposure ReadOnly" value="{}"><br> exposure
-<input type="" name="exposure_mode" value="{}"><br> exposure_mode
-<input type="number" name="color_effects_u" value="{}"><br> color_effect_u
-<input type="number" name="color_effects_v" value="{}"><br> color_effect_v
-<input type="number" name="iso" value="{}"><br> ISO
-<input type="submit" value="Übernehmen"></form>"""
+<input type="number" name="sF" value="{}"><br>  Shutterspeed
+<input type="number" name="shutter" value="{}"><br> exposure
+<input type="number" name="exposure ReadOnly" value="{}"><br> exposure_mode
+<input type="" name="exposure_mode" value="{}"><br> color_effect_u
+<input type="number" name="color_effects_u" value="{}"><br> color_effect_v
+<input type="number" name="color_effects_v" value="{}"><br> ISO
+<input type="number" name="iso" value="{}"><br> 
+<input type="submit" value="Übernehmen"></form>
+"""
 
 
 class StreamingOutput(object):
@@ -234,7 +236,7 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
                     int(data.get("mF"      , [None])[0]),
                     int(data.get("sF"      , [None])[0])
                 )
-                content = u"<html><head><title>PiCamera Plugin</title></head><body><h1><OK Einstellungen gespeichert</h1><p>In Kürze wird die die Hauptseite geladen...<p><meta http-equiv="refresh" content="3;url=/index.html" /><p></body></html>"
+                content = u"""<html><head><title>PiCamera Plugin</title></head><body><h1><OK Einstellungen gespeichert</h1><p>In Kürze wird die die Hauptseite geladen...<p><meta http-equiv="refresh" content="3;url=/index.html" /><p></body></html>"""
                 content = content.encode('utf-8')
                 self.send_response(200)
                 self.send_header('Age', 0)
