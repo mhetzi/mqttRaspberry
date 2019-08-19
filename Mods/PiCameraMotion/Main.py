@@ -469,8 +469,19 @@ class PiMotionMain(threading.Thread):
             img.save(path)
 
     def fill_settings_html(self, html: str):
-        html = html.format(self._analyzer.countMaxNoise, self._analyzer.countMinNoise,
-                           self._analyzer.blockMinNoise, self._analyzer.frameToTriggerMotion, self._analyzer.framesToNoMotion)
+        cv = self._camera.color_effects
+        if cv is None:
+            cv = (-1,-1)
+        html = html.format(self._analyzer.countMaxNoise,
+                self._analyzer.countMinNoise,
+                self._analyzer.blockMinNoise,
+                self._analyzer.frameToTriggerMotion,
+                self._analyzer.framesToNoMotion,
+                self._camera.shutter_speed,
+                self._camera.exposure_speed,
+                cv[0], cv[1],
+                self._camera.iso
+            )
         return html
 
     def update_settings_call(self, countMaxNoise, countMinNoise, blockMinNoise, frameToTriggerMotion, framesToNoMotion):
