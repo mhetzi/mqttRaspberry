@@ -44,6 +44,11 @@ update() {
     git pull git://xeon.lan/mqttRaspberry;
     git reset --hard origin/master;
     git pull git://xeon.lan/mqttRaspberry;
+
+    git pull git://xeon.lan/mqttRaspberry;
+    git reset --hard origin/master;
+    git pull git://xeon.lan/mqttRaspberry;
+    
     local pullSuccess=$?
 
     if [[ $hasVenvInstalled -eq 0 ]]; then
@@ -80,6 +85,12 @@ then
     source /opt/mqttScripts/venv/bin/activate
     ./Launcher.py --systemd --config /opt/mqttScripts/config/mqttra.config
     exit $?
+fi
+
+if [ "$1" == "stop-service" ]
+then
+    #git reset --hard testing;
+    echo "shutdown" > /opt/mqttScripts/signal.pipe
 fi
 
 if [ "$1" == "configure" ]

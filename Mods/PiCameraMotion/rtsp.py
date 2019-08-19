@@ -46,7 +46,7 @@ class CameraSplitIO(threading.Thread):
     def __init__(self, camera: cam.PiCamera, splitter_port=1):
         threading.Thread.__init__(self)
         self._camera = camera
-        self._queue = queue.Queue(2)
+        self._queue = queue.Queue(10)
         self._splitter_port = splitter_port
         self.lock = threading.Lock()
 
@@ -88,17 +88,22 @@ class CameraSplitIO(threading.Thread):
                             self._queue.put_nowait(item)
                             self._hadSPS = True
                         except queue.Full:
-                            try:
-                                self.logger.debug("queue.Full on append()")
-                            except queue.Empty:
-                                if self._myParent is not None and not self.is_alive():
-                                    self.logger.warning("Recorder here. Lebe ja gar nicht mehr! Shutdown wird wiederholt...")
-                                    self.shutdown()
+                            self.logger.debug("queue.Full on append()")
+                            if self._myParent is not None and not self.is_alive():
+                                self.logger.warning("Recorder here. Lebe ja gar nicht mehr! Shutdown wird wiederholt...")
+                                self.shutdown()
             else:
                 try:
                     self._queue.put_nowait(item)
                 except:
                     self._hadSPS = False
+                    try:
+                        while True:
+                            self._queue.get_nowait()
+                    except queue.Empty:
+                        if self._myParent is not None and not self.is_alive():
+                            self.logger.warning("Recorder here. Lebe ja gar nicht mehr! Shutdown wird wiederholt...")
+                            self.shutdown()
                     pass
         self._oldAppend(item)
 

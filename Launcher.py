@@ -131,7 +131,7 @@ class Launcher:
             self._log.error("Es wurde kein Server konfiguriert. Bitte die einstellungen unter CLIENT abändern.")
             self.reload_event.set()
             self.pm.shutdown()
-        except Exception as x:
+        except Exception:
             self._log.exception("MQTT Hauptthread gestorben")
             self.reload_event.set()
             self.pm.shutdown()
