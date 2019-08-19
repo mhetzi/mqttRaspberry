@@ -111,6 +111,7 @@ if [ "$1" == "reinstall" ]
 then
     cd /opt/mqttScripts/
     rm -rfv data venv
+    rmdir data venv
     install;
 fi
 

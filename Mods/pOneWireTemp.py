@@ -5,6 +5,8 @@ import logging
 import os
 import re
 import threading
+import schedule
+import json
 
 class PluginLoader:
 
@@ -23,6 +25,15 @@ class PluginLoader:
 
 class OneWireTemp(threading.Thread):
 
+    def _reset_daily(self):
+        for d in self._paths:
+            id = d["i"]
+            self._config["w1t/stat/{}/lmin".format(id)] = self._config.get("w1t/stat/{}/min".format(id), "n/A")
+            self._config["w1t/stat/{}/lmax".format(id)] = self._config.get("w1t/stat/{}/max".format(id), "n/A")
+
+            self._config["w1t/stat/{}/min".format(id)] = "RESET"
+            self._config["w1t/stat/{}/max".format(id)] = "RESET"
+
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         threading.Thread.__init__(self)
         self._config = opts
@@ -30,7 +41,13 @@ class OneWireTemp(threading.Thread):
         self.__logger = logger.getChild("w1Temp")
         self._paths = []
         self._prev_deg = []
-        for temp in self._config.get("w1t", []):
+
+        if isinstance(self._config.get("w1t", None), list):
+            devices = self._config["w1t"]
+            self._config["w1t"] = {}
+            self._config["w1t/dev"] = devices
+
+        for temp in self._config.get("w1t/dev", []):
             d = {
                 "i": temp.get("id", ""),
                 "n": temp.get("name", ""),
@@ -51,10 +68,15 @@ class OneWireTemp(threading.Thread):
             unique_id = "sensor.w1-{}.{}".format(d["i"], d["n"])
             topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, d["n"], conf.autodisc.SensorDeviceClasses.TEMPERATURE)
             if topics.config is not None:
-                self.__logger.info("Werde AutodiscoveryTopic senden mit der Payload: {}".format(topics.get_config_payload(d["n"], "°C", unique_id=unique_id)))
-                self.__client.publish(topics.config, topics.get_config_payload(d["n"], "°C", unique_id=unique_id), retain=True)
+                self.__logger.info("Werde AutodiscoveryTopic senden mit der Payload: {}".format(topics.get_config_payload(d["n"], "°C", unique_id=unique_id, value_template="{{ value_json.now }}", json_attributes=True)))
+                self.__client.publish(
+                    topics.config,
+                    topics.get_config_payload(d["n"], "°C", unique_id=unique_id, value_template="{{ value_json.now }}", json_attributes=True),
+                    retain=True
+                )
             self.__client.will_set(topics.ava_topic, "offline", retain=True)
             self.__client.publish(topics.ava_topic, "online", retain=True)
+        schedule.every().day.at("00:00").do( lambda: self._reset_daily() )
 
     def stop(self):
         self.__doStop.set()
@@ -91,11 +113,35 @@ class OneWireTemp(threading.Thread):
             topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, d["n"], conf.autodisc.SensorDeviceClasses.TEMPERATURE)
 
             if new_temp != self._prev_deg[i] or force:
+                id = d["i"]
+                cmin = self._config.get("w1t/stat/{}/min".format(id), "RESET")
+                cmax = self._config.get("w1t/stat/{}/max".format(id), "RESET")
+
+                if cmin == "RESET":
+                    cmin = new_temp
+                elif cmin > new_temp:
+                    cmin = new_temp
+                if cmax == "RESET":
+                    cmax = new_temp
+                elif cmax < new_temp:
+                    cmax = new_temp
+
+                self._config["w1t/stat/{}/min".format(id)] = cmin
+                self._config["w1t/stat/{}/max".format(id)] = cmax
+
+                js = {
+                    "now": str(new_temp),
+                    "Heute höchster Wert": self._config.get("w1t/stat/{}/min".format(id), "n/A"),
+                    "Heute tiefster Wert": self._config.get("w1t/stat/{}/max".format(id), "n/A"),
+                    "Gestern höchster Wert": self._config.get("w1t/stat/{}/lmin".format(id), "n/A"),
+                    "Gestern tiefster Wert": self._config.get("w1t/stat/{}/lmax".format(id), "n/A")
+                }
+                jstr = json.dumps(js)
                 if new_temp != -1000 and self._prev_deg == -1000:
                     self.__client.publish(topics.ava_topic, "online", retain=True)
-                    self.__client.publish(topics.state, str(new_temp))
+                    self.__client.publish(topics.state, jstr)
                 elif new_temp != -1000:
-                    self.__client.publish(topics.state, str(new_temp))
+                    self.__client.publish(topics.state, jstr)
                 else:
                     self.__client.publish(topics.ava_topic, "offline", retain=True)
                 self._prev_deg[i] = new_temp

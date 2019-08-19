@@ -28,6 +28,9 @@ class WeatherflowPlugin:
     def reset_daily_rain(self):
         self._logger.debug("Setze Täglichen Regenzähler & Temperatur Stats zurück...")
         self._config["Weatherflow/daily_rain"] = 0
+        self._config["Weatherflow/temp_stats/lmin"] = self._config.get("Weatherflow/temp_stats/min", "n/A")
+        self._config["Weatherflow/temp_stats/lmax"] = self._config.get("Weatherflow/temp_stats/max", "n/A")
+
         self._config["Weatherflow/temp_stats/min"] = "RESET"
         self._config["Weatherflow/temp_stats/max"] = "RESET"
 
@@ -301,8 +304,12 @@ class WeatherflowPlugin:
             tendenz = "Tendenz: Steigend"
 
 
-        temperature_json = {"min": self._config["Weatherflow/temp_stats/min"],
-                            "max": self._config["Weatherflow/temp_stats/max"], "now": update.air_temperatur, "tendenz": tendenz}
+        temperature_json = {"Heute Min": self._config["Weatherflow/temp_stats/min"],
+                            "Heute Max": self._config["Weatherflow/temp_stats/max"],
+                            "now": update.air_temperatur,
+                            "Gestern Min": self._config.get("Weatherflow/temp_stats/lmin", "n/A"),
+                            "Gestern Max": self._config.get("Weatherflow/temp_stats/lmax", "n/A"),
+                            }
 
         self.update_sensor(update.serial_number, "station_pressure", update.station_pressure, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
         self.update_sensor(update.serial_number, "air_temperature", json.dumps(temperature_json), autodisc.SensorDeviceClasses.GENERIC_SENSOR)
