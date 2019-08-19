@@ -49,6 +49,7 @@ class CameraSplitIO(threading.Thread):
         self._queue = queue.Queue(10)
         self._splitter_port = splitter_port
         self.lock = threading.Lock()
+        self.append = self._append
 
     def open_named_pipe(self):
         self.init_named_pipe(False)
@@ -71,7 +72,10 @@ class CameraSplitIO(threading.Thread):
         # self.fill_rtsp_stream()
         delete = False
 
-    def append(self, item: bytes):
+    def _restore_append(self):
+        self.append = self._append
+
+    def _append(self, item: bytes):
         encoder = self._camera._encoders[self._splitter_port]
         frame = None
         if encoder.frame.complete:
@@ -168,6 +172,7 @@ class CameraSplitIO(threading.Thread):
             self._io._data.append = self._oldAppend
         else:
             self._myParent.append = self._oldAppend
+            self._myParent._restore_append()
 
     def run(self):
         if self.file is None:

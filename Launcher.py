@@ -103,11 +103,11 @@ class Launcher:
         try:
             self.pm.needed_plugins()
             self.mqtt_client, deviceID = self.pm.start_mqtt_client()
-            try:
+            """try:
                 import ptvsd
                 ptvsd.enable_attach(address=("0.0.0.0", 3000)) 
             except:
-                self._log.info("Remote Debugging (ptvsd) nicht verfügbar")
+                self._log.info("Remote Debugging (ptvsd) nicht verfügbar")"""
             self.pm.enable_mods()
             self.mqtt_client.loop_start()
             self.mqtt_client._thread.join()
@@ -162,6 +162,7 @@ class Launcher:
             elif opt == "-s" or opt == "--systemd":
                 self._ch.setFormatter(logging.Formatter('%(name)s - %(levelname)s - %(message)s'))
                 systemd = True
+                self._log.info("OK Systemflag gefunden. Bin ein Service.")
             elif opt == "--no-reload":
                 auto_reload_config = False
             elif opt == "-?" or opt == "-h" or opt == "help":

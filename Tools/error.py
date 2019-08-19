@@ -30,4 +30,4 @@ def try_install_package(package:str, throw=ImportError(), ask=True):
 
 def set_system_mode(mode:bool):
    global is_system_mode
-   is_system_mode = True
+   is_system_mode = mode
