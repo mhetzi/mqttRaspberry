@@ -272,7 +272,7 @@ class WeatherflowPlugin:
             self._online_states[serial_number]["lastUpdate"] = datetime.datetime.now()
             self._online_states[serial_number]["intervall"] = interval
             self._online_states[serial_number]["error"] = DeviceStatus.SensorStatus.OK
-            self._online_states[serial_number]["wasOnline"] = True
+            self._online_states[serial_number]["wasOnline"] = False
         if serial_number not in self._config.get("Weatherflow/seen_devices", []):
             self._logger.info("Ist unbekanntes Gerät.")
             if not no_register:
