@@ -41,13 +41,13 @@ install() {
 
 update() {
     #git reset --hard testing;
-    git pull git://xeon.lan/mqttRaspberry;
+    git pull ;
     git reset --hard origin/master;
-    git pull git://xeon.lan/mqttRaspberry;
+    git pull ;
 
-    git pull git://xeon.lan/mqttRaspberry;
+    git pull ;
     git reset --hard origin/master;
-    git pull git://xeon.lan/mqttRaspberry;
+    git pull;
     
     local pullSuccess=$?
 

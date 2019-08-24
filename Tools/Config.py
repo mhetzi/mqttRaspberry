@@ -146,6 +146,9 @@ class BasicConfig:
             self[key] = default
         return self[key]
 
+    def sett(self, key: str, value):
+        self[key] = value
+
     def __getitem__(self, item: str):
         path = item.split("/")
         if len(path) == 1:

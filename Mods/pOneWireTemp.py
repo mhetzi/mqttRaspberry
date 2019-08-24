@@ -23,19 +23,30 @@ class PluginLoader:
         OneWireConf(conf).run()
 
 
-class OneWireTemp(threading.Thread):
+class OneWireTemp:
 
     def _reset_daily(self):
         for d in self._paths:
-            id = d["i"]
-            self._config["w1t/stat/{}/lmin".format(id)] = self._config.get("w1t/stat/{}/min".format(id), "n/A")
-            self._config["w1t/stat/{}/lmax".format(id)] = self._config.get("w1t/stat/{}/max".format(id), "n/A")
+            i = d["i"]
+            
+            path_min = "w1t/stat/{}/min".format(i)
+            path_max = "w1t/stat/{}/max".format(i)
+            path_lmin = "w1t/stat/{}/lmin".format(i)
+            path_lmax = "w1t/stat/{}/lmax".format(i)
 
-            self._config["w1t/stat/{}/min".format(id)] = "RESET"
-            self._config["w1t/stat/{}/max".format(id)] = "RESET"
+            current_min = self._config.get(path_min, "n/A")
+            current_max = self._config.get(path_max, "n/A")
+
+            self.__logger.debug("{} = {}".format(path_lmin, current_min))
+            self._config.sett(path_min, current_min)
+            self.__logger.debug("{} = {}".format(path_lmax, current_max))
+            self._config[path_lmax] = current_max
+
+            self.__logger.debug("reset daily stats")
+            self._config["w1t/stat/{}/min".format(i)] = "RESET"
+            self._config["w1t/stat/{}/max".format(i)] = "RESET"
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        threading.Thread.__init__(self)
         self._config = opts
         self.__client = client
         self.__logger = logger.getChild("w1Temp")
@@ -57,11 +68,8 @@ class OneWireTemp(threading.Thread):
             self.__logger.info("Temperaturfühler {} mit der ID {} wird veröffentlicht.".format(d["n"], d["i"]))
             self.__logger.info("Der Pfad ist \"{}\"".format(d["p"]))
             self._prev_deg.append(-1)
-        self.__doStop = threading.Event()
         self.__lastTemp = 0.0
         self.__ava_topic = device_id
-        self.setName("w1TempUpdater")
-        self.start()
 
     def register(self):
         for d in self._paths:
@@ -76,22 +84,20 @@ class OneWireTemp(threading.Thread):
                 )
             self.__client.will_set(topics.ava_topic, "offline", retain=True)
             self.__client.publish(topics.ava_topic, "online", retain=True)
-        schedule.every().day.at("00:00").do( lambda: self._reset_daily() )
+
+        self._daily_job = schedule.every().day.at("00:00")
+        self._daily_job.do( lambda: self._reset_daily() )
+
+        self._job = schedule.every(10).seconds
+        self._job.do( lambda: self.send_update() )
+
 
     def stop(self):
-        self.__doStop.set()
-        self.join()
+        schedule.cancel_job(self._daily_job)
+        schedule.cancel_job(self._job)
 
     def sendStates(self):
         self.send_update(True)
-
-    def run(self):
-        count = 0
-        while not self.__doStop.wait(1.0):
-            count += 1
-            if count > 10:
-                self.send_update()
-                count = 0
 
     @staticmethod
     def get_temperatur(p) -> float:
@@ -113,9 +119,9 @@ class OneWireTemp(threading.Thread):
             topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, d["n"], conf.autodisc.SensorDeviceClasses.TEMPERATURE)
 
             if new_temp != self._prev_deg[i] or force:
-                id = d["i"]
-                cmin = self._config.get("w1t/stat/{}/min".format(id), "RESET")
-                cmax = self._config.get("w1t/stat/{}/max".format(id), "RESET")
+                ii = d["i"]
+                cmin = self._config.get("w1t/stat/{}/min".format(ii), "RESET")
+                cmax = self._config.get("w1t/stat/{}/max".format(ii), "RESET")
 
                 if cmin == "RESET":
                     cmin = new_temp
@@ -126,15 +132,15 @@ class OneWireTemp(threading.Thread):
                 elif cmax < new_temp:
                     cmax = new_temp
 
-                self._config["w1t/stat/{}/min".format(id)] = cmin
-                self._config["w1t/stat/{}/max".format(id)] = cmax
+                self._config["w1t/stat/{}/min".format(ii)] = cmin
+                self._config["w1t/stat/{}/max".format(ii)] = cmax
 
                 js = {
                     "now": str(new_temp),
-                    "Heute höchster Wert": self._config.get("w1t/stat/{}/min".format(id), "n/A"),
-                    "Heute tiefster Wert": self._config.get("w1t/stat/{}/max".format(id), "n/A"),
-                    "Gestern höchster Wert": self._config.get("w1t/stat/{}/lmin".format(id), "n/A"),
-                    "Gestern tiefster Wert": self._config.get("w1t/stat/{}/lmax".format(id), "n/A")
+                    "Heute höchster Wert": self._config.get("w1t/stat/{}/max".format(ii), "n/A"),
+                    "Heute tiefster Wert": self._config.get("w1t/stat/{}/min".format(ii), "n/A"),
+                    "Gestern höchster Wert": self._config.get("w1t/stat/{}/lmax".format(ii), "n/A"),
+                    "Gestern tiefster Wert": self._config.get("w1t/stat/{}/lmin".format(ii), "n/A")
                 }
                 jstr = json.dumps(js)
                 if new_temp != -1000 and self._prev_deg == -1000:
