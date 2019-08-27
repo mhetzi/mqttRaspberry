@@ -73,6 +73,7 @@ class PiMotionMain(threading.Thread):
     _rtsp_split = None
     _jsonOutput = None
     _motion_topic = None
+    _debug_topic = None
     _do_record_topic = None
     _lastState = {"motion": 0, "x": 0, "y": 0, "val": 0, "c": 0}
     _rtsp_recorder = None
@@ -149,7 +150,23 @@ class PiMotionMain(threading.Thread):
             self._motion_topic.ava_topic, "online", retain=True)
         self.__client.will_set(
             self._motion_topic.ava_topic, "offline", retain=True)
-
+        # Setup MQTT debug sensor
+        uid_debug = "sensor.piMotion-dbg-{}-{}".format(
+            self._device_id, sensorName)
+        self._debug_topic = self._config.get_autodiscovery_topic(
+            conf.autodisc.Component.SENSOR,
+            sensorName,
+            conf.autodisc.SensorDeviceClasses.GENERIC_SENSOR
+        )
+        debug_payload = self._debug_topic.get_config_payload(
+            sensorName, "", unique_id=uid_debug, value_template="{{ value_json.val }}", json_attributes=True)
+        if self._debug_topic.config is not None:
+            self.__client.publish(self._debug_topic.config,
+                                  payload=debug_payload, qos=0, retain=True)
+        self.__client.publish(
+            self._debug_topic.ava_topic, "online", retain=True)
+        self.__client.will_set(
+            self._debug_topic.ava_topic, "offline", retain=True)
         # Setup MQTT recording switch
         switchName = "{} Aufnehmen".format(sensorName)
         uid_do_record = "switch.piMotion-{}-{}".format(
@@ -397,20 +414,25 @@ class PiMotionMain(threading.Thread):
                 self._config.get("PiMotion/motion/recordPost", 1)))
 
         self._inMotion = motion
-        self.motion_data(data)
+        self.motion_data(data=data, changed=True)
 
-    def motion_data(self, data: dict):
+    def motion_data(self, data: dict, changed=False):
         # x y val count
         self._lastState = {"motion": 1 if self._inMotion else 0, "x": data["hotest"][0],
                            "y": data["hotest"][1], "val": data["hotest"][2], "c": data["noise_count"]}
         self._jsonOutput.write(self._lastState)
         self.update_anotation()
         if self._analyzer is not None and not self._analyzer._calibration_running:
-            self.sendStates()
+            self.sendStates(changed=changed)
 
-    def sendStates(self):
-        self.__client.publish(self._motion_topic.state,
-                              json.dumps(self._lastState))
+    def sendStates(self, changed=None):
+        if changed is None:
+            self.__client.publish(self._motion_topic.state, json.dumps(self._lastState))
+            self.__client.publish(self._debug_topic.state, json.dumps(self._lastState))
+        elif changed:
+            self.__client.publish(self._motion_topic.state, json.dumps(self._lastState))
+        else:
+            self.__client.publish(self._debug_topic.state, json.dumps(self._lastState))
 
     def pil_magnitude_save_call(self, d, data: dict):
         if self._pilQueue is not None:

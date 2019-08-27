@@ -3,7 +3,7 @@ Description=MQTTscripts
 
 [Service]
 TimeoutStartSec=60
-ExecStartPre=/opt/mqttScripts/data/update.sh update
+ExecStartPre=-/opt/mqttScripts/data/update.sh update
 ExecStart=/opt/mqttScripts/data/update.sh run-service
 TimeoutStopSec=35s
 Restart=always
