@@ -38,13 +38,13 @@ class OneWireTemp:
             current_max = self._config.get(path_max, "n/A")
 
             self.__logger.debug("{} = {}".format(path_lmin, current_min))
-            self._config.sett(path_min, current_min)
+            self._config.sett(path_lmin, current_min)
             self.__logger.debug("{} = {}".format(path_lmax, current_max))
-            self._config[path_lmax] = current_max
+            self._config.sett(path_lmax, current_max)
 
             self.__logger.debug("reset daily stats")
-            self._config["w1t/stat/{}/min".format(i)] = "RESET"
-            self._config["w1t/stat/{}/max".format(i)] = "RESET"
+            self._config[path_min] = "RESET"
+            self._config[path_max] = "RESET"
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         self._config = opts
@@ -88,7 +88,7 @@ class OneWireTemp:
         self._daily_job = schedule.every().day.at("00:00")
         self._daily_job.do( lambda: self._reset_daily() )
 
-        self._job = schedule.every(10).seconds
+        self._job = schedule.every(60).seconds
         self._job.do( lambda: self.send_update() )
 
 
@@ -120,27 +120,33 @@ class OneWireTemp:
 
             if new_temp != self._prev_deg[i] or force:
                 ii = d["i"]
-                cmin = self._config.get("w1t/stat/{}/min".format(ii), "RESET")
-                cmax = self._config.get("w1t/stat/{}/max".format(ii), "RESET")
 
-                if cmin == "RESET":
+                path_min = "w1t/stat/{}/min".format(ii)
+                path_max = "w1t/stat/{}/max".format(ii)
+                path_lmin = "w1t/stat/{}/lmin".format(ii)
+                path_lmax = "w1t/stat/{}/lmax".format(ii)
+
+                cmin = self._config.get(path_min, "RESET")
+                cmax = self._config.get(path_max, "RESET")
+
+                if cmin == "RESET" or cmin == "n/A":
                     cmin = new_temp
                 elif cmin > new_temp:
                     cmin = new_temp
-                if cmax == "RESET":
+                if cmax == "RESET" or cmax == "n/A":
                     cmax = new_temp
                 elif cmax < new_temp:
                     cmax = new_temp
 
-                self._config["w1t/stat/{}/min".format(ii)] = cmin
-                self._config["w1t/stat/{}/max".format(ii)] = cmax
+                self._config[path_min] = cmin
+                self._config[path_min] = cmax
 
                 js = {
                     "now": str(new_temp),
-                    "Heute höchster Wert": self._config.get("w1t/stat/{}/max".format(ii), "n/A"),
-                    "Heute tiefster Wert": self._config.get("w1t/stat/{}/min".format(ii), "n/A"),
-                    "Gestern höchster Wert": self._config.get("w1t/stat/{}/lmax".format(ii), "n/A"),
-                    "Gestern tiefster Wert": self._config.get("w1t/stat/{}/lmin".format(ii), "n/A")
+                    "Heute höchster Wert": cmax,
+                    "Heute tiefster Wert": cmin,
+                    "Gestern höchster Wert": self._config.get(path_lmax, "n/A"),
+                    "Gestern tiefster Wert": self._config.get(path_lmin, "n/A")
                 }
                 jstr = json.dumps(js)
                 if new_temp != -1000 and self._prev_deg == -1000:
