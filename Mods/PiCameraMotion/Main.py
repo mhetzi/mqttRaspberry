@@ -82,6 +82,7 @@ class PiMotionMain(threading.Thread):
     _pilQueue = None
     _pilThread = None
     _http_out = None
+    _sendDebug = False
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         threading.Thread.__init__(self)
@@ -124,12 +125,25 @@ class PiMotionMain(threading.Thread):
         self.__client.publish(self._do_record_topic.state,
                               payload=b'ON' if recording else b'OFF')
 
+    def set_do_dbg(self, debug: bool):
+        self.__logger.info(
+            "Config Wert Dbg wird auf {} gesetzt".format(debug))
+        self.__client.publish(self._do_record_topic.state,
+                              payload=b'ON' if debug else b'OFF')
+
     def on_message(self, client, userdata, message: mclient.MQTTMessage):
         if self._do_record_topic.command == message.topic:
             if message.payload.decode('utf-8') == "ON":
                 self.set_do_record(True)
             elif message.payload.decode('utf-8') == "OFF":
                 self.set_do_record(False)
+
+    def on_dbg_message(self, client, userdata, message: mclient.MQTTMessage):
+        if self._do_record_topic.command == message.topic:
+            if message.payload.decode('utf-8') == "ON":
+                self.set_do_dbg(True)
+            elif message.payload.decode('utf-8') == "OFF":
+                self.set_do_dbg(False)
 
     def register(self):
         # Setup MQTT motion binary_sensor
@@ -151,15 +165,15 @@ class PiMotionMain(threading.Thread):
         self.__client.will_set(
             self._motion_topic.ava_topic, "offline", retain=True)
         # Setup MQTT debug sensor
-        uid_debug = "sensor.piMotion-dbg-{}-{}".format(
+        uid_debug = "switch.piMotion-dbg-{}-{}".format(
             self._device_id, sensorName)
         self._debug_topic = self._config.get_autodiscovery_topic(
-            conf.autodisc.Component.SENSOR,
+            conf.autodisc.Component.SWITCH,
             sensorName,
             conf.autodisc.SensorDeviceClasses.GENERIC_SENSOR
         )
         debug_payload = self._debug_topic.get_config_payload(
-            sensorName, "", unique_id=uid_debug, value_template="{{ value_json.val }}", json_attributes=True)
+            sensorName, "", unique_id=uid_debug, value_template="{{ value_json.on_dbg_message }}", json_attributes=True)
         if self._debug_topic.config is not None:
             self.__client.publish(self._debug_topic.config,
                                   payload=debug_payload, qos=0, retain=True)
@@ -167,6 +181,9 @@ class PiMotionMain(threading.Thread):
             self._debug_topic.ava_topic, "online", retain=True)
         self.__client.will_set(
             self._debug_topic.ava_topic, "offline", retain=True)
+        self.__client.subscribe(self._debug_topic.command)
+        self.__client.message_callback_add(
+            self._debug_topic.command, self.on_dbg_message)
         # Setup MQTT recording switch
         switchName = "{} Aufnehmen".format(sensorName)
         uid_do_record = "switch.piMotion-{}-{}".format(
@@ -198,6 +215,8 @@ class PiMotionMain(threading.Thread):
         self._pilThread = threading.Thread(
             target=self.pil_magnitude_save, name="MagSave")
         self._pilThread.start()
+
+        self.set_do_dbg(self._sendDebug)
 
     def set_pluginManager(self, p: pm.PluginManager):
         self._pluginManager = p
@@ -419,7 +438,7 @@ class PiMotionMain(threading.Thread):
     def motion_data(self, data: dict, changed=False):
         # x y val count
         self._lastState = {"motion": 1 if self._inMotion else 0, "x": data["hotest"][0],
-                           "y": data["hotest"][1], "val": data["hotest"][2], "c": data["noise_count"]}
+                           "y": data["hotest"][1], "val": data["hotest"][2], "c": data["noise_count"], "dbg_on": self._sendDebug}
         self._jsonOutput.write(self._lastState)
         self.update_anotation()
         if self._analyzer is not None and not self._analyzer._calibration_running:
@@ -431,7 +450,7 @@ class PiMotionMain(threading.Thread):
             self.__client.publish(self._debug_topic.state, json.dumps(self._lastState))
         elif changed:
             self.__client.publish(self._motion_topic.state, json.dumps(self._lastState))
-        else:
+        elif self._sendDebug:
             self.__client.publish(self._debug_topic.state, json.dumps(self._lastState))
 
     def pil_magnitude_save_call(self, d, data: dict):

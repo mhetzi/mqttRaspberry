@@ -94,7 +94,7 @@ class bhl1750:
                 self._threasholds[0] = 50
             elif self._dev_last > 250:
                 self._threasholds[0] = 10
-            elif self._dev_last > 10
+            elif self._dev_last > 10:
                 self._threasholds[0] = 2
             else:
                 self._threasholds[0] = 0.5
@@ -105,7 +105,7 @@ class bhl1750:
                 self._threasholds[1] = 50
             elif self._dev_alt_last > 250:
                 self._threasholds[1] = 10
-            elif self._dev_alt_last > 10
+            elif self._dev_alt_last > 10:
                 self._threasholds[1] = 2
             else:
                 self._threasholds[1] = 0.5
