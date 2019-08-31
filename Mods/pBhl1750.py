@@ -89,20 +89,24 @@ class bhl1750:
     def update_threshhold(self):
         if self._conf["BHL1750/device"]:
             if self._dev_last > 900:
-                self._threasholds[0] = 110
+                self._threasholds[0] = 150
             elif self._dev_last > 500:
-                self._threasholds[0] = 35
+                self._threasholds[0] = 50
             elif self._dev_last > 250:
                 self._threasholds[0] = 10
+            elif self._dev_last > 10
+                self._threasholds[0] = 2
             else:
                 self._threasholds[0] = 0.5
         if self._conf["BHL1750/device_alt"]:
             if self._dev_alt_last > 900:
-                self._threasholds[1] = 110
+                self._threasholds[1] = 150
             elif self._dev_alt_last > 500:
-                self._threasholds[1] = 35
+                self._threasholds[1] = 50
             elif self._dev_alt_last > 250:
                 self._threasholds[1] = 10
+            elif self._dev_alt_last > 10
+                self._threasholds[1] = 2
             else:
                 self._threasholds[1] = 0.5
         self._logger.info("Threshold sind jetzt auf ({}, {})".format(self._threasholds[0], self._threasholds[1]))
