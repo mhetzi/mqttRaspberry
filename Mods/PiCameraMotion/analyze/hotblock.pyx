@@ -17,6 +17,9 @@ cdef packed struct rBLOCK:
 
 ctypedef rBLOCK retBlock
 
+ctypedef np.uint* zeroMapHandleInt
+ctypedef np.uint zeroMapHandle
+
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound (False) # turn off negative index wrapping for entire function
 cdef retBlock chotBlock(np.ndarray[BLOCK, ndim=2] arr, np.int16_t rows, np.int16_t cols, np.int16_t minNoise):
@@ -74,20 +77,6 @@ def hotBlock(a, np.int16_t rows, np.int16_t cols, np.int16_t minNoise, np.ndarra
     #print(meh.__class__.__name__)
     return meh.b.x, meh.b.y, meh.b.sad, meh.c, meh
 
-def init_block_mask(np.int16_t rows, np.int16_t cols):
-    cdef np.ndarray ret = np.zeros([rows, cols], dtype=[('x', 'i1'),
-        ('y', 'i1'),
-        ('sad', 'u2'),])
-    return ret
-
-def update_block_mask(retBlock new_limit, np.ndarray[BLOCK, ndim=2] block_mask):
-    block_mask[new_limit.b.x, new_limit.b.y].sad = new_limit.b.sad
-
-def build_block_mask(array, rows, cols):
-    cdef np.ndarray ret = np.zeros([rows, cols], dtype=[('x', 'i1'),
-        ('y', 'i1'),
-        ('sad', 'u2'),])
-    for x in range( rows ):
-        for y in range( cols ):
-            ret[x,y] = array[x][y]
-    return ret
+cdef initZeroMap(np.int16_t rows, np.int16_t cols):
+    cdef zeroMapHandleInt handle = malloc( sizeof(np.uint16_t * row * cols) )
+    return (np.uint) handle
