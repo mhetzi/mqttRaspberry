@@ -35,8 +35,8 @@ class Analyzer(cama.PiAnalysisOutput):
     __max_ermittelt = False
     __min_ermittelt = False
     __motion_triggered = False
-    __block_mask = {"enabled": False, "mask": None,
-                    "isBuilding": False, "cObj": None}
+    zeromap_py = {"enabled": False, "isBuilding": False, "dict": None}
+    __zeromap_data = None
 
     def motion_call(self, motion: bool, data: dict, wasMeassureing: bool):
         self.logger.error("motion_call nicht überschrieben!")
@@ -61,21 +61,37 @@ class Analyzer(cama.PiAnalysisOutput):
             width, height = self.size or self.camera.resolution
             self.cols = ((width + 15) // 16) + 1
             self.rows = (height + 15) // 16
+            if self.zeromap_py["enabled"]:
+                self.logger.debug("Erstelle C Object for zeroMap...")
+                self.__zeromap_data = Mods.PiCameraMotion.analyze.hotblock.ZeroMap(self.rows, self.cols)
+            if self.zeromap_py["dict"] is not None and self.__zeromap_data is not None:
+                self.logger.debug("Lade Savedata in C zeroMap...")
+                self.__zeromap_data.loadZeroMap(self.zeromap_py["dict"])
         self.analyze(
             np.frombuffer(b, dtype=cama.motion_dtype).
             reshape((self.rows, self.cols)))
         return result
 
     def analyze(self, a: cama.motion_dtype):
-        cMask = None
-        if self.__block_mask["enabled"] and self.__block_mask["cObj"] is not None:
-            cMask = self.__block_mask["cObj"]
+        if self.zeromap_py["enabled"] and self.__zeromap_data != None and not self.zeromap_py["isBuilding"]:
+            a = self.__zeromap_data.subtractMask(a)
         hottestBlock = Mods.PiCameraMotion.analyze.hotblock.hotBlock(
-            a, self.rows, self.cols, self.blockMinNoise, cMask)
+            a, self.rows, self.cols, self.blockMinNoise)
         try:
             self._queue.put_nowait((hottestBlock, a))
         except queue.Full:
             self.logger.debug("Queue ist voll")
+
+    def trainZeroMap(self):
+        self.logger.debug("Erstelle C Object for zeroMap...")
+        if self.__zeromap_data is None:
+            self.__zeromap_data = Mods.PiCameraMotion.analyze.hotblock.ZeroMap(self.rows, self.cols)
+        self.logger.info("Schalte zeroMap ein...")
+        self.zeromap_py["enabled"] = True
+        self.logger.info("Schalte zeroMap Baustatus um...")
+        self.zeromap_py["isBuilding"] = True
+        self.framesToNoMotion *= 10
+
 
     def __calibrate(self, hottestBlock: dict):
         if self.countMinNoise <= hottestBlock[3] and self.states["motion_frames"] >= self.frameToTriggerMotion:
@@ -100,154 +116,133 @@ class Analyzer(cama.PiAnalysisOutput):
             self.states["motion_frames"] = 0
             self.logger.info(
                 "Kalibriere derzeit bei {} +blockNoise".format(self.blockMinNoise))
-
-    def __prepare_block_mask_data(self):
-        if self.rows is None or self.cols is None:
-            return False
-        if self.__block_mask["mask"] is None:
-            self.logger.debug("Build Mask dict")
-            self.__block_mask["mask"] = []
-            for _ in range(self.rows):
-                col = []
-                for __ in range(self.cols):
-                    col.append(0)
-                self.__block_mask["mask"].append(col)
-            self.__block_mask["cObj"] = Mods.PiCameraMotion.analyze.hotblock.init_block_mask(
-                self.rows, self.cols)
-            return True
-        elif self.__block_mask["mask"] is not None and self.__block_mask["cObj"] is None:
-            try:
-                if not isinstance(self.__block_mask["mask"], list):
-                    self.logger.warning("Mask Object ist von Typ {} sollte aber list sein".format(
-                        type(self.__block_mask["mask"])))
-                    raise TypeError()
-                self.__block_mask["cObj"] = Mods.PiCameraMotion.analyze.hotblock.build_block_mask(
-                    self.__block_mask["mask"],
-                    self.rows,
-                    self.cols
-                )
-                return True
-            except TypeError as e:
-                self.__block_mask["mask"] = None
-                self.__block_mask["cObj"] = None
-                self.logger.warning(
-                    "TypeError( {} ) on build_block_mask resetting...".format(str(e)))
-                return False
-        return True
-
-    def __build_block_mask(self, hottestBlock):
-        if not self.__prepare_block_mask_data():
-            self.logger.warning("__prepare_block_mask_data error.")
+    
+    def __train_zero(self, a: cama.motion_dtype):
+        if self.__zeromap_data is None:
+            self.zeromap_py["isBuilding"] = False
             return
-        x = hottestBlock[0]
-        y = hottestBlock[1]
-        sad = hottestBlock[2]
-        if self.__block_mask["mask"][x][y] < sad:
-            self.__block_mask["mask"][x][y] = sad
-            self.logger.debug(
-                "x: {}, y: {} auf minimal {} gesetzt".format(x, y, sad))
-            self.__block_mask["cObj"] = Mods.PiCameraMotion.analyze.hotblock.update_block_mask(
-                hottestBlock[4], self.__block_mask["cObj"])
-
-    def enable_blockmask(self, mask, on=True, build_new=False):
-        if mask is not None:
-            self.__block_mask["mask"] = mask
+        self.logger.debug("T")
+        changed = self.__zeromap_data.trainZeroMap(a)
+        still_pre_change = self.states["still_frames"]
+        if changed:
+            self.states["still_frames"] = 0
+            self.states["motion_frames"] += 1
         else:
-            self.__block_mask["mask"] = []
-        self.__block_mask["enabled"] = on
-        self.__block_mask["isBuilding"] = build_new
-        self.__prepare_block_mask_data()
+            self.states["still_frames"] += 1
+            self.states["motion_frames"] = 0
+        
+        if self.states["motion_frames"] > 0 and still_pre_change > self.framesToNoMotion / 10:
+            self.motion_call(True, self.states, False)
+        elif self.states["still_frames"] == self.framesToNoMotion / 10:
+            self.motion_call(False, self.states, False)
 
-    def get_blockmask_enabled(self):
-        return self.__block_mask["enabled"], self.__block_mask["mask"], self.__block_mask["isBuilding"]
+        self.logger.debug("TZ C:{} still: {} motion:{}".format(changed, self.states["still_frames"], self.states["motion_frames"]))
 
     def thread_queue_reader(self):
-        import copy
-        for _ in range(6):
-            try:
-                self._queue.get_nowait()
-            except queue.Empty:
-                self.logger.debug("Queue ist leer")
-        self.logger.debug("QueueReader läuft")
-        if self.blockMinNoise < 0 and self.countMinNoise < 0:
-            self._calibration_running = True
-            self.blockMinNoise = 0
-            self.framesToNoMotion *= 10
+        try:
+            import copy
+            for _ in range(6):
+                try:
+                    self._queue.get_nowait()
+                except queue.Empty:
+                    self.logger.debug("Queue ist leer")
+            self.logger.debug("QueueReader läuft")
+            if self.blockMinNoise < 0 and self.countMinNoise < 0:
+                self._calibration_running = True
+                self.blockMinNoise = 0
+                self.framesToNoMotion *= 10
 
-        while self.__thread_do_run:
-            hottestBlock, a = self._queue.get()
-            self.processed += 1
-            self.states["hotest"] = [hottestBlock[0],
-                                     hottestBlock[1], hottestBlock[2]]
-            self.states["noise_count"] = hottestBlock[3]
-            self.states["object"] = hottestBlock
-            if self.countMinNoise > hottestBlock[3] and self.countMaxNoise > hottestBlock[3] and hottestBlock[2] < self.blockMinNoise:
-                self.states["still_frames"] += 1
-                self.states["motion_frames"] = 0
-                if self._calibration_running:
+            while self.__thread_do_run:
+                hottestBlock, a = self._queue.get()
+                self.processed += 1
+                self.states["hotest"] = [hottestBlock[0],
+                                        hottestBlock[1], hottestBlock[2]]
+                self.states["noise_count"] = hottestBlock[3]
+                self.states["object"] = hottestBlock
+
+                if self.zeromap_py["isBuilding"]:
+                    self.__train_zero(a)
                     self.logger.debug("still_frame {} von {}".format(
                         self.states["still_frames"], self.framesToNoMotion))
-            else:
-                self.states["motion_frames"] += 1
-                #self.logger.debug("Bewegung! {} von {}".format(
-                #    self.states["motion_frames"], self.frameToTriggerMotion))
-                if self._calibration_running:
-                    self.__calibrate(hottestBlock)
-                if self.__block_mask["isBuilding"]:
-                    self.__build_block_mask(hottestBlock)
-                try:
-                    if self.states["motion_frames"] >= self.frameToTriggerMotion and not self.__motion_triggered:
-                        self.pil_magnitude_save_call(a, self.__old_States)
-                        self.pil_magnitude_save_call(a, self.states)
-                    else:
-                        self.__old_States = copy.deepcopy(self.states)
-                except:
-                    pass
 
-            if self._calibration_running and self.states["still_frames"] > self.framesToNoMotion:
-                try:
-                    self.motion_call(False, self.states, True)
-                except:
-                    pass
-                self._calibration_running = False
-                self.logger.info("Die ermittelten Werte block {} count {}".format(
-                    self.blockMinNoise, self.countMinNoise))
-                self.framesToNoMotion = self.framesToNoMotion / 10
-            elif not self._calibration_running:
-                try:
-                    if self.states["noise_count"] >= self.countMinNoise or self.states["hotest"][2] > self.blockMinNoise:
-                        self.motion_data_call(self.states)
-                except Exception as e:
-                    self.logger.exception(
-                        "Motion data call Exception: {}".format(str(e)))
-                try:
-                    if self.states["motion_frames"] >= self.frameToTriggerMotion and not self.__motion_triggered:
-                        self.__motion_triggered = True
-                        self.logger.debug("Trigger Motion")
-                        self.states["still_frames"] = 0
-                        self.states["motion_frames"] = 0
-                        self.motion_call(True, self.states, False)
-                        self.logger.debug("motion_call called")
-                    elif self.states["motion_frames"] >= self.frameToTriggerMotion and self.__motion_triggered:
-                        self.states["still_frames"] = 0
-                        self.states["motion_frames"] = 0
-                    elif self.states["still_frames"] >= self.framesToNoMotion and self.__motion_triggered:
-                        self.logger.debug("Detrigger Motion")
-                        self.states["motion_frames"] = 0
-                        self.motion_call(False, self.states, False)
-                        self.logger.debug("motion_call called")
-                        self.__motion_triggered = False
-                except Exception as e:
-                    self.logger.exception(
-                        "Motion call Exception: {}".format(str(e)))
-        self.logger.debug("QueueReader geht schlafe (für immer)")
+                elif self.countMinNoise > hottestBlock[3] and self.countMaxNoise > hottestBlock[3] and hottestBlock[2] < self.blockMinNoise:
+                    self.states["still_frames"] += 1
+                    self.states["motion_frames"] = 0
+                    if self._calibration_running:
+                        self.logger.debug("still_frame {} von {}".format(
+                            self.states["still_frames"], self.framesToNoMotion))
+                else:
+                    self.states["motion_frames"] += 1
+                    #self.logger.debug("Bewegung! {} von {}".format(
+                    #    self.states["motion_frames"], self.frameToTriggerMotion))
+                    if self._calibration_running:
+                        self.__calibrate(hottestBlock)
+                    try:
+                        if self.states["motion_frames"] >= self.frameToTriggerMotion and not self.__motion_triggered:
+                            self.pil_magnitude_save_call(a, self.__old_States)
+                            self.pil_magnitude_save_call(a, self.states)
+                        else:
+                            self.__old_States = copy.deepcopy(self.states)
+                    except:
+                        pass
+                if self.zeromap_py["isBuilding"] and self.states["still_frames"] > self.framesToNoMotion:
+                    self.zeromap_py["isBuilding"] = False
+                    self.logger.info("ZeroMap gebaut. Sicherung wird erstellt")
+                    self.framesToNoMotion = self.framesToNoMotion / 10
+                    self.zeromap_py["dict"] = self.__zeromap_data.saveZeroMap()
+                    try:
+                        self.motion_call(False, self.states, True)
+                    except:
+                        pass
+
+                if self._calibration_running and self.states["still_frames"] > self.framesToNoMotion:
+                    try:
+                        self.motion_call(False, self.states, True)
+                    except:
+                        pass
+                    self._calibration_running = False
+                    self.logger.info("Die ermittelten Werte block {} count {}".format(
+                        self.blockMinNoise, self.countMinNoise))
+                    self.framesToNoMotion = self.framesToNoMotion / 10
+                elif not self._calibration_running:
+                    try:
+                        if self.states["noise_count"] >= self.countMinNoise or self.states["hotest"][2] > self.blockMinNoise:
+                            self.motion_data_call(self.states)
+                    except Exception as e:
+                        self.logger.exception(
+                            "Motion data call Exception: {}".format(str(e)))
+                    try:
+                        if self.states["motion_frames"] >= self.frameToTriggerMotion and not self.__motion_triggered:
+                            self.__motion_triggered = True
+                            self.logger.debug("Trigger Motion")
+                            self.states["still_frames"] = 0
+                            self.states["motion_frames"] = 0
+                            self.motion_call(True, self.states, False)
+                            self.logger.debug("motion_call called")
+                        elif self.states["motion_frames"] >= self.frameToTriggerMotion and self.__motion_triggered:
+                            self.states["still_frames"] = 0
+                            self.states["motion_frames"] = 0
+                        elif self.states["still_frames"] >= self.framesToNoMotion and self.__motion_triggered:
+                            self.logger.debug("Detrigger Motion")
+                            self.states["motion_frames"] = 0
+                            self.motion_call(False, self.states, False)
+                            self.logger.debug("motion_call called")
+                            self.__motion_triggered = False
+                    except Exception as e:
+                        self.logger.exception(
+                            "Motion call Exception: {}".format(str(e)))
+            self.logger.debug("QueueReader geht schlafe (für immer)")
+        except:
+            self.logger.exception("QueueReader geht schlafen (Exception)")
 
     def run_queue(self):
         self.logger.debug("Queue Thread wird erstellt...")
         self._thread = threading.Thread(
             target=lambda: self.thread_queue_reader(), name="Analyzer Thread")
         self.logger.debug("Queue Thread wird gestartet...")
-        self._thread.run()
+        self._thread.start()
 
     def stop_queue(self):
         self.__thread_do_run = False
+        if self.__zeromap_data is not None:
+            self.zeromap_py["dict"] = self.__zeromap_data.saveZeroMap()

@@ -24,6 +24,7 @@ PAGE = u"""\
 <h1>mqtt PiCamera Plugin</h1>
 <p>
 <a href="calibrate.run">Minimalen Block Noise ermitteln</a>
+<a href="zeromap.run">ZeroMap erstellen</a>
 <a href="stream.mjpg">Stream in Vollbild</a>
 <a href="snap.jpg">Snapshot erstellen</a>
 <a href="info.json">Debug JSON abrufen</a>
@@ -120,7 +121,7 @@ class StreamingPictureOutput(object):
 
 def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
     class StreamingHandler(server.BaseHTTPRequestHandler):
-        def meassure_call(self):
+        def meassure_call(self, type):
             logging.warning("meassure_call nicht überladen")
 
         def fill_setting_html(self, html: str):
@@ -218,7 +219,19 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
                 self.wfile.write(b'OK!')
                 self.wfile.write(b'\r\n')
                 if self.meassure_call is not None:
-                    self.meassure_call()
+                    self.meassure_call(0)
+            elif self.path == "/zeromap.run":
+                self.send_response(200)
+                self.send_header('Age', 0)
+                self.send_header('Cache-Control', 'no-cache, private')
+                self.send_header('Pragma', 'no-cache')
+                self.send_header(
+                    'Content-Type', 'multipart/x-mixed-replace; boundary=NEW_JSON_DATA')
+                self.end_headers()
+                self.wfile.write(b'OK!')
+                self.wfile.write(b'\r\n')
+                if self.meassure_call is not None:
+                    self.meassure_call(1)
             elif self.path.startswith("/updateMotion.data"):
                 data = self.path.replace("/updateMotion.data?", "")
                 data = urllib.parse.parse_qs(data)

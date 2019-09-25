@@ -1,6 +1,10 @@
 import numpy as np
 cimport numpy as np
 cimport cython
+from libc.stdint cimport uintptr_t
+from libc.stdlib cimport malloc, free
+from libc.string cimport memset
+from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
 
 cdef packed struct sBLOCK:
     np.int8_t x
@@ -17,8 +21,13 @@ cdef packed struct rBLOCK:
 
 ctypedef rBLOCK retBlock
 
-ctypedef np.uint* zeroMapHandleInt
-ctypedef np.uint zeroMapHandle
+cdef packed struct zeroMapHandleIntern:
+    np.uint16_t** zeroMapData
+    np.int16_t rows
+    np.int16_t cols
+
+ctypedef zeroMapHandleIntern* zeroMapHandleInt
+ctypedef uintptr_t zeroMapHandle
 
 @cython.boundscheck(False) # turn off bounds-checking for entire function
 @cython.wraparound (False) # turn off negative index wrapping for entire function
@@ -48,19 +57,7 @@ cdef retBlock chotBlock(np.ndarray[BLOCK, ndim=2] arr, np.int16_t rows, np.int16
                 hotest.c += 1
     return hotest
 
-@cython.boundscheck(False) # turn off bounds-checking for entire function
-@cython.wraparound (False) # turn off negative index wrapping for entire function
-cdef subtractMask(np.ndarray[BLOCK, ndim=2] arr, np.int16_t rows, np.int16_t cols, np.ndarray[BLOCK, ndim=2] mask):
-    cdef np.int32_t v = 0
-    for r in range(rows):
-        for c in range(cols):
-            v = arr[r,c].sad - mask[r,c].sad
-            if v < 0:
-                v = 0
-            arr[r,c].sad = v
-    return arr
-
-def hotBlock(a, np.int16_t rows, np.int16_t cols, np.int16_t minNoise, np.ndarray[BLOCK, ndim=2] block_mask=None):
+def hotBlock(a, np.int16_t rows, np.int16_t cols, np.int16_t minNoise):
     #print("Rows: Typ: {}, länge: {}".format(a.__class__.__name__, rows))
     #print("Cols: Typ: {}, länge: {}".format(a[0].__class__.__name__, cols))
     #print("Data: Typ: {}, Data: {}".format(a[0][0].__class__.__name__, a[0][0]))
@@ -69,14 +66,82 @@ def hotBlock(a, np.int16_t rows, np.int16_t cols, np.int16_t minNoise, np.ndarra
     meh.b.y   = 0
     meh.b.sad = 0
     meh.c     = 0
-    if block_mask is not None:
-        a = subtractMask(a, rows, cols, block_mask)
     meh = chotBlock(a, rows, cols, minNoise)
 
     #print("Return: Typ: {}, länge: {}".format(meh.__class__.__name__, rows))
     #print(meh.__class__.__name__)
     return meh.b.x, meh.b.y, meh.b.sad, meh.c, meh
 
-cdef initZeroMap(np.int16_t rows, np.int16_t cols):
-    cdef zeroMapHandleInt handle = malloc( sizeof(np.uint16_t * row * cols) )
-    return (np.uint) handle
+cdef class ZeroMap:
+    cdef np.uint16_t** zeroMapData
+    cdef np.int16_t rows, cols
+
+    def __init__(self, rows, cols):
+        self.zeroMapData = NULL
+        cdef size_t size = sizeof(np.uint16_t) * rows * cols
+
+        self.rows = rows
+        self.cols = cols
+        self.zeroMapData = <np.uint16_t**> PyMem_Malloc(sizeof(np.uint16_t*) * rows)
+        if self.zeroMapData != NULL:
+            for r in range(self.rows):
+                self.zeroMapData[r] =  <np.uint16_t*> PyMem_Malloc(sizeof(np.uint16_t) * cols)
+
+    def __del__(self):
+        if self.zeroMapData != NULL:
+            for r in range(self.rows):
+                PyMem_Free(self.zeroMapData[r])
+            PyMem_Free(self.zeroMapData)
+
+    def trainZeroMap(self, np.ndarray[BLOCK, ndim=2] arr):
+        hasChanged = False
+        cdef np.uint16_t v = 0
+
+        if self.zeroMapData != NULL:
+            for r in range(self.rows):
+                for c in range(self.cols):
+                    v = arr[r,c].sad
+                    if v > self.zeroMapData[r][c]:
+                        self.zeroMapData[r][c] = v + ( v / 100 * 15 )
+                        print(self.zeroMapData[r][c])
+                        hasChanged = True
+
+        return hasChanged
+
+    def saveZeroMap(self):
+        if self.zeroMapData == NULL:
+            print("!!! SAVE FAILED zeroMapData is NULL !!!")
+            return {}
+        arr = {}
+        for r in range(self.rows):
+            arr[str(r)] = {}
+            for c in range(self.cols):
+                arr[str(r)][str(c)] = self.zeroMapData[r][c]
+                print(self.zeroMapData[r][c])
+        return arr
+
+    def loadZeroMap(self, arr: dict):
+        if self.zeroMapData == NULL:
+            print("!! LOAD FAIL, zeroMapData == NULL !!")
+            return
+        for r in range(self.rows):
+            row =  arr.get(str(r), None)
+            if row is None:
+                continue
+            for c in range(self.cols):
+                self.zeroMapData[r][c] = row.get(str(c), 0)
+
+    @cython.boundscheck(False) # turn off bounds-checking for entire function
+    @cython.wraparound (False) # turn off negative index wrapping for entire function
+    def subtractMask(self, np.ndarray[BLOCK, ndim=2] arr):
+        if self.zeroMapData == NULL:
+            return arr
+
+        cdef np.int32_t v = 0
+        for r in range(self.rows):
+            for c in range(self.cols):
+                v = arr[r,c].sad - self.zeroMapData[r][c]
+                if v < 0:
+                    v = 0
+                arr[r,c].sad = v
+        return arr

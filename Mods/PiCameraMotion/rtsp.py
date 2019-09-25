@@ -74,8 +74,11 @@ class CameraSplitIO(threading.Thread):
 
     def _restore_append(self):
         self.append = self._append
+        
 
     def _append(self, item: bytes):
+        self._oldAppend(item)
+
         encoder = self._camera._encoders[self._splitter_port]
         frame = None
         if encoder.frame.complete:
@@ -109,7 +112,6 @@ class CameraSplitIO(threading.Thread):
                             self.logger.warning("Recorder here. Lebe ja gar nicht mehr! Shutdown wird wiederholt...")
                             self.shutdown()
                     pass
-        self._oldAppend(item)
 
     def _redirectPackages(self, io: cams.PiCameraCircularIO, file):
         self.logger.debug("Überschreibe append methode")

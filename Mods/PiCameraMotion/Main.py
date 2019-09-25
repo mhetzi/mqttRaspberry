@@ -235,10 +235,7 @@ class PiMotionMain(threading.Thread):
 
         if self._analyzer is not None:
             self._analyzer.stop_queue()
-            data, enable, build = self._analyzer.get_blockmask_enabled()
-            self._config["PiMotion/blockMask/mask_data"] = data
-            self._config["PiMotion/blockMask/enable"] = enable
-            self._config["PiMotion/blockMask/do_rebuild"] = build
+            self._config["PiMotion/zeroMap"] = self._analyzer.zeromap_py
 
         if self._pilQueue is not None and self._pilThread is not None:
             self.__logger.info("Stoppe PIL queue...")
@@ -278,13 +275,11 @@ class PiMotionMain(threading.Thread):
                 anal.motion_call = lambda motion, data, mes: self.motion(
                     motion, data, mes)
                 anal.motion_data_call = lambda data: self.motion_data(data)
-                anal.enable_blockmask(
-                    self._config.get("PiMotion/blockMask/mask_data", None),
-                    self._config.get("PiMotion/blockMask/enable", False),
-                    self._config.get("PiMotion/blockMask/do_rebuild", False)
-                )
                 anal.pil_magnitude_save_call = lambda img, data: self.pil_magnitude_save_call(
                     img, data)
+
+                anal.zeromap_py = self._config.get("PiMotion/zeroMap", {"enabled": False, "isBuilding": False, "dict": None})
+
                 self._analyzer = anal
 
                 self._circularStream = cam.PiCameraCircularIO(
@@ -328,7 +323,7 @@ class PiMotionMain(threading.Thread):
                         self._config.get("PiMotion/http/port", 8083)
                     )   
                     streamingHandle = httpc.makeStreamingHandler(http_out, self._jsonOutput)
-                    streamingHandle.meassure_call = lambda s: self.meassure_minimal_blocknoise()
+                    streamingHandle.meassure_call = lambda s,i: self.meassure_call(i)
                     streamingHandle.fill_setting_html = lambda s, html: self.fill_settings_html(
                         html)
                     streamingHandle.update_settings_call = lambda s, a,b,c,d,e: self.update_settings_call(a,b,c,d,e)
@@ -389,6 +384,13 @@ class PiMotionMain(threading.Thread):
             #    self._lastState["x"], self._lastState["y"], self._lastState["val"], self._lastState["c"]
             # )
 
+    def meassure_call(self, i):
+        if i == 0:
+            self.meassure_minimal_blocknoise()
+        elif i == 1:
+            self._analyzer.trainZeroMap()
+                        
+
     def meassure_minimal_blocknoise(self):
         self.__logger.info("Starte neue Kalibrierung...")
         self._analyzer.states["still_frames"] = 0
@@ -399,12 +401,14 @@ class PiMotionMain(threading.Thread):
         if self._rtsp_recorder is not None:
             self._rtsp_recorder.shutdown()
             self._rtsp_recorder = None
+            self._rtsp_split._restore_append()
         self._postRecordTimer = None
 
     def motion(self, motion: bool, data: dict, wasMeassureing: bool):
         if wasMeassureing:
             self._config["PiMotion/motion/blockMinNoise"] = self._analyzer.blockMaxNoise
             self._config["PiMotion/motion/frameMinNoise"] = self._analyzer.countMinNoise
+            self._config["PiMotion/zeroMap"] = self._analyzer.zeromap_py
             self._config.save()
         if motion:
             self.__logger.info("Motion")
@@ -416,7 +420,7 @@ class PiMotionMain(threading.Thread):
                     path, dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                 if self._postRecordTimer is None and self._rtsp_recorder is None:
                     self._rtsp_recorder = self._rtsp_split.recordTo(path=path)
-                else:
+                elif self._postRecordTimer is not None:
                     self._postRecordTimer.cancel()
                     self._postRecordTimer = None
                     self.__logger.debug("Aufname timer wird zurückgesetzt")
