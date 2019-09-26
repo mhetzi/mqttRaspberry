@@ -87,6 +87,8 @@ class CameraSplitIO(threading.Thread):
             pass
         elif frame.timestamp is None and frame.frame_type != camf.PiVideoFrameType.sps_header and self._myParent is None:
             self.logger.debug("frame timestamp is None")
+        elif self.is_alive():
+            pass
         else:
             if not self._hadSPS:
                 with self.lock:
