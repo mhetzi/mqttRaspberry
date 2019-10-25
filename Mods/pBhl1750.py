@@ -89,11 +89,11 @@ class bhl1750:
     def update_threshhold(self):
         if self._conf["BHL1750/device"]:
             if self._dev_last > 900:
-                self._threasholds[0] = 150
+                self._threasholds[0] = 250
             elif self._dev_last > 500:
                 self._threasholds[0] = 50
             elif self._dev_last > 250:
-                self._threasholds[0] = 10
+                self._threasholds[0] = 25
             elif self._dev_last > 10:
                 self._threasholds[0] = 2
             else:

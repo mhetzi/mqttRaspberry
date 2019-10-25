@@ -47,7 +47,7 @@ class RaspberryPiCpuTemp:
         self.__client.will_set(topics.ava_topic, "offline", retain=True)
         self.__client.publish(topics.ava_topic, "online", retain=True)
         self._topic = topics
-        self._shed_Job = schedule.every(1).minutes
+        self._shed_Job = schedule.every(2).minutes
         self._shed_Job.do(self.send_update)
 
     def stop(self):
