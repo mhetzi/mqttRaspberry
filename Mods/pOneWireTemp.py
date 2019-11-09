@@ -139,7 +139,7 @@ class OneWireTemp:
                     cmax = new_temp
 
                 self._config[path_min] = cmin
-                self._config[path_min] = cmax
+                self._config[path_max] = cmax
 
                 js = {
                     "now": str(new_temp),

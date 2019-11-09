@@ -286,6 +286,7 @@ class WeatherflowPlugin:
         return True
 
     def process_obs_air(self, update: ObsAir.ObsAir):
+        self._logger.debug("Air update")
         if not self.set_lastseen_device(update.serial_number, update.report_intervall_minutes):
             self.register_new_air(update.serial_number, update)
 
@@ -351,6 +352,7 @@ class WeatherflowPlugin:
         self.update_sensor(update.serial_number, "battery", json.dumps(battery_json), autodisc.SensorDeviceClasses.BATTERY)
 
     def process_obs_sky(self, update: Obs_Sky.ObsSky):
+        self._logger.debug("Sky update")
         if not self.set_lastseen_device(update.serial_number, update.report_interval_minutes):
             self.register_new_sky(update.serial_number, update)
 
