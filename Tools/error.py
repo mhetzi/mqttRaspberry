@@ -25,7 +25,10 @@ def try_install_package(package:str, throw=ImportError(), ask=True):
          raise throw
    if not ask:
       from pip._internal import main as pipm
-      pipm(['install', package])
+      try:
+         pipm(['install', package])
+      except TypeError:
+         pipm.main(['install', package])
       raise RestartError()
 
 def set_system_mode(mode:bool):
