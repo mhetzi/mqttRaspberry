@@ -24,7 +24,8 @@ class ResettableTimer:
         self._timer.start()
 
     def cancel(self):
-        self._timer.cancel()
+        if self._timer is not None:
+            self._timer.cancel()
 
     def reset(self):
         self.cancel()
