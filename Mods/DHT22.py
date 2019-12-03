@@ -238,9 +238,12 @@ class DHT22:
 
 
 class DhtConf:
+    from Tools import ConsoleInputTools
     def __init__(self, conf: conf.BasicConfig):
         self.__ids = []
         self.c = conf
 
     def run(self):
-        pass
+        self.c["DHT/dev/pin"] = ConsoleInputTools.get_number_input("Pin Nummer von Datenpin? ", 22)
+        self.c["DHT/dev/type"] = ConsoleInputTools.get_input("DHT Type? Möglich ist 11 22 2302", "22")
+
