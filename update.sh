@@ -27,7 +27,7 @@ install() {
     source venv/bin/activate
     python3 -m pip install pip-review
     echo "mqttScripts wird heruntergeladen..."
-    git clone git://xeon.lan/mqttRaspberry data
+    git clone git://xeon.lan/mqttRaspberry data || git clone https://github.com/mhetzi/mqttRaspberry.git data;
     echo "Repo geladen"
     read -p "Service aktivieren und starten? " -n 1 -r
     if [[ $REPLY =~ ^[YyJj]$ ]]
