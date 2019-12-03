@@ -109,7 +109,7 @@ class OneWireTemp:
                 tmp = re.search("t=.*", data)
                 if tmp is not None:
                     tmp = tmp.group(0).replace("t=", "")
-                    return round(int(tmp) / 1000, 2)
+                    return round(int(tmp) / 1000, 1)
         return -1000
 
     def send_update(self, force=False):

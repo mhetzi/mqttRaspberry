@@ -3,6 +3,7 @@ import pathlib
 import os.path as osp
 import logging
 import Tools.Autodiscovery as autodisc
+import Tools.ResettableTimer as rtimer
 
 try:
     import json
@@ -16,7 +17,15 @@ try:
 
     FILEWATCHING = True
 except ImportError:
-    FILEWATCHING = False
+    try:
+        import Tools.error as err
+        err.try_install_package('watchdog')
+    except err.RestartError:
+        from watchdog.observers import Observer
+        import watchdog.events as watchevents
+        FILEWATCHING = True
+    except:
+        FILEWATCHING = False
 
 
 class NoClientConfigured(Exception):
@@ -61,6 +70,9 @@ class BasicConfig:
                 "Kann Dateiwächter nicht einrichten, nicht installiert. \n Bitte führe pip install watchdog aus.")
         else:
             self._logger.info("Automatisches neuladen der Konfiguration deaktiviert.")
+        
+        self.autoSave = rtimer.ResettableTimer(30,function=self.save, userval=None, autorun=False)
+        self.file_is_dirty = False
 
     def load(self) -> None:
         try:
@@ -76,7 +88,12 @@ class BasicConfig:
         if self._config.get("PLUGINS", None) is None:
             self._config["PLUGINS"] = {}
 
-    def save(self) -> None:
+    def save(self, delayed=False) -> None:
+        if delayed:
+            self.autoSave.reset()
+            return
+        if not self.file_is_dirty:
+            return
         try:
             resolved = str(self._conf_path.resolve())
         except FileNotFoundError:
@@ -85,6 +102,7 @@ class BasicConfig:
         with open(resolved, "w") as json_file:
             json.dump(self._config, json_file, indent=2)
             self._logger.info("[2/2] Gespeichert...")
+            self.file_is_dirty = False
 
     def pre_reload(self):
         pass
@@ -195,6 +213,8 @@ class BasicConfig:
                 self._config["PLUGINS"] = value
                 break
             i += 1
+        self.file_is_dirty = True
+        self.save(True)
 
     def __delitem__(self, key:str):
         path = key.split("/")

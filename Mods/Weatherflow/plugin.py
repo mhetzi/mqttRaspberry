@@ -307,7 +307,7 @@ class WeatherflowPlugin:
 
         temperature_json = {"Heute Min": self._config["Weatherflow/temp_stats/min"],
                             "Heute Max": self._config["Weatherflow/temp_stats/max"],
-                            "now": update.air_temperatur,
+                            "now": round(update.air_temperatur, 1),
                             "Gestern Min": self._config.get("Weatherflow/temp_stats/lmin", "n/A"),
                             "Gestern Max": self._config.get("Weatherflow/temp_stats/lmax", "n/A"),
                             }
