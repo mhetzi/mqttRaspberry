@@ -4,11 +4,19 @@ import logging
 import os
 import re
 import threading
+import math
 
 import paho.mqtt.client as mclient
 import schedule
 
-import Adafruit_DHT
+try:
+    import Adafruit_DHT
+except ImportError as ie:
+    try:
+        import Tools.error as err
+        err.try_install_package('Adafruit_DHT', throw=ie, ask=True)
+    except err.RestartError:
+        import Adafruit_DHT
 import Tools.Config as conf
 
 
@@ -57,7 +65,7 @@ class DHT22:
         self._config   = opts
         self.__client  = client
         self.__logger  = logger.getChild("w1Temp")
-        self._prev_deg = []
+        self._prev_deg = [None, None]
         self.dht = None
 
         if isinstance(self._config.get("DHT", None), list):
@@ -83,17 +91,17 @@ class DHT22:
         )
         self._temp_topic = self._config.get_autodiscovery_topic(
             conf.autodisc.Component.SENSOR,
-            self._config.get("DHT/name", "DHT"),
+            "{}_C".format(self._config.get("DHT/name", "DHT")),
             conf.autodisc.SensorDeviceClasses.TEMPERATURE
         )
         if self._temp_topic.config is not None:
             self.__logger.info("Werde AutodiscoveryTopic senden mit der Payload: {}".format(
-                self._temp_topic.get_config_payload(self._config.get("DHT/name", "DHT"), "°C", unique_id=unique_id, value_template="{{ value_json.now }}", json_attributes=True))
+                self._temp_topic.get_config_payload("{}_C".format(self._config.get("DHT/name", "DHT")), "°C", unique_id=unique_id, value_template="{{ value_json.now }}", json_attributes=True))
                 )
             self.__client.publish(
                 self._temp_topic.config,
                 self._temp_topic.get_config_payload(
-                    self._config.get("DHT/name", "DHT"),
+                    "{}_C".format(self._config.get("DHT/name", "DHT")),
                     "°C",
                     unique_id=unique_id, value_template="{{ value_json.now }}", json_attributes=True),
                 retain=True
@@ -108,17 +116,17 @@ class DHT22:
         )
         self._rh_topic = self._config.get_autodiscovery_topic(
             conf.autodisc.Component.SENSOR,
-            self._config.get("DHT/name", "DHT"),
+            "{}_Rh".format(self._config.get("DHT/name", "DHT")),
             conf.autodisc.SensorDeviceClasses.HUMIDITY
         )
         if self._rh_topic.config is not None:
             self.__logger.info("Werde AutodiscoveryTopic senden mit der Payload: {}".format(
-                self._rh_topic.get_config_payload(self._config.get("DHT/name", "DHT"), "%", unique_id=unique_id, value_template="{{ value_json.now }}", json_attributes=True))
+                self._rh_topic.get_config_payload("{}_Rh".format(self._config.get("DHT/name", "DHT")), "%", unique_id=unique_id, value_template="{{ value_json.now }}", json_attributes=True))
                 )
             self.__client.publish(
                 self._rh_topic.config,
                 self._rh_topic.get_config_payload(
-                    self._config.get("DHT/name", "DHT"),
+                    "{}_Rh".format(self._config.get("DHT/name", "DHT")),
                     "%",
                     unique_id=unique_id, value_template="{{ value_json.now }}", json_attributes=True),
                 retain=True
@@ -233,17 +241,19 @@ class DHT22:
             self.dht,
             self._config.get("DHT/dev/pin",22)
         )
+        humidity = round(humidity, ndigits=1)
+        temperature = round(temperature, ndigits=1)
         self.sendTemperature(temperature, force)
         self.sendHumidity(humidity, force)
 
 
 class DhtConf:
-    from Tools import ConsoleInputTools
     def __init__(self, conf: conf.BasicConfig):
         self.__ids = []
         self.c = conf
 
     def run(self):
-        self.c["DHT/dev/pin"] = ConsoleInputTools.get_number_input("Pin Nummer von Datenpin? ", 22)
-        self.c["DHT/dev/type"] = ConsoleInputTools.get_input("DHT Type? Möglich ist 11 22 2302", "22")
+        from Tools import ConsoleInputTools as cit
+        self.c["DHT/dev/pin"] = cit.get_number_input("Pin Nummer von Datenpin? ", 22)
+        self.c["DHT/dev/type"] = cit.get_input("DHT Type? Möglich ist 11 22 2302", "22")
 
