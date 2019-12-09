@@ -42,7 +42,7 @@ class DHT22:
 
     def _reset_daily(self):
         for d in ["°c", "rH%"]:
-            i = d["i"]
+            i = d
             
             path_min  = "DHT/stat/{}/min".format(i)
             path_max  = "DHT/stat/{}/max".format(i)

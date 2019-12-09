@@ -32,7 +32,7 @@ class PortaMatic:
             "inside"  : Pin.Pin(opts["PortaMatic/pins/inside"  ], Pin.PinDirection.IN),
             "outside" : Pin.Pin(opts["PortaMatic/pins/outside" ], Pin.PinDirection.IN),
             "tester"  : Pin.Pin(opts["PortaMatic/pins/tester"  ], Pin.PinDirection.IN),
-            "pulseOut": Pin.Pin(opts["PortaMatic/pins/pulseOut"], Pin.PinDirection.IN)
+            "pulseOut": Pin.Pin(opts["PortaMatic/pins/pulseOut"], Pin.PinDirection.OUT)
         }
         self._device_id = device_id
         
