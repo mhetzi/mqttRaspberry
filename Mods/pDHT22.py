@@ -65,7 +65,7 @@ class DHT22:
         self._config   = opts
         self.__client  = client
         self.__logger  = logger.getChild("w1Temp")
-        self._prev_deg = [None, None]
+        self._prev_deg = [None,None]
         self.dht = None
 
         if isinstance(self._config.get("DHT", None), list):
@@ -236,13 +236,23 @@ class DHT22:
             self._prev_deg[1] = new_temp
 
 
-    def send_update(self, force=False):
+    def send_update(self, force=False, insane=0):
         humidity, temperature = Adafruit_DHT.read_retry(
             self.dht,
             self._config.get("DHT/dev/pin",22)
         )
         humidity = round(humidity, ndigits=1)
         temperature = round(temperature, ndigits=1)
+
+        if self._prev_deg[0] is None:
+            pass
+        elif temperature > (self._prev_deg[0] + 2) and temperature < (self._prev_deg[0] - 2):
+            self.__logger.warning("INSANE: Neue Temperatur {} ist unnatürlich! Alte war {}".format(temperature, self._prev_deg[0]))
+            if insane > 2:
+                self.__logger.info("Nach 3 Versuchen wird der Wert verwendet.")
+            else:
+                return self.send_update(force=force, insane=insane+1)
+
         self.sendTemperature(temperature, force)
         self.sendHumidity(humidity, force)
 
