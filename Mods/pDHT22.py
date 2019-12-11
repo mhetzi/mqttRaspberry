@@ -18,6 +18,7 @@ except ImportError as ie:
     except err.RestartError:
         import Adafruit_DHT
 import Tools.Config as conf
+from Tools import RangeTools
 
 
 class PluginLoader:
@@ -138,7 +139,7 @@ class DHT22:
         self._daily_job = schedule.every().day.at("00:00")
         self._daily_job.do( lambda: self._reset_daily() )
 
-        self._job = schedule.every(60).seconds
+        self._job = schedule.every(self._config.get("DHT/update_seconds", 60)).seconds
         self._job.do( lambda: self.send_update() )
 
 
@@ -245,9 +246,17 @@ class DHT22:
         temperature = round(temperature, ndigits=1)
 
         if self._prev_deg[0] is None:
-            pass
-        elif temperature > (self._prev_deg[0] + 2) and temperature < (self._prev_deg[0] - 2):
+            self.__logger.info("__prev_deg[0] (Temperature) is None")
+        elif not RangeTools.is_plus_minus(2.0, self._prev_deg[0], temperature):
             self.__logger.warning("INSANE: Neue Temperatur {} ist unnatürlich! Alte war {}".format(temperature, self._prev_deg[0]))
+            if insane > 2:
+                self.__logger.info("Nach 3 Versuchen wird der Wert verwendet.")
+            else:
+                return self.send_update(force=force, insane=insane+1)
+        elif self._prev_deg[1] is None:
+            self.__logger.info("__prev_deg[1] (Humidity) is None")
+        elif not RangeTools.is_plus_minus(2, self._prev_deg[1], humidity):
+            self.__logger.warning("INSANE: Neue Luftfeuchte {} ist unnatürlich! Alte war {}".format(temperature, self._prev_deg[1]))
             if insane > 2:
                 self.__logger.info("Nach 3 Versuchen wird der Wert verwendet.")
             else:
@@ -265,5 +274,7 @@ class DhtConf:
     def run(self):
         from Tools import ConsoleInputTools as cit
         self.c["DHT/dev/pin"] = cit.get_number_input("Pin Nummer von Datenpin? ", 22)
-        self.c["DHT/dev/type"] = cit.get_input("DHT Type? Möglich ist 11 22 2302", "22")
+        self.c["DHT/dev/type"] = cit.get_input("DHT Type? Möglich ist 11 22 2302 ", "22")
+        self.c["DHT/name"] = cit.get_input("Name für Hass ", True, "DHT")
+        self.c["DHT/update_seconds"] = cit.get_number_input("Wie oft soll gemessen werden? ", 60)
 

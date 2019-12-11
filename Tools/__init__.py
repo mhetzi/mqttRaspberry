@@ -1,5 +1,14 @@
 # -*- coding: utf-8 -*-
 
+class RangeTools:
+    @staticmethod
+    def is_in_range(min: float, max: float, value: float) -> bool:
+        return min <= value <= max
+
+    @staticmethod
+    def is_plus_minus(plusMinus: float, oldVal: float, newVal: float) -> bool:
+        return RangeTools.is_in_range(oldVal - plusMinus, oldVal + plusMinus, newVal)
+
 class ConsoleInputTools:
 
     @staticmethod
