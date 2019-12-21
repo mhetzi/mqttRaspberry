@@ -60,8 +60,8 @@ class WeatherflowPlugin:
         self._raining_info = {}
         self._wind_info = {}
         self._online_states = {}
-        self._sensor_errror = DeviceStatus.SensorStatus.OK
         self._pluginManager = None
+        self._deviceUpdates = {}
 
     def set_pluginManager(self, pm):
         self._pluginManager = pm
@@ -158,9 +158,15 @@ class WeatherflowPlugin:
                            autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR)
 
         if self._config["Weatherflow/events"]:
-            self.register_new_sensor(serial_number, "Regen", "raining", "", autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR, deviceInfo)
+            self.register_new_sensor(serial_number, "Regen", "raining", "", autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR, deviceInfo, 
+                value_template="{{ value_json.Regen }}", json_attributes=True)
             self.register_new_sensor(serial_number, "Windig", "windy", "", autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR, deviceInfo)
-            self.update_sensor(serial_number, "raining", 0, autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR)
+            self.update_sensor(
+                serial_number,
+                "raining", 
+                json.dumps({"Regen": 0,"Hagel": "Nein" }),
+                autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR
+            )
             self.update_sensor(serial_number, "windy", 0, autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR)
 
     def register_new_sensor(self, serial_number, visible_name, name, messurement_value, device_class: autodisc.DeviceClass, devInf: autodisc.DeviceInfo, value_template=None, json_attributes=None):
@@ -181,15 +187,19 @@ class WeatherflowPlugin:
         topic = self._config.get_autodiscovery_topic(autodisc.Component.SENSOR, name, device_class, node_id=serial_number)
         self._client.publish(topic.state, value)
 
-    def update_is_raining(self, serial, is_raining=False):
+    def update_is_raining(self, serial, is_raining=False, is_hail=False):
+        rain_json = {
+            "Regen": 1 if is_raining else 0,
+            "Hagel": "Ja" if is_hail else "Nein" 
+        }
         if is_raining and self._config["Weatherflow/events"]:
-            self.update_sensor(serial, "raining", 1, autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR)
+            self.update_sensor(serial, "raining", json.dumps(rain_json), autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR)
             if self._raining_info.get(serial, None) is None:
-                self._raining_info[serial] = rTimer.ResettableTimer(120, self.update_is_raining, serial)
+                self._raining_info[serial] = rTimer.ResettableTimer(360, self.update_is_raining, serial)
             else:
                 self._raining_info[serial].reset()
         else:
-            self.update_sensor(serial, "raining", 0, autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR)
+            self.update_sensor(serial, "raining", json.dumps(rain_json), autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR)
             self._raining_info[serial] = None
 
     def update_is_windy(self, serial, is_windy=False, km=None, deg=None):
@@ -221,6 +231,7 @@ class WeatherflowPlugin:
                 self._wind_info[k].cancel()
 
     def process_update(self, update: dict):
+
         pupd = Tools.parse_json_to_update(update)
         if pupd is None:
             self._logger.info("Nachricht {} von Station ist kein update.".format(update))
@@ -228,7 +239,7 @@ class WeatherflowPlugin:
         #self._logger.debug("Habe von Station {} update bekommen. Nachricht war: {}".format(pupd.update_type.name, update))
 
         if pupd.update_type == updateType.UpdateType.DeviceStatus:
-            self._sensor_errror = pupd.sensor_status
+            self._deviceUpdates[pupd.serial_number] = pupd
             self.set_lastseen_device(pupd.serial_number, 1, True)
         elif pupd.update_type == updateType.UpdateType.ObsAir:
             self.process_obs_air(pupd)
@@ -322,32 +333,42 @@ class WeatherflowPlugin:
             self.update_sensor(update.serial_number, "lightning_last_dist", "0", autodisc.SensorDeviceClasses.GENERIC_SENSOR)
             self.update_sensor(update.serial_number, "lightning_last_nrg", "0", autodisc.SensorDeviceClasses.GENERIC_SENSOR)
 
-        if self._sensor_errror == DeviceStatus.SensorStatus.OK:
-            battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.95), 1)
-        elif self._sensor_errror == DeviceStatus.SensorStatus.AIR_LIGHTNING_DISTURBER:
-            battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.95), 1)
-        elif self._sensor_errror == DeviceStatus.SensorStatus.AIR_LIGHTNING_FAILED:
-            battery_str = "Blitzsensor ist ausgefallen"
-        elif self._sensor_errror == DeviceStatus.SensorStatus.AIR_LIGHTNING_NOISE:
-            battery_str = "Zu viel Rauschen für Blitzsensor"
-        elif self._sensor_errror == DeviceStatus.SensorStatus.AIR_PRESSURE_FAILED:
-            battery_str = "Luftdrucksensor ausgefallen"
-        elif self._sensor_errror == DeviceStatus.SensorStatus.AIR_TEMPERATURE_FAILED:
-            battery_str = "Temperatursensor ausgefallen"
-        elif self._sensor_errror == DeviceStatus.SensorStatus.AIR_RH_FAILED:
-            battery_str = "Luftfeuchtesensor ausgefallen"
+        battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.95), 1)
+        sensor_ok = ""
+        if self._deviceUpdates[update.serial_number]._sensor_status == DeviceStatus.SensorStatus.OK:
+            sensor_ok = "OK"
+        elif self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.AIR_LIGHTNING_DISTURBER:
+            sensor_ok = "OK_LD"
         else:
-            battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.95), 1)
+            if self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.AIR_LIGHTNING_FAILED:
+                sensor_ok = str(sensor_ok) + "Blitzsensor ist ausgefallen. "
+            if self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.AIR_LIGHTNING_NOISE:
+                sensor_ok = str(sensor_ok) + "Zu viel Rauschen für Blitzsensor. "
+            if self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.AIR_PRESSURE_FAILED:
+                sensor_ok = str(sensor_ok) + "Luftdrucksensor ausgefallen. "
+            if self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.AIR_TEMPERATURE_FAILED:
+                sensor_ok = str(sensor_ok) + "Temperatursensor ausgefallen. "
+            if self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.AIR_RH_FAILED:
+                sensor_ok = str(sensor_ok) + "Luftfeuchtesensor ausgefallen. "
 
         if self._config.get("Weatherflow/{0}/minBat".format(update.serial_number), 10) > update.battery:
             self._config["Weatherflow/{0}/minBat".format(update.serial_number)] = update.battery
         elif self._config.get("Weatherflow/{0}/maxBat".format(update.serial_number), 0) < update.battery:
             self._config["Weatherflow/{0}/maxBat".format(update.serial_number)] = update.battery
+
+        rssi = -100
+        try:
+            rssi = self._deviceUpdates[update.serial_number]._rssi
+        except:
+            pass
+
         battery_json = {
                         "min": self._config.get("Weatherflow/{0}/minBat".format(update.serial_number), 0),
                         "max": self._config.get("Weatherflow/{0}/maxBat".format(update.serial_number), 0),
                         "now": battery_str,
-                        "volt": update.battery
+                        "volt": update.battery,
+                        "rssi": rssi,
+                        "sensors": sensor_ok
                         }
         self.update_sensor(update.serial_number, "battery", json.dumps(battery_json), autodisc.SensorDeviceClasses.BATTERY)
 
@@ -372,11 +393,11 @@ class WeatherflowPlugin:
         self.update_is_windy(update.serial_number, True, update.wind_avg, update.wind_direction)
         
         charging_str = "discharging"
-        if update.rain_type is not None and update.rain_type == "hail":
-            battery_str = "Hagel"
-            self._logger.info("Reporting Battery as hail")
-        elif self._sensor_errror == DeviceStatus.SensorStatus.OK:
-            battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.95), 1)
+        battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.95), 1)
+        sensors = ""
+
+        if self._deviceUpdates[update.serial_number]._sensor_status == DeviceStatus.SensorStatus.OK:
+            sensors = "OK"
             if update.battery > 3.32:
                 self._config["Weatherflow/sky_solar_module"] = True
             if self._config.get("Weatherflow/sky_solar_module", False):
@@ -385,31 +406,37 @@ class WeatherflowPlugin:
                     battery_str = 100
                     charging_str = "charging"
             self._logger.info("Reporting Battery {} because there are no errors.".format(update.battery))
-        elif self._sensor_errror == DeviceStatus.SensorStatus.SKY_LIGHT_UV_FAILED:
-            battery_str = "UV Sensor ist ausgefallen"
-        elif self._sensor_errror == DeviceStatus.SensorStatus.SKY_PRECIP_FAILED:
-            battery_str = "Regen Sensor ist ausgefallen"
-        elif self._sensor_errror == DeviceStatus.SensorStatus.SKY_WIND_FAILED:
-            battery_str = "Wind Sensor ist ausgefallen"
         else:
-            battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.95), 1)
-            self._logger.info("Reporting Battery {} because there are unknown errors.".format(update.battery))
+            if self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.SKY_LIGHT_UV_FAILED:
+                sensors = str(sensors) + "UV Sensor ist ausgefallen"
+            if self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.SKY_PRECIP_FAILED:
+                sensors = str(sensors) + "Regen Sensor ist ausgefallen"
+            if self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.SKY_WIND_FAILED:
+                sensors = str(sensors) + "Wind Sensor ist ausgefallen"
 
         if update.rain_type != 0:
             self._logger.info("rain_type: {}".format(update.rain_type))
-            self.update_is_raining(update.serial_number, True)
+            self.update_is_raining(update.serial_number, True, update.rain_type == 2)
     
         if self._config.get("Weatherflow/{0}/minBat".format(update.serial_number), 10) > update.battery:
             self._config["Weatherflow/{0}/minBat".format(update.serial_number)] = update.battery
         elif self._config.get("Weatherflow/{0}/maxBat".format(update.serial_number), 0) < update.battery:
             self._config["Weatherflow/{0}/maxBat".format(update.serial_number)] = update.battery
         
+        rssi = -100
+        try:
+            rssi = self._deviceUpdates[update.serial_number]._rssi
+        except:
+            pass
+
         battery_json = {
                         "min": self._config.get("Weatherflow/{0}/minBat".format(update.serial_number), 0),
                         "max": self._config.get("Weatherflow/{0}/maxBat".format(update.serial_number), 0),
                         "now": battery_str,
                         "volt": update.battery,
-                        "charging state": charging_str
+                        "charging state": charging_str,
+                        "rssi": rssi,
+                        "sensors": sensors
                         }
         self.update_sensor(update.serial_number, "battery_sky", json.dumps(battery_json), autodisc.SensorDeviceClasses.BATTERY)
 

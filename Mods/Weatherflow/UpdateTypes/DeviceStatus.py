@@ -33,7 +33,7 @@ class DeviceStatus:
         self._voltage = json["voltage"]
         self._firmware_revision = json["firmware_revision"]
         self._rssi = json["rssi"]
-        self._sensor_status = SensorStatus(json["sensor_status"])
+        self._sensor_status = json["sensor_status"]
         self.__update_type = ut.UpdateType.DeviceStatus
 
     @property

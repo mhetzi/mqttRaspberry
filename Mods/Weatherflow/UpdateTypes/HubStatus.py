@@ -16,8 +16,10 @@ class HubStatus:
         self._firmware_revision = json["firmware_revision"]
         self._uptime = json["uptime"]
         self._timestamp = datetime.datetime.fromtimestamp(json["timestamp"])
+        self.reset_flags = json["reset_flags"]
         self._rssi = json["rssi"]
         self._seq = json["seq"]
+        self._radio_stats = json["radio_stats"]
         self.__update_type = ut.UpdateType.HubStatus
 
     @property
