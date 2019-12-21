@@ -408,11 +408,11 @@ class WeatherflowPlugin:
             self._logger.info("Reporting Battery {} because there are no errors.".format(update.battery))
         else:
             if self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.SKY_LIGHT_UV_FAILED:
-                sensors = str(sensors) + "UV Sensor ist ausgefallen"
+                sensors = str(sensors) + "UV Sensor ist ausgefallen. "
             if self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.SKY_PRECIP_FAILED:
-                sensors = str(sensors) + "Regen Sensor ist ausgefallen"
+                sensors = str(sensors) + "Regen Sensor ist ausgefallen. "
             if self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.SKY_WIND_FAILED:
-                sensors = str(sensors) + "Wind Sensor ist ausgefallen"
+                sensors = str(sensors) + "Wind Sensor ist ausgefallen."
 
         if update.rain_type != 0:
             self._logger.info("rain_type: {}".format(update.rain_type))
