@@ -392,13 +392,14 @@ class WeatherflowPlugin:
         self.update_sensor(update.serial_number, "local_hour_rain_accumulation", self._config["Weatherflow/hourly_rain"], autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR)
         self.update_is_windy(update.serial_number, True, update.wind_avg, update.wind_direction)
         
-        charging_str = "discharging"
-        battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.95), 1)
+        charging_str = "on battery"
+        battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2, 3.18), 1)
         sensors = ""
 
         if update.battery > 3.32:
             self._config["Weatherflow/sky_solar_module"] = True
         if self._config.get("Weatherflow/sky_solar_module", False):
+            charging_str = "discharging"
             battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2.5, 3.3), 1)
             if battery_str > 100.0:
                 battery_str = 100
