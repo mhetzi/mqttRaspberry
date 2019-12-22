@@ -90,6 +90,7 @@ class OneWireTemp:
 
         self._job = schedule.every(60).seconds
         self._job.do( lambda: self.send_update() )
+        self.send_update()
 
 
     def stop(self):

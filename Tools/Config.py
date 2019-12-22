@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 import pathlib
 import os.path as osp
+from pathlib import Path
 import logging
 import Tools.Autodiscovery as autodisc
 import Tools.ResettableTimer as rtimer
+import time
 
 try:
     import json
@@ -56,10 +58,10 @@ class ClientConfig:
 
 
 class BasicConfig:
+    _is_in_saving = False
 
-    def __init__(self, pfad: pathlib.Path, logger: logging.Logger, do_load=False, filesystem_listen=True):
-        expanded = osp.expanduser(pfad)
-        self._conf_path = pathlib.Path(expanded)
+    def __init__(self, pfad: Path, logger: logging.Logger, do_load=False, filesystem_listen=True):
+        self._conf_path = pfad.expanduser()
         self._logger = logger.getChild("BasicConfig")
         self._config = {}
         if do_load: self.load()
@@ -76,17 +78,31 @@ class BasicConfig:
 
     def load(self) -> None:
         try:
-            resolved = str(self._conf_path.resolve())
-            self._logger.debug("[1/2] Öffne Konfigurationsdatei zum laden " + resolved)
+            self._logger.info("[1/2] Öffne Konfigurationsdatei zum laden " + str(self._conf_path.absolute()))
             self._config = None
-            with open(resolved, "r") as json_file:
+            with self._conf_path.open("r") as json_file:
                 self._config = json.load(json_file)
                 self._logger.info("[2/2] Geladen...")
-        except FileNotFoundError:
+        except Exception:
+            self._logger.exception("Fehler beim Laden von Config")
             self._logger.warning("[2/2] Nicht geladen. Datei existiert nicht.")
-            self._config = {}
+            try:
+                backup = self._conf_path.with_suffix(".cbackup")
+                self._logger.info("[3/4] Öffne Backup Konfigurationsdatei zum laden " + str(backup.absolute()))
+                self._config = None
+                with backup.open("r") as json_file:
+                    self._config = json.load(json_file)
+                    self._logger.info("[4/4] Geladen...")
+            except:
+                self._logger.error("[4/4] Backuo konne ebenfalls nicht geladen werden!")
+                self._config = {}
+
+
         if self._config.get("PLUGINS", None) is None:
             self._config["PLUGINS"] = {}
+
+    def am_i_saving(self) -> bool:
+        return self._is_in_saving
 
     def save(self, delayed=False) -> None:
         if delayed:
@@ -94,15 +110,17 @@ class BasicConfig:
             return
         if not self.file_is_dirty:
             return
-        try:
-            resolved = str(self._conf_path.resolve())
-        except FileNotFoundError:
-            resolved = str(self._conf_path.absolute())
-        self._logger.debug("[1/2] Öffne Konfigurationsdatei zum speichern" + resolved)
-        with open(resolved, "w") as json_file:
+        self._is_in_saving = True
+        self._logger.debug("[1/3] Erstelle Backup der alten Konfig...")
+        if self._conf_path.exists():
+            self._conf_path.rename(self._conf_path.with_suffix(".cbackup"))
+        self._logger.debug("[2/3] Öffne Konfigurationsdatei zum speichern" + str(self._conf_path.absolute()))
+        with self._conf_path.open("w") as json_file:
             json.dump(self._config, json_file, indent=2)
-            self._logger.info("[2/2] Gespeichert...")
+            self._logger.info("[3/3] Gespeichert...")
             self.file_is_dirty = False
+        time.sleep(2)
+        self._is_in_saving = False
 
     def pre_reload(self):
         pass
@@ -238,6 +256,8 @@ class BasicConfig:
 if FILEWATCHING:
     class FileWatchingConfig(watchevents.FileSystemEventHandler, BasicConfig):
         def load(self, reload=False):
+            if self._is_in_saving:
+                return
             if reload:
                 self._logger.info("Konfiguration wird neu geladen. Wurde verändert.")
                 self.pre_reload()
@@ -246,16 +266,12 @@ if FILEWATCHING:
             else:
                 super().load()
 
-        def on_created(self, event: watchevents.DirCreatedEvent):
-            if event.src_path == self._conf_path.absolute():
-                self.load(True)
-
         def on_modified(self, event: watchevents.DirModifiedEvent):
-            if event.src_path == self._conf_path.absolute():
+            if self._conf_path.samefile(event.src_path):
                 self.load(True)
 
         def on_moved(self, event: watchevents.DirMovedEvent):
-            if event.dest_path == self._conf_path.absolute():
+            if self._conf_path.samefile(event.src_path):
                 self.load(True)
 
         def __init__(self, pfad: pathlib.Path, logger: logging.Logger, do_load=False, filesystem_listen=True):
@@ -268,6 +284,8 @@ if FILEWATCHING:
 
 
 def config_factory(pfad: pathlib.Path, logger: logging.Logger, do_load=False, filesystem_listen=True) -> BasicConfig:
+    if isinstance(pfad, str):
+        pfad = Path(pfad)
     if filesystem_listen and FILEWATCHING:
         return FileWatchingConfig(pfad, logger, do_load, filesystem_listen)
     else:

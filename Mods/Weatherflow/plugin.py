@@ -396,16 +396,16 @@ class WeatherflowPlugin:
         battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.95), 1)
         sensors = ""
 
+        if update.battery > 3.32:
+            self._config["Weatherflow/sky_solar_module"] = True
+        if self._config.get("Weatherflow/sky_solar_module", False):
+            battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2.5, 3.3), 1)
+            if battery_str > 100.0:
+                battery_str = 100
+                charging_str = "charging"
+
         if self._deviceUpdates[update.serial_number]._sensor_status == DeviceStatus.SensorStatus.OK:
             sensors = "OK"
-            if update.battery > 3.32:
-                self._config["Weatherflow/sky_solar_module"] = True
-            if self._config.get("Weatherflow/sky_solar_module", False):
-                battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2.5, 3.3), 1)
-                if battery_str > 100.0:
-                    battery_str = 100
-                    charging_str = "charging"
-            self._logger.info("Reporting Battery {} because there are no errors.".format(update.battery))
         else:
             if self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.SKY_LIGHT_UV_FAILED:
                 sensors = str(sensors) + "UV Sensor ist ausgefallen. "
