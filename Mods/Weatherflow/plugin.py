@@ -143,9 +143,12 @@ class WeatherflowPlugin:
         self.register_new_sensor(serial_number, "Lux", "lux", "lux", autodisc.SensorDeviceClasses.ILLUMINANCE, deviceInfo)
         self.register_new_sensor(serial_number, "UV Index", "uv_index", "uv", autodisc.SensorDeviceClasses.GENERIC_SENSOR, deviceInfo)
         self.register_new_sensor(serial_number, "Regen", "accumulated_rain", "mm", autodisc.SensorDeviceClasses.GENERIC_SENSOR, deviceInfo)
-        self.register_new_sensor(serial_number, "Wind Max", "wind_gust", "m/s", autodisc.SensorDeviceClasses.GENERIC_SENSOR, deviceInfo)
-        self.register_new_sensor(serial_number, "Wind avg", "wind_average", "m/s", autodisc.SensorDeviceClasses.GENERIC_SENSOR, deviceInfo)
-        self.register_new_sensor(serial_number, "Wind Min", "wind_lull", "m/s", autodisc.SensorDeviceClasses.GENERIC_SENSOR, deviceInfo)
+        self.register_new_sensor(serial_number, "Wind Max", "wind_gust", "m/s", autodisc.SensorDeviceClasses.GENERIC_SENSOR, deviceInfo,
+                                value_template="{{ value_json.ms }}", json_attributes=True)
+        self.register_new_sensor(serial_number, "Wind avg", "wind_average", "m/s", autodisc.SensorDeviceClasses.GENERIC_SENSOR, deviceInfo,
+                                value_template="{{ value_json.ms }}", json_attributes=True)
+        self.register_new_sensor(serial_number, "Wind Min", "wind_lull", "m/s", autodisc.SensorDeviceClasses.GENERIC_SENSOR, deviceInfo,
+                                value_template="{{ value_json.ms }}", json_attributes=True)
         self.register_new_sensor(serial_number, "Wind Richtung", "wind_direction", "°", autodisc.SensorDeviceClasses.GENERIC_SENSOR, deviceInfo)
         self.register_new_sensor(serial_number, "Batterie (SKY)", "battery_sky", "%", autodisc.SensorDeviceClasses.BATTERY, deviceInfo,
                                 value_template="{{ value_json.now }}", json_attributes=True)
@@ -185,6 +188,8 @@ class WeatherflowPlugin:
 
     def update_sensor(self, serial_number, name, value, device_class: autodisc.DeviceClass):
         topic = self._config.get_autodiscovery_topic(autodisc.Component.SENSOR, name, device_class, node_id=serial_number)
+        if isinstance(value, dict):
+            value = json.dumps(value)
         self._client.publish(topic.state, value)
 
     def update_is_raining(self, serial, is_raining=False, is_hail=False):
@@ -324,7 +329,7 @@ class WeatherflowPlugin:
                             }
 
         self.update_sensor(update.serial_number, "station_pressure", update.station_pressure, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
-        self.update_sensor(update.serial_number, "air_temperature", json.dumps(temperature_json), autodisc.SensorDeviceClasses.GENERIC_SENSOR)
+        self.update_sensor(update.serial_number, "air_temperature", temperature_json, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
         self.update_sensor(update.serial_number, "relative_humidity", update.relative_humidity, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
         self.update_sensor(update.serial_number, "lightning_count", update.lightning_strike_count, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
         self.update_sensor(update.serial_number, "lightning_dist", update.lightning_strike_avg_distance, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
@@ -370,7 +375,7 @@ class WeatherflowPlugin:
                         "rssi": rssi,
                         "sensors": sensor_ok
                         }
-        self.update_sensor(update.serial_number, "battery", json.dumps(battery_json), autodisc.SensorDeviceClasses.BATTERY)
+        self.update_sensor(update.serial_number, "battery", battery_json, autodisc.SensorDeviceClasses.BATTERY)
 
     def process_obs_sky(self, update: Obs_Sky.ObsSky):
         self._logger.debug("Sky update")
@@ -383,9 +388,18 @@ class WeatherflowPlugin:
         self.update_sensor(update.serial_number, "lux", update.lux, autodisc.SensorDeviceClasses.ILLUMINANCE)
         self.update_sensor(update.serial_number, "uv_index", update.uv_index, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
         self.update_sensor(update.serial_number, "accumulated_rain", update.accumulated_rain, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
-        self.update_sensor(update.serial_number, "wind_gust", update.wind_gust, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
-        self.update_sensor(update.serial_number, "wind_average", update.wind_avg, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
-        self.update_sensor(update.serial_number, "wind_lull", update.wind_lull, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
+        try:
+            self.update_sensor(update.serial_number, "wind_gust",
+                {"ms": update.wind_gust, "km/h": update.wind_gust * 3.6}
+                , autodisc.SensorDeviceClasses.GENERIC_SENSOR)
+            self.update_sensor(update.serial_number, "wind_average", 
+                {"ms": update.wind_avg, "km/h": update.wind_avg * 3.6}
+                , autodisc.SensorDeviceClasses.GENERIC_SENSOR)
+            self.update_sensor(update.serial_number, "wind_lull", 
+                {"ms": update.wind_lull, "km/h": update.wind_lull * 3.6}
+                , autodisc.SensorDeviceClasses.GENERIC_SENSOR)
+        except TypeError:
+            pass
         self.update_sensor(update.serial_number, "wind_direction", update.wind_direction, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
         self.update_sensor(update.serial_number, "solar_radiation", update.solar_radiation, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
         self.update_sensor(update.serial_number, "local_day_rain_accumulation", round(self._config["Weatherflow/daily_rain"], 1), autodisc.SensorDeviceClasses.GENERIC_SENSOR)
@@ -439,7 +453,7 @@ class WeatherflowPlugin:
                         "rssi": rssi,
                         "sensors": sensors
                         }
-        self.update_sensor(update.serial_number, "battery_sky", json.dumps(battery_json), autodisc.SensorDeviceClasses.BATTERY)
+        self.update_sensor(update.serial_number, "battery_sky", battery_json, autodisc.SensorDeviceClasses.BATTERY)
 
 
     def count_lightnings_per_minute(self):

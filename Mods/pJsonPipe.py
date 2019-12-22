@@ -51,11 +51,13 @@ class JsonPipe(threading.Thread):
         while not self._doExit:
             try:
                 os.mkfifo(self._config.get("JsonPipe/Path", None))
+                os.chmod(self._config.get("JsonPipe/Path", None), 0o0666)
             except OSError as oe:
                 if oe.errno != errno.EEXIST:
                     os.remove(self._config.get("JsonPipe/Path", None))
                     try:
                         os.mkfifo(self._config.get("JsonPipe/Path", None))
+                        os.chmod(self._config.get("JsonPipe/Path", None), 0o0666)
                     except OSError as oe:
                         if oe.errno != errno.EEXIST:
                             self.__logger.info("Namedpipe konnte nicht erstellt werden")

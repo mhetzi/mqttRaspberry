@@ -42,13 +42,17 @@ class DHT22:
     _rh_topic = None
 
     def _reset_daily(self):
-        for d in ["°c", "rH%"]:
-            i = d
+        for i in ["°c", "rH%"]:
             
             path_min  = "DHT/stat/{}/min".format(i)
             path_max  = "DHT/stat/{}/max".format(i)
             path_lmin = "DHT/stat/{}/lmin".format(i)
             path_lmax = "DHT/stat/{}/lmax".format(i)
+
+            if self._config[path_min] == "RESET":
+                continue
+            elif self._config[path_max] == "RESET":
+                continue
 
             current_min = self._config.get(path_min, "n/A")
             current_max = self._config.get(path_max, "n/A")
@@ -136,7 +140,7 @@ class DHT22:
         self.__client.will_set(self._rh_topic.ava_topic, "offline", retain=True)
         self.__client.publish(self._rh_topic.ava_topic, "online", retain=True)
 
-        self._daily_job = schedule.every().day.at("00:00")
+        self._daily_job = schedule.every().day.at("00:01")
         self._daily_job.do( lambda: self._reset_daily() )
 
         self._job = schedule.every(self._config.get("DHT/update_seconds", 60)).seconds
