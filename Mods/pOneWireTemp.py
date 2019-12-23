@@ -34,6 +34,11 @@ class OneWireTemp:
             path_lmin = "w1t/stat/{}/lmin".format(i)
             path_lmax = "w1t/stat/{}/lmax".format(i)
 
+            if self._config[path_min] == "RESET":
+                continue
+            elif self._config[path_max] == "RESET":
+                continue
+
             current_min = self._config.get(path_min, "n/A")
             current_max = self._config.get(path_max, "n/A")
 
