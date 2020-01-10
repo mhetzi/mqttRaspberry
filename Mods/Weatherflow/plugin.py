@@ -338,7 +338,7 @@ class WeatherflowPlugin:
             self.update_sensor(update.serial_number, "lightning_last_dist", "0", autodisc.SensorDeviceClasses.GENERIC_SENSOR)
             self.update_sensor(update.serial_number, "lightning_last_nrg", "0", autodisc.SensorDeviceClasses.GENERIC_SENSOR)
 
-        battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2, 2.95), 1)
+        battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 1.6, 2.95), 1)
         sensor_ok = ""
         if self._deviceUpdates[update.serial_number]._sensor_status == DeviceStatus.SensorStatus.OK:
             sensor_ok = "OK"
@@ -407,18 +407,24 @@ class WeatherflowPlugin:
         self.update_is_windy(update.serial_number, True, update.wind_avg, update.wind_direction)
         
         charging_str = "on battery"
-        battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2, 3.18), 1)
+        battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 1.6, 3.18), 1)
         sensors = ""
 
         if update.battery > 3.32:
             self._config["Weatherflow/sky_solar_module"] = True
         if self._config.get("Weatherflow/sky_solar_module", False):
             charging_str = "discharging"
-            battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2.5, 3.3), 1)
-            if battery_str > 100.0:
+            battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2.5, 3.6), 1)
+            if update.battery > 3.2:
                 battery_str = 100
-                charging_str = "charging"
-
+                charging_str = "Komplett aufgeladen"
+            elif update.battery > 3.5:
+                battery_str = 100
+                charging_str = "Aufladen"
+            elif update.battery < 3.0:
+                charging_str = 'Unter "Working voltage"'
+        elif update.battery < 1.8:
+            charging_str = "Austauschen"
         if self._deviceUpdates[update.serial_number]._sensor_status == DeviceStatus.SensorStatus.OK:
             sensors = "OK"
         else:
