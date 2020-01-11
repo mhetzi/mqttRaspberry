@@ -111,6 +111,7 @@ class Launcher:
             self.pm.enable_mods()
             self.mqtt_client.loop_start()
             self.mqtt_client._thread.join()
+            return True
         except ConnectionRefusedError:
             self._log.info("Server hat die Verbindung nicht angenommen. Läuft die Server Anwendung?")
             self.reload_event.set()
@@ -135,6 +136,7 @@ class Launcher:
             self._log.exception("MQTT Hauptthread gestorben")
             self.reload_event.set()
             self.pm.shutdown()
+        return False
 
     def launch(self):
         prog_args = sys.argv[1:]
@@ -212,11 +214,14 @@ class Launcher:
             self.reload_event.clear()
             if self.reload:
                 self.reload = False
-                self.relaunch()
+                if self.relaunch():
+                    self.reload_event.set()
             else:
                 return
 
     def exit(self, signum, frame):
+        self.reload_event.set()
+        self.reload = False
         self._log.info("Zeit zum Begraben gehn...\n PluginManager wird heruntergefahren...")
         self.pm.shutdown()
         self._log.info("MQTT Thread wird gestoppt...")
