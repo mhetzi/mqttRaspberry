@@ -34,17 +34,20 @@ class ShellSwitch:
 
     def exec_switch(self, name:str, on:bool, initKill=None):
         switch = self._config["ShellSwitch/entrys/{}".format(name)]
-        state_js = {"on": switch["on_command"], "off": switch["off_command"]}
+        state_js = {
+            "on": switch.get("on_command", None),
+            "off": switch.get("off_command", None)
+        }
         try:
             if initKill is None:
                 if on:
-                    cp = subprocess.run(switch["on_command"], shell=True, check=True)
+                    cp = subprocess.run(switch.get("on_command", "False"), shell=True, check=True)
                     self._config["ShellSwitch/entrys/{}/wasOn".format(name)] = on
-                    state_js["state"] = "ON"
+                    state_js["state"] = "ON" if switch.get("onOff", True) else "OFF"
                     state_js["error_code"] = cp.returncode
                     self.__logger.info("{} wurde angeschaltet.".format(name))
                 else:
-                    cp = subprocess.run(switch["off_command"], shell=True, check=True)
+                    cp = subprocess.run(switch.get("off_command", "False"), shell=True, check=True)
                     self._config["ShellSwitch/entrys/{}/wasOn".format(name)] = on
                     state_js["state"] = "OFF"
                     state_js["error_code"] = cp.returncode
