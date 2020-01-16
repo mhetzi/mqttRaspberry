@@ -12,7 +12,7 @@ def is_venv():
    return (hasattr(sys, 'real_prefix') or
          (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix))
 
-def try_install_package(package:str, throw=ImportError(), ask=True):
+def try_install_package(package:str, throw=ImportError(), ask=True, retry=5):
    if not is_venv():
       raise throw
    if ask and is_system_mode:
@@ -29,6 +29,9 @@ def try_install_package(package:str, throw=ImportError(), ask=True):
          pipm(['install', package])
       except TypeError:
          pipm.main(['install', package])
+      except EnvironmentError as e:
+         print("Fehler in pip. Werde es noch {} mal versuchen.".format(retry+1))
+         try_install_package(package=package, throw=e, ask=False, retry=retry-1)
       raise RestartError()
 
 def set_system_mode(mode:bool):
