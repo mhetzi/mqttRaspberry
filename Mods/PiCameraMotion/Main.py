@@ -310,8 +310,7 @@ class PiMotionMain(threading.Thread):
                     self._rtsp_server = rtsp_server
 
                 camera.start_recording(self._circularStream, format='h264',
-                                       motion_output=anal, quality=20, sps_timing=True, intra_period=10, inline_headers=True,
-                                       profile='high', level='4', bitrate=25000000)
+                                       motion_output=anal, quality=25, sps_timing=True, intra_period=10)
 
                 if self._config.get("PiMotion/http/enabled", False):
                     self.__logger.info("Aktiviere HTTP...")
@@ -334,7 +333,7 @@ class PiMotionMain(threading.Thread):
                     self._http_server = server
 
                     camera.start_recording(
-                        http_out, format='mjpeg', splitter_port=2, quality=80)
+                        http_out, format='mjpeg', splitter_port=2)
                     t = threading.Thread(name="http_server", target=server.run)
                     self.__logger.info("Starte HTTP...")
                     t.start()
