@@ -52,7 +52,10 @@ class ShellSwitch:
                     state_js["state"] = "OFF"
                     state_js["error_code"] = cp.returncode
                     self.__logger.info("{} wurde ausgeschaltet.".format(name))
-                switch["wasOn"] = on
+                if not switch["onOff"]:
+                    switch["onOff"] = False
+                else:
+                    switch["wasOn"] = on
             elif initKill and switch["init_command"] is not None:
                 self.__logger.info("Führe init command [{}] aus.".format(switch["init_command"]))
                 cp = subprocess.run(switch["init_command"], shell=True, check=True)
