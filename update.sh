@@ -29,10 +29,15 @@ install() {
     echo "mqttScripts wird heruntergeladen..."
     git clone git://xeon.lan/mqttRaspberry data || git clone https://github.com/mhetzi/mqttRaspberry.git data;
     echo "Repo geladen"
-    read -p "Service aktivieren und starten? " -n 1 -r
+    read -p "Service aktivieren? " -n 1 -r
     if [[ $REPLY =~ ^[YyJj]$ ]]
     then
-        sudo bash -c "cp /opt/mqttScripts/data/mqttScript@.service /etc/systemd/system/; systemctl enable --now mqttScript@$username"
+        sudo bash -c "cp /opt/mqttScripts/data/mqttScript@.service /etc/systemd/system/; systemctl enable mqttScript@$username"
+        read -p "Service starten? " -n 1 -r
+        if [[ $REPLY =~ ^[YyJj]$ ]]
+        then
+            sudo bash -c "systemctl start mqttScript@$username"
+        fi
     fi
     
     exit 0

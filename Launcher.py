@@ -9,6 +9,23 @@ import time
 import Tools.PluginManager as pman
 import Tools.Config as tc
 import signal
+import ctypes
+
+LIB = 'libcap.so.2'
+try:
+    libcap = ctypes.CDLL(LIB)
+except OSError:
+    print(
+        'Library {} not found. Unable to set thread name.'.format(LIB)
+    )
+else:
+    def _name_hack(self):
+        # PR_SET_NAME = 15
+        libcap.prctl(15, self.name.encode())
+        threading.Thread._bootstrap_original(self)
+
+    threading.Thread._bootstrap_original = threading.Thread._bootstrap
+    threading.Thread._bootstrap = _name_hack
 
 class Launcher:
 
@@ -17,55 +34,6 @@ class Launcher:
     reload = True
     reconnect_time = 0.1
     mqtt_client = None
-
-    def build_std_device_info(self):
-        import sys
-        import subprocess
-        import Tools.Autodiscovery as ad
-        import re
-        import platform
-        devInf = ad.DeviceInfo()
-        devInf.name = platform.node()
-        if sys.platform == "linux":
-            gitVer = ""
-            osRelease = ""
-            try:
-                gitVerProc = subprocess.run(["git", "rev-parse", "--short", "HEAD"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                gitVer = gitVerProc.stdout.decode('utf-8').replace("\n","")
-            except:
-                self._log.exception("Kein Git gefunden")
-            try:
-                osReleaseFile = open("/etc/os-release", "r")
-                osReleaseBuffer = osReleaseFile.read()
-                osRelease = re.findall('PRETTY_NAME=\".*?\"', osReleaseBuffer)[0].replace("PRETTY_NAME=", "")
-            except:
-                self._log.exception("os-release")
-
-            devInf.sw_version = "{}|APP:{}".format(osRelease, gitVer)
-
-            MACs = []
-            try:
-                rpi_model = open("/sys/firmware/devicetree/base/model", "r").read().replace("\n","")
-                devInf.model = rpi_model
-                devInf.mfr = "Raspberry"
-                serial = open("/proc/cpuinfo", "r").read()
-                serial = re.findall("Serial.*?$", serial)[0].replace(" ", "").replace("Serial:", "").replace("\t", "")
-                MACs.append(serial)
-                devInf.pi_serial = serial
-            except:
-                self._log.exception("Kein Raspberry Pi Model")
-            try:
-                ip_link_proc = subprocess.run(["ip", "link"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                for MAC in re.findall("..:..:..:..:..:..", ip_link_proc.stdout.decode('utf-8')):
-                    if MAC != "ff:ff:ff:ff:ff:ff" and MAC != "00:00:00:00:00:00":
-                        MACs.append(MAC)
-                        self._log.info("Füge MAC {} hinzu".format(MAC))
-            except:
-                self._log.exception("IDs")
-        devInf.IDs = MACs
-        ad.Topics.set_standard_deviceinfo(devInf)
-        self._log.debug(devInf)
-
 
     def __init__(self):
         log = logging.getLogger("Launch")
@@ -104,8 +72,9 @@ class Launcher:
             self.pm.needed_plugins()
             self.mqtt_client, deviceID = self.pm.start_mqtt_client()
             try:
-                import ptvsd
-                ptvsd.enable_attach(address=("0.0.0.0", 3000)) 
+                if self.config.get("ptvsd/enabled", False):
+                    import ptvsd
+                    ptvsd.enable_attach(address=("0.0.0.0", 3000)) 
             except:
                 self._log.info("Remote Debugging (ptvsd) nicht verfügbar")
             self.pm.enable_mods()
@@ -185,7 +154,10 @@ class Launcher:
                 conf_all_mods = True
 
         self.config = tc.config_factory(configPath, logger=self._log, do_load=True, filesystem_listen=auto_reload_config)
-        self.build_std_device_info()
+        from Tools import _std_dev_info
+        import Tools.Autodiscovery as ad
+        devInfo = _std_dev_info.DevInfoFactory.build_std_device_info(self._log.getChild("std_dev"))
+        ad.Topics.set_standard_deviceinfo(devInfo)
 
         try:
             import Tools.error as err

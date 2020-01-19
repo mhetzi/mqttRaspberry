@@ -9,11 +9,12 @@ import logging
 
 class Component(enum.Enum):
     BINARY_SENROR = "binary_sensor"
-    COVER = "cover"
-    FAN = "fan"
-    LIGHT = "light"
+    COVER  = "cover"
+    FAN    = "fan"
+    LIGHT  = "light"
     SWITCH = "switch"
     SENSOR = "sensor"
+    LOCK   = "lock"
 
 class DeviceClass:
     pass
@@ -90,7 +91,7 @@ class Topics:
             self._dev_class = SensorDeviceClasses.GENERIC_SENSOR
 
     # Wenn unique_id gesetzt ist wird die globale device info verwendet, ist device gesetzt wird diese device info genommen
-    def get_config_payload(self, name: str, measurement_unit: str, ava_topic=None, value_template=None, json_attributes=False, device=None, unique_id=None) -> str:
+    def get_config_payload(self, name: str, measurement_unit: str, ava_topic=None, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None) -> str:
 
         p = {
             "name": name,
@@ -108,6 +109,9 @@ class Topics:
         if isinstance(self._dev_class, BinarySensorDeviceClasses):
             p["payload_on"]  = 1
             p["payload_off"] = 0
+        
+        if icon is not None:
+            p["icon"] = icon
 
         try:
             if self._dev_class.value is not None:
