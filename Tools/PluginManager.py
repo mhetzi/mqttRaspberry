@@ -72,6 +72,7 @@ class PluginManager:
         self.config = config
         self._client = None
         self._client_name = None
+        self._wasConnected = False
 
     def enable_mods(self):
         self.scheduler_event = self.run_scheduler_continuously()
@@ -141,9 +142,12 @@ class PluginManager:
             except:
                 pass
             try:
-                x.register()
+                x.register(self._wasConnected)
             except:
-                self.logger.exception("Fehler beim Regestireren des Plugins")
+                try:
+                    x.register()
+                except:
+                    self.logger.exception("Fehler beim Regestireren des Plugins")
 
     def disable_mods(self):
         for x in self.configured_list.keys():
@@ -212,6 +216,7 @@ class PluginManager:
 
     def disconnect_callback(self, client, userdata, rc):
         self.logger.info("Verbindung getrennt")
+        self._wasConnected = self.is_connected
         self.is_connected = False
 
     def connect_callback(self, client, userdata, flags, rc):

@@ -57,14 +57,14 @@ class Switch:
         self._callback(state_requested=True, message=None)
 
     def turn(self, state=None):
-        self._pm._client.publish(self._topics.state, payload=state)
+        self._pm._client.publish(self._topics.state, payload=state.encode('utf-8'))
 
     def turnOn(self, json=None):
         if json is not None and self._jsattrib:
             self._log.error("Sending json without declaring json_attributes true. Homeassistant does not like that!")
             raise AttributeError("Sending json without declaring json_attributes true. Homeassistant does not like that!")
         if json is None:
-            self.turn("ON")
+            return self.turn("ON")
         self.turn(json)
 
     def turnOff(self, json=None):
@@ -72,7 +72,7 @@ class Switch:
             self._log.error("Sending json without declaring json_attributes true. Homeassistant does not like that!")
             raise AttributeError("Sending json without declaring json_attributes true. Homeassistant does not like that!")
         if json is None:
-            self.turn("OFF")
+            return self.turn("OFF")
         self.turn(json)
 
 class LockState(enum.IntEnum):
@@ -81,7 +81,7 @@ class LockState(enum.IntEnum):
 
 class Lock(Switch):
     def __init__(self, logger:logging.Logger, pman: PluginManager, callback, name: str, measurement_unit: str='', ava_topic=None, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None):
-        super().__init__(logger=logger,pman=pman,callable=self.callback_translate,name=name,measurement_unit=measurement_unit, ava_topic=ava_topic,value_template=value_template, json_attributes=json_attributes, device=device, unique_id=unique_id, icon=icon)
+        super().__init__(logger=logger,pman=pman,callback=self.callback_translate,name=name,measurement_unit=measurement_unit, ava_topic=ava_topic,value_template=value_template, json_attributes=json_attributes, device=device, unique_id=unique_id, icon=icon)
         self._topics = pman.config.get_autodiscovery_topic(
             autodisc.Component.LOCK,
             name,
@@ -96,7 +96,7 @@ class Lock(Switch):
             self._log.error("Sending json without declaring json_attributes true. Homeassistant does not like that!")
             raise AttributeError("Sending json without declaring json_attributes true. Homeassistant does not like that!")
         if json is None:
-            self.turn("locked")
+            return self.turn("LOCKED")
         self.turn(json)
 
     def unlock(self, json=None):
@@ -104,12 +104,12 @@ class Lock(Switch):
             self._log.error("Sending json without declaring json_attributes true. Homeassistant does not like that!")
             raise AttributeError("Sending json without declaring json_attributes true. Homeassistant does not like that!")
         if json is None:
-            self.turn("unlocked")
+            return self.turn("UNLOCKED")
         self.turn(json)
     
     def callback_translate(self, state_requested=False, message=None):
         if state_requested:
-            self._cb(state_requested=True, message=None)
+            return self._cb(state_requested=True, message=None)
         msg = message.payload.decode('utf-8')
         if msg == "LOCK":
             return self._cb(message=LockState.LOCK, state_requested=False)

@@ -67,12 +67,16 @@ class Session:
         self.name       = self.properties.Get("org.freedesktop.login1.Session", "Id")
         self.isRemote   = self.properties.Get("org.freedesktop.login1.Session", "Remote")
         self.uname      = self.properties.Get("org.freedesktop.login1.Session", "Name")
+        self.uID        = self.properties.Get("org.freedesktop.login1.Session", "User")
 
         self._log = log.getChild("Session")
         self._pman = pm
 
+        self._lock_notify   = None
+        self._unlock_notify = None
+
     def register(self):
-        if self.isGUI:
+        if self.isGUI and self.uID[0] == os.getuid():
             self._lock = Lock(
                 self._log,
                 self._pman,
@@ -81,6 +85,15 @@ class Session:
                 unique_id="lock.logind.session.gui.{}.screenlock".format(self.uname)
             )
             self._lock.register()
+
+            self._lock_notify = self.session.connect_to_signal("Lock",   self._lock.lock)
+            self._unlock_notify  = self.session.connect_to_signal("Unlock", self._lock.unlock)
+    
+    def stop(self):
+        if self._lock_notify is not None:
+            self._lock_notify.remove()
+        if self._unlock_notify is not None:
+            self._unlock_notify.remove()
 
     def terminate(self):
         self.session.Terminate()
@@ -108,10 +121,18 @@ class logindDbus:
         self._mainloop = None
         self.thread_gml = GlibThread()
         
+        self.sleeping = False
+        self.shutdown = False
+
         self.inhibit_lock = -1
         self._switches = {}
         self.sessions = {}
         self._config = opts
+
+        self._poff_notiy  = None
+        self._sleep_notiy = None
+        self._nsess_notiy = None
+        self._rsess_notiy = None
     
     def _setup_dbus_interfaces(self):
         from dbus.mainloop.glib import DBusGMainLoop
@@ -123,11 +144,34 @@ class logindDbus:
         self._proxy  = self._bus.get_object('org.freedesktop.login1', '/org/freedesktop/login1')
         self._login1 = dbus.Interface(self._proxy, 'org.freedesktop.login1.Manager')
 
+        self._sleep_notiy = self._login1.connect_to_signal("PrepareForSleep", lambda x: self._notify_sleep(sleep=x))
+        self._poff_notiy  = self._login1.connect_to_signal("PrepareForShutdown", lambda x: self._notify_sleep(shutdown=x))
+
+        self._nsess_notiy = self._login1.connect_to_signal("SessionNew",     lambda sID, path: self._mod_session(add=True,  path=path) )
+        self._rsess_notiy = self._login1.connect_to_signal("SessionRemoved", lambda sID, path: self._mod_session(add=False, path=path) )
+        
+        for session in self._login1.ListSessions():
+            self._logger.info("Neue Benutzersession gefunden {} auf {} in Pfad {}.".format(session[2], session[3], session[4]))
+            self._mod_session(add=True, path=session[4])
+    
+    def _mod_session(self, add=True, path=str):
+        if path in self.sessions.keys():
+            self.sessions[path].stop()
+            del self.sessions[path]
+        if add:
+            self.sessions[path] = Session(self._logger, self._pluginManager, path, self._bus)
+            self.sessions[path].register()
+
+    def _notify_sleep(self, sleep=False, shutdown=False):
+        self.sleeping = sleep
+        self.shutdown = shutdown
+        self.sw_call(userdata="suspend", state_requested=True)
+        self.sw_call(userdata="isOn", state_requested=True)
 
     def set_pluginManager(self, pm:PluginMan.PluginManager):
         self._pluginManager = pm
 
-    def register(self):
+    def register(self, wasConnected=False):
         self._setup_dbus_interfaces()
         netName = autodisc.Topics.get_std_devInf().name
         # Kann ich ausschalten?
@@ -177,18 +221,33 @@ class logindDbus:
             'Publish Powerstatus to Network',
             'delay'
             ).take()
-        self.thread_gml.start()
+        if not wasConnected:
+            self.thread_gml.start()
 
     def stop(self):
-        self._logger.info("[1/4] Entferne Inhibitation block")
+        self._logger.info("[1/5] Entferne Inhibitation block")
         self.uninhibit( )
-        self._logger.info("[2/4] Entferne Inhibtitation delay")
+        self._logger.info("[2/5] Entferne Inhibtitation delay")
         if self.delay_lock > 0:
             os.close(self.delay_lock)
-            self._logger.info("[3/4] Beende Glib MainLoop")
+        self._logger.info("[3/5] Signale werden entfernt")
+        if self._poff_notiy is not None:
+            self._poff_notiy.remove()
+        if self._sleep_notiy is not None:
+            self._sleep_notiy.remove()
+        for k in self.sessions.keys():
+            session: Session = self.sessions[k]
+            session.stop()
+        if self._nsess_notiy is not None:
+            self._nsess_notiy.remove()
+        if self._rsess_notiy is not None:
+            self._rsess_notiy.remove()
+
+        self._logger.info("[4/5] Beende Glib MainLoop")
         self.thread_gml.shutdown()
-        self._logger.info("[4/4] Warten auf Glib MainLoop")
+        self._logger.info("[5/5] Warten auf Glib MainLoop")
         self.thread_gml.join()
+
     
     def inhibit(self):
         if self.inhibit_lock > 1:
@@ -228,16 +287,22 @@ class logindDbus:
 
     def sendShutdown(self, sig):
         if int(sig) == 1:
-            self._switches["suspend"].turnOff()
+            self._switches["isOn"].turnOff()
             return self._pluginManager.shutdown()
-        self._switches["suspend"].turnOn()
+        self._switches["isOn"].turnOn()
 
     def sw_call(self, userdata=None, state_requested=False, message=None):
         if state_requested:
             if userdata == "isOn":
-                self._switches["isOn"].turnOn()
+                if self.shutdown or self.sleeping:
+                    self._switches["isOn"].turnOff()
+                else:
+                    self._switches["isOn"].turnOn()
             elif userdata == "suspend":
-                self._switches["suspend"].turnOff()
+                if self.sleeping:
+                    self._switches["suspend"].turnOn()
+                else:    
+                    self._switches["suspend"].turnOff()
             elif userdata == "reboot":
                 self._switches["reboot"].turnOff()
             elif userdata == "inhibit":
