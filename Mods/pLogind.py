@@ -1,22 +1,6 @@
 """
-from pydbus import SystemBus
-bus = SystemBus()
-proxy = bus.get(".login1", "/org/freedesktop/login1")
-
-proxy.ListSessions()
-=> [('c1', 42, 'gdm', 'seat0', '/org/freedesktop/login1/session/c1'),
-    ('4', 1000, 'marcel', '', '/org/freedesktop/login1/session/_34'),
-    ('2', 1000, 'marcel', 'seat0', '/org/freedesktop/login1/session/_32')]
-
-import os
-os.getuid()
-
-import dbus
-bus = dbus.SystemBus()
-proxy = bus.get_object('org.freedesktop.login1', '/org/freedesktop/login1')
-login1 = dbus.Interface(proxy, 'org.freedesktop.login1.Manager')
-fd = login1.Inhibit('handle-power-key', 'test_logind', 'test_logind handling power button', 'block').take()
-
+Könnte sein dass es nur als Benutzerservice (systemctl --user) funktioniert!
+Could be that this Plugin only works when run as user service (systemctl --user)!
 """
 try:
     import dbus
@@ -54,10 +38,10 @@ class GlibThread(threading.Thread):
         self.loop.quit()
 
 class Session:
-    name: str
-    session: dbus.Interface
-    isGUI: bool
-    _lock: Lock
+    name = ""
+    session = None
+    isGUI = False
+    _lock = None
 
     def __init__(self, log:logging.Logger, pm: PluginMan.PluginManager, bus_path:str, bus: dbus.SystemBus):
         self._proxy     = bus.get_object('org.freedesktop.login1', bus_path)
@@ -173,7 +157,7 @@ class logindDbus:
 
     def register(self, wasConnected=False):
         self._setup_dbus_interfaces()
-        netName = autodisc.Topics.get_std_devInf().name
+        netName = autodisc.Topics.get_std_devInf().name if self._config.get("logind/custom_name", None) is None else self._config.get("logind/custom_name", None)
         # Kann ich ausschalten?
         if self._login1.CanPowerOff() == "yes" and self._config.get("logind/allow_power_off", True):
             self._switches["isOn"] = Switch(
@@ -236,7 +220,7 @@ class logindDbus:
         if self._sleep_notiy is not None:
             self._sleep_notiy.remove()
         for k in self.sessions.keys():
-            session: Session = self.sessions[k]
+            session= self.sessions[k]
             session.stop()
         if self._nsess_notiy is not None:
             self._nsess_notiy.remove()
@@ -337,10 +321,12 @@ class logindConfig:
 
     def configure(self, conf: conf.BasicConfig, logger:logging.Logger):
         from Tools import ConsoleInputTools
-        conf["logind/allow_power_off"] = ConsoleInputTools.get_bool_input("Erlaube Ausschalten: ", True)
-        conf["logind/allow_suspend"] = ConsoleInputTools.get_bool_input("Erlaube Bereitschaftsmodus: ", True)
-        conf["logind/allow_reboot"] = ConsoleInputTools.get_bool_input("Erlaube Neustarten: ", True)
-        conf["logind/allow_inhibit"] = ConsoleInputTools.get_bool_input("Erlaube Blockieren von Schlafmodus: ", True)
+        conf["logind/allow_power_off"] = ConsoleInputTools.get_bool_input("\nErlaube Ausschalten: ", True)
+        conf["logind/allow_suspend"] = ConsoleInputTools.get_bool_input("\nErlaube Bereitschaftsmodus: ", True)
+        conf["logind/allow_reboot"] = ConsoleInputTools.get_bool_input("\nErlaube Neustarten: ", True)
+        conf["logind/allow_inhibit"] = ConsoleInputTools.get_bool_input("\nErlaube Blockieren von Schlafmodus: ", True)
+        if ConsoleInputTools.get_bool_input("\nBenutze anderen Namen: ", True):
+            conf["logind/custom_name"] = ConsoleInputTools.get_input("\nDen Namen Bitte: ", True)
 
 
 class PluginLoader:

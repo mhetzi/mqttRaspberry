@@ -9,6 +9,26 @@ hasVenvInstalled=$?;
 echo "Virtalenv installed? $hasVenvInstalled"
 echo "Parameter übergeben: $1"
 
+install_user() {
+    sudo cp /opt/mqttScripts/data/mqttScript.service /etc/systemd/user/mqttScript.service
+    systemctl enable --user mqttScript
+    read -p "Service starten? " -n 1 -r
+    if [[ $REPLY =~ ^[YyJj]$ ]]
+    then
+        systemctl start --user mqttScript
+    fi
+}
+
+install_system() {
+    sudo bash -c "cp /opt/mqttScripts/data/mqttScript.service /etc/systemd/system/mqttScript@.service"
+    sudo bash -c "echo User=%i >> /etc/systemd/system/mqttScript@.service"
+    sudo bash -c "systemctl enable mqttScript@$username"
+    read -p "Service starten? " -n 1 -r
+    if [[ $REPLY =~ ^[YyJj]$ ]]
+    then
+        sudo bash -c "systemctl start mqttScript@$username"
+    fi
+}
 
 install() {
     echo $1
@@ -32,17 +52,18 @@ install() {
     read -p "Service aktivieren? " -n 1 -r
     if [[ $REPLY =~ ^[YyJj]$ ]]
     then
-        sudo bash -c "cp /opt/mqttScripts/data/mqttScript@.service /etc/systemd/system/; systemctl enable mqttScript@$username"
-        read -p "Service starten? " -n 1 -r
-        if [[ $REPLY =~ ^[YyJj]$ ]]
+        echo "logind PLugin brauch zB Benutzerservice"
+        read -p "Als [B]enutzerservice oder als [S]ystemservice installieren? " -n 1 -r
+        if [[ $REPLY =~ ^[YyJjBb]$ ]]
         then
-            sudo bash -c "systemctl start mqttScript@$username"
+            install_user;
+        else
+            install_system;
         fi
     fi
     
     exit 0
 }
-    
 
 update() {
     #git reset --hard testing;

@@ -1,6 +1,9 @@
 [Unit]
 Description=MQTTscripts
 
+[Install]
+WantedBy=multi-user.target
+
 [Service]
 TimeoutStartSec=60
 ExecStartPre=-/opt/mqttScripts/data/update.sh update
@@ -8,9 +11,4 @@ ExecStart=/opt/mqttScripts/data/update.sh run-service
 TimeoutStopSec=35s
 Restart=always
 Type=idle
-User=%i
 WorkingDirectory=/opt/mqttScripts/config
-
-[Install]
-WantedBy=multi-user.target
-
