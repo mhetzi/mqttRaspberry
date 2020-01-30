@@ -66,7 +66,7 @@ class WeatherflowPlugin:
     def set_pluginManager(self, pm):
         self._pluginManager = pm
 
-    def register(self):
+    def register(self, wasConnected=False):
         if self._config.get("Weatherflow/deregister", False):
             self._config["Weatherflow/deregister"] = False
             for sens in self._config.get("Weatherflow/reg_sensor", []):
@@ -79,18 +79,19 @@ class WeatherflowPlugin:
             self._config["Weatherflow/seen_devices"] = []
             self._config.save()
 
-        self._logger.info("Starte UDP Server, um auf broadcasts von der Station lauschen zu können")
-        self._udp = wudp.UdpServer(self._config.get("Weatherflow/broadcast_addr", "255.255.255.255"),
-                                   self._config.get("Weatherflow/broadcast_port", 50222), logger=self._logger.getChild("UDP"))
-        self._config.get("Weatherflow/events", True)
-        self._udp.on_message = self.process_update
+        if not wasConnected:
+            self._logger.info("Starte UDP Server, um auf broadcasts von der Station lauschen zu können")
+            self._udp = wudp.UdpServer(self._config.get("Weatherflow/broadcast_addr", "255.255.255.255"),
+                                    self._config.get("Weatherflow/broadcast_port", 50222), logger=self._logger.getChild("UDP"))
+            self._config.get("Weatherflow/events", True)
+            self._udp.on_message = self.process_update
 
-        self._udp.start()
-        self._timer.start()
+            self._udp.start()
+            self._timer.start()
 
-        self._logger.debug("Regestriere Schedule Jobs für Tägliche und Stündliche Reset Aufgaben...")
-        schedule.every().day.at("00:00").do(WeatherflowPlugin.reset_daily_rain, self)
-        schedule.every().hours.do(WeatherflowPlugin.reset_hourly_rain, self)
+            self._logger.debug("Regestriere Schedule Jobs für Tägliche und Stündliche Reset Aufgaben...")
+            schedule.every().day.at("00:00").do(WeatherflowPlugin.reset_daily_rain, self)
+            schedule.every().hours.do(WeatherflowPlugin.reset_hourly_rain, self)
 
     def register_new_serial(self, serial):
         online_topic = WeatherflowPlugin.get_device_online_topic(serial)
@@ -245,6 +246,7 @@ class WeatherflowPlugin:
 
         if pupd.update_type == updateType.UpdateType.DeviceStatus:
             self._deviceUpdates[pupd.serial_number] = pupd
+            self._logger.debug(update)
             self.set_lastseen_device(pupd.serial_number, 1, True)
         elif pupd.update_type == updateType.UpdateType.ObsAir:
             self.process_obs_air(pupd)
@@ -281,7 +283,8 @@ class WeatherflowPlugin:
             #self._logger.info("Sky sagt es geht der wind {}m/s Richtung {}°".format(pupd.wind_speed, pupd.wind_direction))
             self.update_is_windy(pupd.serial_number, True, pupd.wind_speed, pupd.wind_direction)
 
-    def set_lastseen_device(self, serial_number: str, interval: int, no_register=False) -> bool:
+    def set_lastseen_device(self, serial_number: str, interval_minutes: int, no_register=False) -> bool:
+        interval = interval_minutes * 60
         if self._online_states.get(serial_number, None) is None and not no_register:
             self._logger.info("Muss für {} neuen Online Status erstellen...".format(serial_number))
             self._online_states[serial_number] = {}
@@ -306,19 +309,15 @@ class WeatherflowPlugin:
         if not self.set_lastseen_device(update.serial_number, update.report_intervall_minutes):
             self.register_new_air(update.serial_number, update)
 
-        tendenz = "Tendenz: Keine"
-
         if self._config.get("Weatherflow/temp_stats/min", "RESET") == "RESET":
             self._config["Weatherflow/temp_stats/min"] = update.air_temperatur
         elif self._config["Weatherflow/temp_stats/min"] > update.air_temperatur:
             self._config["Weatherflow/temp_stats/min"] = update.air_temperatur
-            tendenz = "Tendenz: Fallend"
 
         if self._config.get("Weatherflow/temp_stats/max", "RESET") == "RESET":
             self._config["Weatherflow/temp_stats/max"] = update.air_temperatur
         elif self._config["Weatherflow/temp_stats/max"] < update.air_temperatur:
             self._config["Weatherflow/temp_stats/max"] = update.air_temperatur
-            tendenz = "Tendenz: Steigend"
 
 
         temperature_json = {"Heute Min": self._config["Weatherflow/temp_stats/min"],
@@ -495,7 +494,7 @@ class WeatherflowPlugin:
         for serial in self._online_states.keys():
             last_update = self._online_states[serial]["lastUpdate"]
             timespan = datetime.datetime.now() - last_update
-            if (timespan.seconds / 60) > (self._online_states[serial]["intervall"] + 10) and self._online_states[serial]["wasOnline"]:
+            if timespan.seconds > (self._online_states[serial]["intervall"] * 2) and self._online_states[serial]["wasOnline"]:
                 self._logger.info("Weatherflow Device {} ist jetzt offline".format(serial))
                 online_topic = WeatherflowPlugin.get_device_online_topic(serial)
                 self._client.publish(online_topic, "offline", retain=True)
