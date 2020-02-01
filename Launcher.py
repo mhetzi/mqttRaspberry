@@ -180,16 +180,7 @@ class Launcher:
             if i == "y" or i == "Y":
                 return
 
-        self.reload_event.set()
-
-        while self.reload_event.wait(15):
-            self.reload_event.clear()
-            if self.reload:
-                self.reload = False
-                if self.relaunch():
-                    self.reload_event.set()
-            else:
-                return
+        self.relaunch()
 
     def exit(self, signum, frame):
         self.reload_event.set()

@@ -54,6 +54,7 @@ class Analyzer(cama.PiAnalysisOutput):
         self.logger = logger
         self.logger.debug("Queue wird erstellt...")
         self._queue = queue.Queue(2)
+        self.disableAnalyzing = False
 
     def write(self, b):
         result = super(Analyzer, self).write(b)
@@ -73,6 +74,8 @@ class Analyzer(cama.PiAnalysisOutput):
         return result
 
     def analyze(self, a: cama.motion_dtype):
+        if self.disableAnalyzing:
+            return
         if self.zeromap_py["enabled"] and self.__zeromap_data != None and not self.zeromap_py["isBuilding"]:
             a = self.__zeromap_data.subtractMask(a)
         hottestBlock = Mods.PiCameraMotion.analyze.hotblock.hotBlock(
@@ -152,8 +155,10 @@ class Analyzer(cama.PiAnalysisOutput):
                 self.blockMinNoise = 0
                 self.framesToNoMotion *= 10
 
-            while self.__thread_do_run:
+            while True:
                 hottestBlock, a = self._queue.get()
+                if not self.__thread_do_run:
+                    break
                 self.processed += 1
                 self.states["hotest"] = [hottestBlock[0],
                                         hottestBlock[1], hottestBlock[2]]
@@ -244,5 +249,6 @@ class Analyzer(cama.PiAnalysisOutput):
 
     def stop_queue(self):
         self.__thread_do_run = False
+        self._queue.put_nowait((None, None))
         if self.__zeromap_data is not None:
             self.zeromap_py["dict"] = self.__zeromap_data.saveZeroMap()

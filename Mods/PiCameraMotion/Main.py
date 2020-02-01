@@ -339,6 +339,8 @@ class PiMotionMain(threading.Thread):
                     t.start()
                 # Und jetzt einfach warten
 
+                anal.disableAnalyzing = not self._config.get("PiMotion/motion/doAnalyze", True)
+
                 firstFrames = True
                 while not self._doExit:
                     try:
@@ -346,6 +348,10 @@ class PiMotionMain(threading.Thread):
                         pps = anal.processed / 5
                         anal.processed = 0
                         self.__logger.debug("Pro Sekunde verarbeitet: %d", pps)
+
+                        if anal.disableAnalyzing:
+                            camera.annotate_text = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
                         if firstFrames:
                             def first_run():
                                 self.__logger.info(
