@@ -8,6 +8,10 @@ class RangeTools:
     @staticmethod
     def is_plus_minus(plusMinus: float, oldVal: float, newVal: float) -> bool:
         return RangeTools.is_in_range(oldVal - plusMinus, oldVal + plusMinus, newVal)
+    
+    @staticmethod
+    def map(x, in_min, in_max, out_min, out_max):
+        return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
 
 class ConsoleInputTools:
 

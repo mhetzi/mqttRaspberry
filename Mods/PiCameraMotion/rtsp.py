@@ -19,7 +19,7 @@ try:
 except ValueError:
     raise ImportError()
 
-from gi.repository import GObject, Gst, GstBase, GstRtspServer
+from gi.repository import GObject, Gst, GstBase, GstRtspServer, GLib, GstRtsp
 import os
 import io
 import threading
@@ -106,6 +106,7 @@ class CameraSplitIO(threading.Thread):
                     self._queue.put_nowait(item)
                 except:
                     self._hadSPS = False
+                    self.logger.warning("Stream full. Clear buffer and wait for new SPS")
                     try:
                         while True:
                             self._queue.get_nowait()
@@ -203,7 +204,7 @@ class CameraSplitIO(threading.Thread):
                 if item is None:
                     self.logger.warning("In der queue war ein None Object!")
             except queue.Empty:
-                pass
+                self.logger.warning("Es war kein Frame in der Queue!")
 
     def recordTo(self, path=None, stream=None, preRecordSeconds=1):
         if path is None and stream is None:
@@ -228,21 +229,24 @@ class GstRtspPython:
         self.logger = None
         self._fps = framerate
         self._camName = camName
+        self._clients = {}
 
     def runServer(self):
         self.logger.info("Server wird gestartet")
-        self.__ml = GObject.MainLoop()
+        self.__ml = GLib.MainLoop()
         self.__srv = GstRtspServer.RTSPServer()
+        self.__srv.connect("client-connected",  self.client_connected_call)
         mounts = self.__srv.get_mount_points()
         self.__fac = GstRtspServer.RTSPMediaFactory()
         self.__srv.set_address("0.0.0.0")
-        self.__fac.set_shared(True)
+        self.__fac.set_shared(False)
         # Bitrate * Sekunden // 8
-        self.__fac.set_buffer_size((17000000 * 1 // 8) / 2)
+        self.__fac.set_buffer_size((17000000 * 1 // 8) ) # was // 8 )/2)
         self.__fac.set_latency(250)
         self.__fac.set_launch(
             '( filesrc location=/tmp/motion-gst-pipe do-timestamp=true ! video/x-h264, framerate={}/1 ! h264parse ! rtph264pay name=pay0 pt=96 )'.format(self._fps))
         mounts.add_factory("/h264", self.__fac)
+        
         self.__srv.attach(None)
         self.__ml.run()
         self.logger.info("Server beendet")
@@ -250,3 +254,18 @@ class GstRtspPython:
     def stopServer(self):
         self.__ml.quit()
         self.logger.info("Server wird beendet")
+    
+    def client_connected_call(self, srv: GstRtspServer.RTSPServer, client: GstRtspServer.RTSPClient):
+        try:
+            con = client.get_connection()
+            ip = con.get_ip()
+            sig = client.connect("closed",  self.client_closed)
+            self._clients[client] = (ip, sig)
+            self.logger.info("Neuer Client {} verbunden".format(ip))
+        except:
+            self.logger.exception("Fehler beim abrufen der IP")
+    
+    def client_closed(self, c: GstRtspServer.RTSPClient):
+        ip, sig = self._clients.get(c, (None,None))
+        c.disconnect(sig)
+        self.logger.info("Verbindung von {} geschlossen!".format(ip))

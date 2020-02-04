@@ -28,6 +28,8 @@ except ImportError:
         FILEWATCHING = True
     except:
         FILEWATCHING = False
+from typing import Dict, Tuple, Sequence
+
 
 
 class NoClientConfigured(Exception):
@@ -55,7 +57,6 @@ class ClientConfig:
 
     def has_user(self) -> bool:
         return self.username is not None and self.password is not None
-
 
 class BasicConfig:
     _is_in_saving = False
@@ -252,6 +253,17 @@ class BasicConfig:
             elif i > len(path):
                 del d
             i += 1
+    
+    def getIndependendFile(self, name:str):
+        if name is None:
+            import uuid
+            uid = uuid.uuid4()
+            name = str(uuid)
+        new_path = self._conf_path.parent
+        new_path.joinpath("{}.config".format(name))
+        c = config_factory(new_path, self._logger, do_load=True)
+        return (c, name)
+        
 
 if FILEWATCHING:
     class FileWatchingConfig(watchevents.FileSystemEventHandler, BasicConfig):
@@ -282,6 +294,39 @@ if FILEWATCHING:
             observer.schedule(self, str(self._conf_path.parent), recursive=False)
             observer.start()
 
+
+
+class PluginConfig:
+
+    def __init__(self, config: BasicConfig, plugin_name:str):
+        self._main  = config
+        self._pname = plugin_name
+    
+    def save(self):
+        self._main.save()
+
+    def get(self, key: str, default=None):
+        t = self[key]
+        if t is None and default is not None:
+            self[key] = default
+        return self[key]
+
+    def sett(self, key: str, value):
+        key = "{}/{}".format(self._pname, key)
+        self._main[key] = value
+
+    def __getitem__(self, item: str):
+        key = "{}/{}".format(self._pname, key)
+        return self._main[key]
+
+    def __setitem__(self, key: str, value):
+        key = "{}/{}".format(self._pname, key)
+        self._main[key] = value
+
+    def __delitem__(self, key:str):
+        key = "{}/{}".format(self._pname, key)
+        del self._main[key]
+    
 
 def config_factory(pfad: pathlib.Path, logger: logging.Logger, do_load=False, filesystem_listen=True) -> BasicConfig:
     if isinstance(pfad, str):

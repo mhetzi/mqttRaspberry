@@ -106,6 +106,11 @@ class OneWireTemp:
         self.send_update(True)
 
     @staticmethod
+    def get_temperature_from_id(id: str) -> float:
+        p = os.path.join("/sys/bus/w1/devices", id)
+        return OneWireTemp.get_temperatur(p)
+
+    @staticmethod
     def get_temperatur(p) -> float:
         if os.path.isfile(p):
             data = None

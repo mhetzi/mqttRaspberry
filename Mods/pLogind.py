@@ -15,7 +15,7 @@ import paho.mqtt.client as mclient
 import Tools.Config as conf
 import Tools.Autodiscovery as autodisc
 import Tools.PluginManager as PluginMan
-from Tools.mqttDevice import Switch, Lock, LockState
+from Tools.Devices.Lock import Switch, Lock, LockState
 import logging
 import schedule
 import json

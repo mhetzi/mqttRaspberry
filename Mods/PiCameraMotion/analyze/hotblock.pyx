@@ -102,8 +102,8 @@ cdef class ZeroMap:
                 for c in range(self.cols):
                     v = arr[r,c].sad
                     if v > self.zeroMapData[r][c]:
-                        self.zeroMapData[r][c] = v + ( v / 100 * 15 )
-                        print(self.zeroMapData[r][c])
+                        self.zeroMapData[r][c] = v + ( v / 100 * 5 )
+                        #print(self.zeroMapData[r][c])
                         hasChanged = True
 
         return hasChanged
@@ -117,7 +117,7 @@ cdef class ZeroMap:
             arr[str(r)] = {}
             for c in range(self.cols):
                 arr[str(r)][str(c)] = self.zeroMapData[r][c]
-                print(self.zeroMapData[r][c])
+                #print(self.zeroMapData[r][c])
         return arr
 
     def loadZeroMap(self, arr: dict):

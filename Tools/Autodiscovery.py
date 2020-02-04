@@ -9,12 +9,13 @@ import logging
 
 class Component(enum.Enum):
     BINARY_SENROR = "binary_sensor"
-    COVER  = "cover"
-    FAN    = "fan"
-    LIGHT  = "light"
-    SWITCH = "switch"
-    SENSOR = "sensor"
-    LOCK   = "lock"
+    COVER   = "cover"
+    FAN     = "fan"
+    LIGHT   = "light"
+    SWITCH  = "switch"
+    SENSOR  = "sensor"
+    LOCK    = "lock"
+    CLIMATE = "climate"
 
 class DeviceClass:
     pass
@@ -73,6 +74,7 @@ class Topics:
     command = ""
     config = ""
     ava_topic = ""
+    base = ""
 
     @staticmethod
     def set_standard_deviceinfo(di: DeviceInfo):
@@ -91,12 +93,14 @@ class Topics:
             self._dev_class = SensorDeviceClasses.GENERIC_SENSOR
 
     # Wenn unique_id gesetzt ist wird die globale device info verwendet, ist device gesetzt wird diese device info genommen
-    def get_config_payload(self, name: str, measurement_unit: str, ava_topic=None, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None) -> str:
+    def get_config_payload(self, name: str, measurement_unit: str, ava_topic=None, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None, asDict=False) -> str:
 
         p = {
-            "name": name,
-            "state_topic": self.state
+            "name": name
         }
+
+        if self._component != Component.CLIMATE:
+            p["state_topic"] = self.state
 
         if self._component == Component.COVER:
             p["position_topic"] = self.state
@@ -153,7 +157,8 @@ class Topics:
 
         if unique_id is not None:
             p["unique_id"] = unique_id.replace(" ", "_").replace("-","_")
-
+        if asDict:
+            return p
         try:
             return json.dumps(p)
         except Exception:
@@ -175,4 +180,5 @@ def getTopics(discoveryPrefix: str, comp: Component, devicedID: str, entitiyID: 
     t.command = mainPath + "set"
     t.config = mainPath + "config" if discoveryPrefix is not None else None
     t.ava_topic = mainPath + "online"
+    t.base = mainPath
     return t

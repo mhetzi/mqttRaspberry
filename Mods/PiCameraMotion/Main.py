@@ -223,6 +223,12 @@ class PiMotionMain(threading.Thread):
 
     def stop(self):
         self._doExit = True
+        if self._pilQueue is not None and self._pilThread is not None:
+            self.__logger.info("Stoppe PIL queue...")
+            try:
+                self._pilQueue.put((None, None), block=False)
+            except queue.Full:
+                pass
         if self._rtsp_server is not None:
             self._rtsp_server.stopServer()
         if self._http_server is not None:
@@ -238,10 +244,8 @@ class PiMotionMain(threading.Thread):
             self._config["PiMotion/zeroMap"] = self._analyzer.zeromap_py
 
         if self._pilQueue is not None and self._pilThread is not None:
-            self.__logger.info("Stoppe PIL queue...")
-            qu = self._pilQueue
-            qu.put((None, None))
-            self._pilThread.join()
+            self.__logger.info("Warte auf PIL Thread...")
+            self._pilThread.join(10)
             self._pilQueue = None
 
     def run(self):
@@ -260,7 +264,7 @@ class PiMotionMain(threading.Thread):
             camera.annotate_background = cam.Color('black')
             camera.annotate_text = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             
-            with analyzers.Analyzer(camera, logger=self.__logger.getChild("Analyzer")) as anal:
+            with analyzers.Analyzer(camera, logger=self.__logger.getChild("Analyzer"), config=self._config) as anal:
                 self.__logger.debug("Analyzer erstellt")
                 anal.frameToTriggerMotion = self._config.get(
                     "PiMotion/motion/motion_frames", 4)
@@ -277,6 +281,7 @@ class PiMotionMain(threading.Thread):
                 anal.motion_data_call = lambda data: self.motion_data(data)
                 anal.pil_magnitude_save_call = lambda img, data: self.pil_magnitude_save_call(
                     img, data)
+                anal.cal_getMjpeg_Frame = self.getMjpegFrame
 
                 anal.zeromap_py = self._config.get("PiMotion/zeroMap", {"enabled": False, "isBuilding": False, "dict": None})
 
@@ -310,7 +315,9 @@ class PiMotionMain(threading.Thread):
                     self._rtsp_server = rtsp_server
 
                 camera.start_recording(self._circularStream, format='h264',
-                                       motion_output=anal, quality=25, sps_timing=True, intra_period=10)
+                                       motion_output=anal, quality=25, sps_timing=True,
+                                       intra_period=self._config.get("PiMotion/camera/fps", 23) * 10,
+                                       sei=True, inline_headers=True, bitrate=0)
 
                 if self._config.get("PiMotion/http/enabled", False):
                     self.__logger.info("Aktiviere HTTP...")
@@ -381,7 +388,7 @@ class PiMotionMain(threading.Thread):
 
     def update_anotation(self, aps=0):
         if self._camera is not None:
-            txt_motion = "Bewegung" if self._inMotion else "."
+            txt_motion = "" if self._inMotion else ""
 
             self._camera.annotate_text = txt_motion
 
@@ -401,7 +408,7 @@ class PiMotionMain(threading.Thread):
         self.__logger.info("Starte neue Kalibrierung...")
         self._analyzer.states["still_frames"] = 0
         self._analyzer._calibration_running = True
-        self._analyzer.framesToNoMotion *= 10
+        self._analyzer.framesToNoMotion *= 15
 
     def stop_record(self):
         if self._rtsp_recorder is not None:
@@ -470,15 +477,25 @@ class PiMotionMain(threading.Thread):
             except queue.Full:
                 pass
 
+    def getMjpegFrame(self):
+        frame = None
+        with self._http_out.condition:
+            frame = self._http_out.frame
+        return frame
+
+
     def pil_magnitude_save(self):
         while True:
-            a, data = self._pilQueue.get()
-            if a is None and data is None:
+            try:
+                a, data = self._pilQueue.get(timeout=5)
+            except queue.Empty:
+                if self._doExit:
+                    self.__logger.warning("PIL Magnitude Save Thread wird beendet")
+                continue
+            if self._doExit or a is None and data is None:
                 self.__logger.warning("PIL Magnitude Save Thread wird beendet")
                 return
-            frame = None
-            with self._http_out.condition:
-                frame = self._http_out.frame
+            frame = self.getMjpegFrame()
             background = None
             try:
                 if frame is not None:
