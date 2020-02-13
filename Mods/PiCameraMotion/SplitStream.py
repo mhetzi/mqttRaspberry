@@ -26,9 +26,13 @@ import threading
 import time
 import queue
 import subprocess
+import logging
 
 Gst.init(None)
 
-class CameraSplitter:
-    def __init__(self, frames_to_sps):
-        pass
+class CameraSplitter(cam.CircularIO);
+    
+    def __init__(self, frames_to_sps: int, log: logging.Logger):
+        self._queue = queue.Queue(maxsize=frames_to_sps + 2)
+
+    def 

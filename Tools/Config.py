@@ -256,13 +256,18 @@ class BasicConfig:
     
     def getIndependendFile(self, name:str):
         if name is None:
+            self._logger.info("Kein Name angegeben.")
             import uuid
             uid = uuid.uuid4()
-            name = str(uuid)
-        new_path = self._conf_path.parent
-        new_path.joinpath("{}.config".format(name))
+            name = str(uid)
+            self._logger.info("Name {} wurde generiert.".format(name))
+        self._logger.debug("Generiere Configpath von {} + {}".format(self._conf_path.parent, "{}.config".format(name)))
+        new_path = self._conf_path.parent.joinpath("{}.config".format(name))
         c = config_factory(new_path, self._logger, do_load=True)
         return (c, name)
+
+    def stop(self):
+        pass
         
 
 if FILEWATCHING:
@@ -288,11 +293,27 @@ if FILEWATCHING:
 
         def __init__(self, pfad: pathlib.Path, logger: logging.Logger, do_load=False, filesystem_listen=True):
             super().__init__(pfad, logger, do_load, filesystem_listen)
+            self._observer = None
+
+        def __del__(self):
+            self.stop()
+
+        def stop(self):
+            try:
+                if self._observer.isAlive():
+                    self._observer.stop()
+                print("Observer killed")
+            except:
+                pass
+
 
         def _register_watchdog(self):
-            observer = Observer()
-            observer.schedule(self, str(self._conf_path.parent), recursive=False)
-            observer.start()
+            try:
+                self._observer = Observer()
+                self._observer.schedule(self, str(self._conf_path.parent), recursive=False)
+                self._observer.start()
+            except OSError:
+                pass
 
 
 
@@ -301,7 +322,9 @@ class PluginConfig:
     def __init__(self, config: BasicConfig, plugin_name:str):
         self._main  = config
         self._pname = plugin_name
-    
+        self.get_autodiscovery_topic = self._main.get_autodiscovery_topic
+        self.getIndependendFile      = self._main.getIndependendFile
+
     def save(self):
         self._main.save()
 
@@ -316,7 +339,7 @@ class PluginConfig:
         self._main[key] = value
 
     def __getitem__(self, item: str):
-        key = "{}/{}".format(self._pname, key)
+        key = "{}/{}".format(self._pname, item)
         return self._main[key]
 
     def __setitem__(self, key: str, value):

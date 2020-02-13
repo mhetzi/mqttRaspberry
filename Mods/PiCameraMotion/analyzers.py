@@ -7,6 +7,7 @@ import threading
 import queue
 import numpy as np
 import io
+import schedule
 
 try:
     import picamera as cam
@@ -20,12 +21,13 @@ from PIL import Image, ImageDraw, ImageFont, ImageStat
 import pyximport
 pyximport.install()
 import Mods.PiCameraMotion.analyze.hotblock
+from Tools.Config import PluginConfig
 
 
 class Analyzer(cama.PiAnalysisOutput):
     processed = 0
     states = {"motion_frames": 0, "still_frames": 0,
-              "noise_count": 0, "hotest": []}
+              "noise_count": 0, "hotest": [], "zmdata": ""}
     __old_States = None
     blockMinNoise = 0
     countMinNoise = 0
@@ -40,6 +42,7 @@ class Analyzer(cama.PiAnalysisOutput):
     __motion_triggered = False
     zeromap_py = {"enabled": False, "isBuilding": False, "dict": None}
     __zeromap_data = None
+    _shed_task = None
 
     def motion_call(self, motion: bool, data: dict, wasMeassureing: bool):
         self.logger.error("motion_call nicht überschrieben!")
@@ -59,9 +62,11 @@ class Analyzer(cama.PiAnalysisOutput):
         self.rows = None
         self.logger = logger
         self.logger.debug("Queue wird erstellt...")
-        self._queue = queue.Queue(2)
+        self._queue = queue.Queue(10)
         self.disableAnalyzing = False
         self.config = config
+        self._shed_task = schedule.every(15).seconds
+        self._shed_task.do(self.laodZeroMap)
 
     def write(self, b):
         result = super(Analyzer, self).write(b)
@@ -72,13 +77,44 @@ class Analyzer(cama.PiAnalysisOutput):
             if self.zeromap_py["enabled"]:
                 self.logger.debug("Erstelle C Object for zeroMap...")
                 self.__zeromap_data = Mods.PiCameraMotion.analyze.hotblock.ZeroMap(self.rows, self.cols)
-            if self.zeromap_py["dict"] is not None and self.__zeromap_data is not None:
-                self.logger.debug("Lade Savedata in C zeroMap...")
-                self.__zeromap_data.loadZeroMap(self.zeromap_py["dict"])
+                self.laodZeroMap()
         self.analyze(
             np.frombuffer(b, dtype=cama.motion_dtype).
             reshape((self.rows, self.cols)))
         return result
+
+    def laodZeroMap(self):
+        cb = self.brightness()
+        if cb == -1:
+            return
+        ll = self.config.get("ranges", None)
+        if ll is None or self.__zeromap_data is None:
+            return
+        if len(ll) < 1:
+            return
+        if self.zeromap_py["isBuilding"]:
+            return
+        found = min(ll, key=lambda x: abs(Analyzer.getMin(x[0], x[1], cb) - cb) )
+        if found[2] != self.states["zmdata"]:
+            f,n = self.config.getIndependendFile(found[2])
+            d = f["pimotion/data"]
+            self.logger.debug("Lade Savedata in C zeroMap von {}".format(n))
+            self.__zeromap_data.loadZeroMap(d)
+            self.states["zmdata"] = found[2]
+            self.states["lowest_brightness"] = found[0]
+            self.states["highest_brightness"] = found[1]
+            f.stop()
+
+    @staticmethod
+    def getMin(v1, v2, n):
+        return min([v1, v2], key=lambda x: abs(x-n))
+
+    @staticmethod
+    def getNumber(val):
+        try:
+            return int(val)
+        except ValueError:
+            return -100000000000
 
     def analyze(self, a: cama.motion_dtype):
         if self.disableAnalyzing:
@@ -92,17 +128,18 @@ class Analyzer(cama.PiAnalysisOutput):
         except queue.Full:
             self.logger.debug("Queue ist voll")
 
-    def trainZeroMap(self):
+    def trainZeroMap(self, update=False):
         self.logger.debug("Erstelle C Object for zeroMap...")
-        if self.__zeromap_data is None:
+        if not update or self.__zeromap_data is None:
             self.__zeromap_data = Mods.PiCameraMotion.analyze.hotblock.ZeroMap(self.rows, self.cols)
         self.logger.info("Schalte zeroMap ein...")
         self.zeromap_py["enabled"] = True
         self.logger.info("Schalte zeroMap Baustatus um...")
         self.zeromap_py["isBuilding"] = True
         self.framesToNoMotion *= 15
-        self.states["lowest_brightness"] = 1000000
-        self.states["highest_brightness"] = 0
+        if not update:
+            self.states["lowest_brightness"] = 1000000
+            self.states["highest_brightness"] = 0
 
 
     def __calibrate(self, hottestBlock: dict):
@@ -133,12 +170,15 @@ class Analyzer(cama.PiAnalysisOutput):
         frame = self.cal_getMjpeg_Frame()
         bio = None
         if frame is not None:
-            bio = Image.open(io.BytesIO(frame))
+            try:
+                bio = Image.open(io.BytesIO(frame))
+            except:
+                self.logger.exception("Erkennen der Helligkeit ist fehlgeschlagen")
+                return -1
         else:
-            self.__logger.warning("Snapshot is None")
+            self.logger.warning("Snapshot is None")
             return
-        im = Image.open(bio)
-        stat = ImageStat.Stat(im)
+        stat = ImageStat.Stat(bio)
         r,g,b = stat.mean
         return math.sqrt(0.299*(r**2) + 0.587*(g**2) + 0.114*(b**2))
 
@@ -153,16 +193,26 @@ class Analyzer(cama.PiAnalysisOutput):
         if changed:
             self.states["still_frames"] = 0
             self.states["motion_frames"] += 1
-            br = self.brightness()
-            if self.states.get("lowest_brightness", 1000000) > br:
-                self.states["lowest_brightness"] = br
-            if self.states.get("highest_brightness", 0) < br:
-                self.states["highest_brightness"] = br
+            if self.states.get("brightness_holdoff", 0) <= 0:
+                br = self.brightness()
+                if br > -1:
+                    if self.states.get("lowest_brightness", 1000000) > br:
+                        self.states["lowest_brightness"] = br
+                    if self.states.get("highest_brightness", 0) < br:
+                        self.states["highest_brightness"] = br
+                self.states["brightness_holdoff"] = 60
+            else:
+                self.states["brightness_holdoff"] -= 1
+
         else:
             self.states["still_frames"] += 1
             self.states["motion_frames"] = 0
 
-        self.logger.debug("TZ C:{} still: {} motion:{} brightness: {}".format(changed, self.states["still_frames"], self.states["motion_frames"], br))
+        self.logger.debug("TZ C:{} still: {} motion:{} brightness: {}".format(
+            "TRUE " if changed else "FALSE",
+            self.states["still_frames"],
+            self.states["motion_frames"],
+            br))
 
         if self.states["motion_frames"] > 0 and still_pre_change > self.framesToNoMotion:
             self.motion_call(True, self.states, False)
@@ -222,13 +272,24 @@ class Analyzer(cama.PiAnalysisOutput):
                     self.zeromap_py["isBuilding"] = False
                     self.logger.info("ZeroMap gebaut. Sicherung wird erstellt")
                     self.framesToNoMotion = self.framesToNoMotion / 15
-                    self.zeromap_py["dict"] = self.__zeromap_data.saveZeroMap()
                     c, name = self.config.getIndependendFile(None)
                     c["pimotion/data"] = self.__zeromap_data.saveZeroMap()
-                    self.zeromap_py["range"] = [
-                        self.states["lowest_brightness"],  # LOAD BACK 
-                        self.states["highest_brightness"], # LOAD BACK
-                        name ]                              # FIGURE OUT WHAT TO LOAD
+                    c.save()
+                    new_calib = [
+                        self.states["lowest_brightness"],
+                        self.states["highest_brightness"],
+                        name
+                    ]
+                    self.logger.info("Füge {} der Config hinzu...".format(new_calib))
+                    old_list = self.config.get("ranges", None)
+                    self.logger.debug("alte Liste ist {}".format(old_list))
+                    if not isinstance(old_list, list) or old_list is None:
+                        old_list = []
+                        self.logger.debug("Liste ist zurückgesetzt {}".format(old_list))
+                    old_list.append(new_calib)
+                    self.config["ranges"] = old_list
+                    self.logger.debug("Neue Liste ist jetzt {}".format(self.config["ranges"]))
+                    self.config.save()
                     try:
                         self.motion_call(False, self.states, True)
                     except:
@@ -257,6 +318,10 @@ class Analyzer(cama.PiAnalysisOutput):
                             self.states["still_frames"] = 0
                             self.states["motion_frames"] = 0
                             self.motion_call(True, self.states, False)
+                            try:
+                                self.laodZeroMap()
+                            except:
+                                self.logger.exception("Neuladen der Zeromap fehlgschlagen")
                             self.logger.debug("motion_call called")
                         elif self.states["motion_frames"] >= self.frameToTriggerMotion and self.__motion_triggered:
                             self.states["still_frames"] = 0
@@ -284,5 +349,5 @@ class Analyzer(cama.PiAnalysisOutput):
     def stop_queue(self):
         self.__thread_do_run = False
         self._queue.put_nowait((None, None))
-        if self.__zeromap_data is not None:
-            self.zeromap_py["dict"] = self.__zeromap_data.saveZeroMap()
+        schedule.cancel_job(self._shed_task)
+        self.config["zeroMap"] = zeromap_py

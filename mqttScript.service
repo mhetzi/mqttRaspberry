@@ -7,7 +7,7 @@ WantedBy=multi-user.target
 [Service]
 TimeoutStartSec=60
 ExecStartPre=-/opt/mqttScripts/data/update.sh update
-ExecStart=/opt/mqttScripts/data/update.sh run-service
+ExecStart=/opt/mqttScripts/venv/bin/python3 /opt/mqttScripts/data/Launcher.py --systemd --config /opt/mqttScripts/config/mqttra.config
 TimeoutStopSec=35s
 Restart=always
 Type=idle

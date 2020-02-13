@@ -25,6 +25,7 @@ PAGE = u"""\
 <p>
 <a href="calibrate.run">Minimalen Block Noise ermitteln</a>
 <a href="zeromap.run">ZeroMap erstellen</a>
+<a href="zeromapUpdate.run"> ZeroMap update </a>
 <a href="stream.mjpg">Stream in Vollbild</a>
 <a href="snap.jpg">Snapshot erstellen</a>
 <a href="info.json">Debug JSON abrufen</a>
@@ -121,6 +122,8 @@ class StreamingPictureOutput(object):
 
 def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
     class StreamingHandler(server.BaseHTTPRequestHandler):
+        HTML_BACK_TO_MAIN = u"""<html><head><title>PiCamera Plugin</title></head><body><h1><OK Einstellungen gespeichert</h1><p>In Kürze wird die die Hauptseite geladen...<p><meta http-equiv="refresh" content="3;url=/index.html" /><p></body></html>""".encode('utf-8')
+
         def meassure_call(self, type):
             logging.warning("meassure_call nicht überladen")
 
@@ -232,6 +235,17 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
                 self.wfile.write(b'\r\n')
                 if self.meassure_call is not None:
                     self.meassure_call(1)
+            elif self.path == "/zeromapUpdate.run":
+                self.send_response(200)
+                self.send_header('Age', 0)
+                self.send_header('Cache-Control', 'no-cache, private')
+                self.send_header('Pragma', 'no-cache')
+                self.send_header('Content-Type', 'text/html; charset=utf-8')
+                self.send_header('Content-Length', len(StreamingHandler.HTML_BACK_TO_MAIN))
+                self.end_headers()
+                self.wfile.write(StreamingHandler.HTML_BACK_TO_MAIN)
+                if self.meassure_call is not None:
+                    self.meassure_call(2)
             elif self.path.startswith("/updateMotion.data"):
                 data = self.path.replace("/updateMotion.data?", "")
                 data = urllib.parse.parse_qs(data)
@@ -249,14 +263,12 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
                     int(data.get("mF"      , [None])[0]),
                     int(data.get("sF"      , [None])[0])
                 )
-                content = u"""<html><head><title>PiCamera Plugin</title></head><body><h1><OK Einstellungen gespeichert</h1><p>In Kürze wird die die Hauptseite geladen...<p><meta http-equiv="refresh" content="3;url=/index.html" /><p></body></html>"""
-                content = content.encode('utf-8')
                 self.send_response(200)
                 self.send_header('Age', 0)
                 self.send_header('Content-Type', 'text/html; charset=utf-8')
-                self.send_header('Content-Length', len(content))
+                self.send_header('Content-Length', len(StreamingHandler.HTML_BACK_TO_MAIN))
                 self.end_headers()
-                self.wfile.write(content)
+                self.wfile.write(StreamingHandler.HTML_BACK_TO_MAIN)
             elif self.path == "/settings.html":
                 print("Generiere SETTINGS:")
                 content = self.fill_setting_html(SETTINGS)

@@ -7,7 +7,8 @@ import json
 import Tools.PluginManager as pm
 import paho.mqtt.client as mclient
 
-import Tools.Config as conf
+from  Tools.Config import BasicConfig, PluginConfig
+import Tools.Autodiscovery as autodisc
 import logging
 import io
 
@@ -84,11 +85,11 @@ class PiMotionMain(threading.Thread):
     _http_out = None
     _sendDebug = False
 
-    def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def __init__(self, client: mclient.Client, opts: BasicConfig, logger: logging.Logger, device_id: str):
         threading.Thread.__init__(self)
         self.__client = client
         self.__logger = logger.getChild("PiMotion")
-        self._config = opts
+        self._config = PluginConfig(opts, "PiMotion")
         self._device_id = device_id
 
         self.__logger.debug("PiMotion.__init__()")
@@ -98,30 +99,30 @@ class PiMotionMain(threading.Thread):
         self._doExit = False
         self._camera = None
 
-        path = self._config.get("PiMotion/record/path", "~/Videos")
+        path = self._config.get("record/path", "~/Videos")
         if not path.endswith("/"):
             path += "/"
         path = "{}/aufnahmen/".format(path)
         pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
-        path = self._config.get("PiMotion/record/path", "~/Videos")
+        path = self._config.get("record/path", "~/Videos")
         if not path.endswith("/"):
             path += "/"
         path = "{}/magnitude/".format(path)
         pathlib.Path(path).mkdir(parents=True, exist_ok=True)
         self._image_font = ImageFont.truetype(
             font=self._config.get(
-                "PiMotion/font", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+                "font", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
             size=9,
             encoding="unic"
         )
 
-        self._pilQueue = queue.Queue(2)
+        self._pilQueue = queue.Queue(5)
 
     def set_do_record(self, recording: bool):
         self.__logger.info(
             "Config Wert aufnehmen wird auf {} gesetzt".format(recording))
-        self._config["PiMotion/record/enabled"] = recording
+        self._config["record/enabled"] = recording
         self.__client.publish(self._do_record_topic.state,
                               payload=b'ON' if recording else b'OFF')
 
@@ -145,15 +146,15 @@ class PiMotionMain(threading.Thread):
             elif message.payload.decode('utf-8') == "OFF":
                 self.set_do_dbg(False)
 
-    def register(self):
+    def register(self, wasConnected=False):
         # Setup MQTT motion binary_sensor
-        sensorName = self._config["PiMotion/motion/sensorName"]
+        sensorName = self._config["motion/sensorName"]
         uid_motion = "binary_sensor.piMotion-{}-{}".format(
             self._device_id, sensorName)
-        self._motion_topic = self._config.get_autodiscovery_topic(
-            conf.autodisc.Component.BINARY_SENROR,
+        self._motion_topic = self._config._main.get_autodiscovery_topic(
+            autodisc.Component.BINARY_SENROR,
             sensorName,
-            conf.autodisc.BinarySensorDeviceClasses.MOTION
+            autodisc.BinarySensorDeviceClasses.MOTION
         )
         motion_payload = self._motion_topic.get_config_payload(
             sensorName, "", unique_id=uid_motion, value_template="{{ value_json.motion }}", json_attributes=True)
@@ -168,9 +169,9 @@ class PiMotionMain(threading.Thread):
         uid_debug = "switch.piMotion-dbg-{}-{}".format(
             self._device_id, sensorName)
         self._debug_topic = self._config.get_autodiscovery_topic(
-            conf.autodisc.Component.SWITCH,
+            autodisc.Component.SWITCH,
             sensorName,
-            conf.autodisc.SensorDeviceClasses.GENERIC_SENSOR
+            autodisc.SensorDeviceClasses.GENERIC_SENSOR
         )
         debug_payload = self._debug_topic.get_config_payload(
             sensorName, "", unique_id=uid_debug, value_template="{{ value_json.on_dbg_message }}", json_attributes=True)
@@ -188,10 +189,10 @@ class PiMotionMain(threading.Thread):
         switchName = "{} Aufnehmen".format(sensorName)
         uid_do_record = "switch.piMotion-{}-{}".format(
             self._device_id, switchName.replace(" ", "_"))
-        self._do_record_topic = self._config.get_autodiscovery_topic(
-            conf.autodisc.Component.SWITCH,
+        self._do_record_topic = self._config._main.get_autodiscovery_topic(
+            autodisc.Component.SWITCH,
             switchName,
-            conf.autodisc.SensorDeviceClasses.GENERIC_SENSOR
+            autodisc.SensorDeviceClasses.GENERIC_SENSOR
         )
         do_record_payload = self._do_record_topic.get_config_payload(
             switchName,
@@ -208,13 +209,14 @@ class PiMotionMain(threading.Thread):
         self.__client.subscribe(self._do_record_topic.command)
         self.__client.message_callback_add(
             self._do_record_topic.command, self.on_message)
-        self.set_do_record(self._config.get("PiMotion/record/enabled", True))
+        self.set_do_record(self._config.get("record/enabled", True))
 
         # Starte thread
-        self.start()
-        self._pilThread = threading.Thread(
-            target=self.pil_magnitude_save, name="MagSave")
-        self._pilThread.start()
+        if not wasConnected:
+            self.start()
+            self._pilThread = threading.Thread(
+                target=self.pil_magnitude_save, name="MagSave")
+            self._pilThread.start()
 
         self.set_do_dbg(self._sendDebug)
 
@@ -241,7 +243,6 @@ class PiMotionMain(threading.Thread):
 
         if self._analyzer is not None:
             self._analyzer.stop_queue()
-            self._config["PiMotion/zeroMap"] = self._analyzer.zeromap_py
 
         if self._pilQueue is not None and self._pilThread is not None:
             self.__logger.info("Warte auf PIL Thread...")
@@ -252,13 +253,13 @@ class PiMotionMain(threading.Thread):
         import time
         time.sleep(5)
         self.__logger.debug("PiMotion.run()")
-        with cam.PiCamera(clock_mode='raw', framerate=self._config.get("PiMotion/camera/fps", 23)) as camera:
+        with cam.PiCamera(clock_mode='raw', framerate=self._config.get("camera/fps", 23)) as camera:
             self._camera = camera
             # Init Kamera
             camera.resolution = (
-                self._config["PiMotion/camera/width"], self._config["PiMotion/camera/height"])
+                self._config["camera/width"], self._config["camera/height"])
             camera.video_denoise = self._config.get(
-                "PiMotion/camera/denoise", True)
+                "camera/denoise", True)
             self.__logger.debug("Kamera erstellt")
 
             camera.annotate_background = cam.Color('black')
@@ -267,15 +268,15 @@ class PiMotionMain(threading.Thread):
             with analyzers.Analyzer(camera, logger=self.__logger.getChild("Analyzer"), config=self._config) as anal:
                 self.__logger.debug("Analyzer erstellt")
                 anal.frameToTriggerMotion = self._config.get(
-                    "PiMotion/motion/motion_frames", 4)
+                    "motion/motion_frames", 4)
                 anal.framesToNoMotion = self._config.get(
-                    "PiMotion/motion/still_frames", 4)
+                    "motion/still_frames", 4)
                 anal.blockMinNoise = self._config.get(
-                    "PiMotion/motion/blockMinNoise", 0)
+                    "motion/blockMinNoise", 0)
                 anal.countMinNoise = self._config.get(
-                    "PiMotion/motion/frameMinNoise", 0)
+                    "motion/frameMinNoise", 0)
                 anal.countMaxNoise = self._config.get(
-                    "PiMotion/motion/frameMaxNoise", 0)
+                    "motion/frameMaxNoise", 0)
                 anal.motion_call = lambda motion, data, mes: self.motion(
                     motion, data, mes)
                 anal.motion_data_call = lambda data: self.motion_data(data)
@@ -283,14 +284,14 @@ class PiMotionMain(threading.Thread):
                     img, data)
                 anal.cal_getMjpeg_Frame = self.getMjpegFrame
 
-                anal.zeromap_py = self._config.get("PiMotion/zeroMap", {"enabled": False, "isBuilding": False, "dict": None})
+                anal.zeromap_py = self._config.get("zeroMap", {"enabled": False, "isBuilding": False, "dict": None})
 
                 self._analyzer = anal
 
                 self._circularStream = cam.PiCameraCircularIO(
-                    camera, seconds=self._config["PiMotion/motion/recordPre"])
+                    camera, seconds=self._config["motion/recordPre"])
 
-                if self._config.get("PiMotion/rtsp/enabled", True):
+                if self._config.get("rtsp/enabled", True):
                     self.__logger.debug("Erstelle CameraSplitIO")
                     rtsp_split = rtsp.CameraSplitIO(camera)
                     self._rtsp_split = rtsp_split
@@ -298,8 +299,8 @@ class PiMotionMain(threading.Thread):
                     rtsp_split.initAndRun(self._circularStream, file=None)
                     self.__logger.info("Aktiviere RTSP...")
                     rtsp_server = rtsp.GstRtspPython(
-                        self._config.get("PiMotion/camera/fps", 23),
-                        self._config["PiMotion/motion/sensorName"]
+                        self._config.get("camera/fps", 23),
+                        self._config["motion/sensorName"]
                     )
                     rtsp_server.logger = self.__logger.getChild("RTSP_srv")
                     self.__logger.info("Starte RTSP...")
@@ -316,18 +317,18 @@ class PiMotionMain(threading.Thread):
 
                 camera.start_recording(self._circularStream, format='h264',
                                        motion_output=anal, quality=25, sps_timing=True,
-                                       intra_period=self._config.get("PiMotion/camera/fps", 23) * 10,
+                                       intra_period=self._config.get("camera/fps", 23) * 5,
                                        sei=True, inline_headers=True, bitrate=0)
 
-                if self._config.get("PiMotion/http/enabled", False):
+                if self._config.get("http/enabled", False):
                     self.__logger.info("Aktiviere HTTP...")
                     http_out = httpc.StreamingOutput()
                     self._http_out = http_out
 
                     self._jsonOutput = httpc.StreamingJsonOutput()
                     address = (
-                        self._config.get("PiMotion/http/addr", "0.0.0.0"),
-                        self._config.get("PiMotion/http/port", 8083)
+                        self._config.get("http/addr", "0.0.0.0"),
+                        self._config.get("http/port", 8083)
                     )   
                     streamingHandle = httpc.makeStreamingHandler(http_out, self._jsonOutput)
                     streamingHandle.meassure_call = lambda s,i: self.meassure_call(i)
@@ -346,7 +347,7 @@ class PiMotionMain(threading.Thread):
                     t.start()
                 # Und jetzt einfach warten
 
-                anal.disableAnalyzing = not self._config.get("PiMotion/motion/doAnalyze", True)
+                anal.disableAnalyzing = not self._config.get("motion/doAnalyze", True)
 
                 firstFrames = True
                 while not self._doExit:
@@ -402,6 +403,8 @@ class PiMotionMain(threading.Thread):
             self.meassure_minimal_blocknoise()
         elif i == 1:
             self._analyzer.trainZeroMap()
+        elif i == 2:
+            self._analyzer.trainZeroMap(True)
                         
 
     def meassure_minimal_blocknoise(self):
@@ -419,14 +422,14 @@ class PiMotionMain(threading.Thread):
 
     def motion(self, motion: bool, data: dict, wasMeassureing: bool):
         if wasMeassureing:
-            self._config["PiMotion/motion/blockMinNoise"] = self._analyzer.blockMaxNoise
-            self._config["PiMotion/motion/frameMinNoise"] = self._analyzer.countMinNoise
-            self._config["PiMotion/zeroMap"] = self._analyzer.zeromap_py
+            self._config["motion/blockMinNoise"] = self._analyzer.blockMaxNoise
+            self._config["motion/frameMinNoise"] = self._analyzer.countMinNoise
+            self._config["zeroMap"] = self._analyzer.zeromap_py
             self._config.save()
         if motion:
             self.__logger.info("Motion")
-            if self._config.get("PiMotion/record/enabled", True):
-                path = self._config.get("PiMotion/record/path", "~/Videos")
+            if self._config.get("record/enabled", True):
+                path = self._config.get("record/path", "~/Videos")
                 if not path.endswith("/"):
                     path += "/"
                 path = "{}/aufnahmen/{}.h264".format(
@@ -444,10 +447,10 @@ class PiMotionMain(threading.Thread):
                 self._postRecordTimer = None
                 self.__logger.debug("Aufname timer wird zurückgesetzt")
             self._postRecordTimer = threading.Timer(interval=self._config.get(
-                "PiMotion/motion/recordPost", 1), function=self.stop_record)
+                "motion/recordPost", 1), function=self.stop_record)
             self._postRecordTimer.start()
             self.__logger.debug("Aufnahme wird in {} Sekunden beendet.".format(
-                self._config.get("PiMotion/motion/recordPost", 1)))
+                self._config.get("motion/recordPost", 1)))
 
         self._inMotion = motion
         self.motion_data(data=data, changed=True)
@@ -455,7 +458,8 @@ class PiMotionMain(threading.Thread):
     def motion_data(self, data: dict, changed=False):
         # x y val count
         self._lastState = {"motion": 1 if self._inMotion else 0, "x": data["hotest"][0],
-                           "y": data["hotest"][1], "val": data["hotest"][2], "c": data["noise_count"], "dbg_on": self._sendDebug}
+                           "y": data["hotest"][1], "val": data["hotest"][2], "c": data["noise_count"], "dbg_on": self._sendDebug,
+                           "brightness": self._analyzer.brightness()}
         self._jsonOutput.write(self._lastState)
         self.update_anotation()
         if self._analyzer is not None and not self._analyzer._calibration_running:
@@ -510,30 +514,32 @@ class PiMotionMain(threading.Thread):
             ).clip(0, 255).astype(np.uint8)
             Bimg = Image.fromarray(d)
             img = Bimg.convert(mode="RGB", dither=Image.FLOYDSTEINBERG)
-            ig = ImageDraw.Draw(img)
             self.__logger.debug(data)
-            ig.point(
-                [(data["object"][4]["col"], data["object"][4]["row"])],
-                fill=(255, 0, 0, 200)
-            )
-            path = self._config.get("PiMotion/record/path", "~/Videos")
+            if data is not None:
+                ig = ImageDraw.Draw(img)
+                ig.point(
+                    [(data["object"][4]["col"], data["object"][4]["row"])],
+                    fill=(255, 0, 0, 200)
+                )
+            path = self._config.get("record/path", "~/Videos")
             if not path.endswith("/"):
                 path += "/"
             path = "{}/magnitude/{}.png".format(
                 path, dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            print('Writing %s' % path)
+            self.__logger.debug('Writing %s' % path)
             if background is not None:
                 self.__logger.debug("Habe Snapshot. Vermische Bilder...")
-                img = img.resize( (self._config["PiMotion/camera/width"], self._config["PiMotion/camera/height"]) )
+                img = img.resize( (self._config["camera/width"], self._config["camera/height"]) )
                 foreground = img.convert("RGBA")
                 background = background.convert("RGBA")
                 img = Image.blend(background, foreground, 0.5)
             
-            draw = ImageDraw.Draw(img)
-            draw.text((0, 0), "X: {} Y: {} VAL: {} C: {}".format(data["hotest"][0], data["hotest"][1], data["hotest"][2], data["noise_count"]),
-                      fill=(255, 255, 0, 155), font=self._image_font)
-            draw.text((20, 20), "R: {} C: {}".format(data["object"][4]["row"], data["object"][4]["col"]),
-                      fill=(255, 255, 0, 155), font=self._image_font)
+            if data is not None:
+                draw = ImageDraw.Draw(img)
+                draw.text((0, 0), "X: {} Y: {} VAL: {} C: {}".format(data["hotest"][0], data["hotest"][1], data["hotest"][2], data["noise_count"]),
+                        fill=(255, 255, 0, 155), font=self._image_font)
+                draw.text((20, 20), "R: {} C: {}".format(data["object"][4]["row"], data["object"][4]["col"]),
+                        fill=(255, 255, 0, 155), font=self._image_font)
             img.save(path)
 
     def fill_settings_html(self, html: str):
@@ -561,9 +567,9 @@ class PiMotionMain(threading.Thread):
         self._analyzerframeToTriggerMotion = frameToTriggerMotion
         self._analyzerframesToNoMotion     = framesToNoMotion
 
-        self._config["PiMotion/motion/motion_frames"] = frameToTriggerMotion
-        self._config["PiMotion/motion/still_frames" ] = framesToNoMotion
-        self._config["PiMotion/motion/blockMinNoise"] = blockMinNoise
-        self._config["PiMotion/motion/frameMinNoise"] = countMinNoise
-        self._config["PiMotion/motion/frameMaxNoise"] = countMaxNoise
+        self._config["motion/motion_frames"] = frameToTriggerMotion
+        self._config["motion/still_frames" ] = framesToNoMotion
+        self._config["motion/blockMinNoise"] = blockMinNoise
+        self._config["motion/frameMinNoise"] = countMinNoise
+        self._config["motion/frameMaxNoise"] = countMaxNoise
         self._config.save()
