@@ -5,7 +5,6 @@ import Tools.Autodiscovery as ad
 import logging
 import os
 import re
-import threading
 import schedule
 
 class PluginLoader:
@@ -28,7 +27,6 @@ class RaspberryPiCpuTemp:
     _shed_Job = None
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        threading.Thread.__init__(self)
         self._config = opts
         self.__client = client
         self.__logger = logger.getChild("PiCpuTemp")

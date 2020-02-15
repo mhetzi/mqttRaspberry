@@ -30,9 +30,9 @@ import logging
 
 Gst.init(None)
 
-class CameraSplitter(cam.CircularIO);
+class CameraSplitter(cam.CircularIO):
     
     def __init__(self, frames_to_sps: int, log: logging.Logger):
         self._queue = queue.Queue(maxsize=frames_to_sps + 2)
 
-    def 
+    

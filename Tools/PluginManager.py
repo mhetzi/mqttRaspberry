@@ -2,7 +2,6 @@
 import logging
 from pathlib import Path
 
-import Tools.Config as tc
 import threading
 import time
 import pkgutil
@@ -23,6 +22,7 @@ except ImportError as ie:
         err.try_install_package('schedule', throw=ie, ask=False)
     except err.RestartError:
         import schedule
+import Tools.Config as tc
 
 class PluginManager:
 
@@ -63,9 +63,10 @@ class PluginManager:
                 schedule.clear()
 
         continuous_thread = ScheduleThread()
+        continuous_thread.setName("scheduler")
         continuous_thread.start()
         self.logger.debug("ScheduleThread gestartet...")
-        return cease_continuous_run
+        return (cease_continuous_run, continuous_thread)
 
     def __init__(self, logger: logging.Logger, config: tc.BasicConfig):
         self.logger = logger.getChild("PluginManager")
@@ -73,9 +74,10 @@ class PluginManager:
         self._client = None
         self._client_name = None
         self._wasConnected = False
+        self.shed_thread = None
 
     def enable_mods(self):
-        self.scheduler_event = self.run_scheduler_continuously()
+        self.scheduler_event, self.shed_thread = self.run_scheduler_continuously()
         self.configured_list = {}
         mep = list(self.config.get_all_plugin_names())
         i = 0
@@ -233,9 +235,13 @@ class PluginManager:
         pass
 
     def shutdown(self):
+        self.logger.info("Plugins werden deaktiviert")
         self.disable_mods()
+        self.logger.info("MQTT wird getrennt")
         if self._client is not None:
             self._client.disconnect()
+        self.logger.info("Beende Scheduler")
+        schedule.clear()
         self.scheduler_event.set()
-        self.config.save()
+        self.shed_thread.join()
 

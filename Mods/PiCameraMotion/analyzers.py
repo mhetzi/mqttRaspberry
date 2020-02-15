@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from PIL import Image, ImageDraw
 import math
 import random
 import threading
@@ -22,7 +21,6 @@ import pyximport
 pyximport.install()
 import Mods.PiCameraMotion.analyze.hotblock
 from Tools.Config import PluginConfig
-
 
 class Analyzer(cama.PiAnalysisOutput):
     processed = 0
@@ -62,7 +60,7 @@ class Analyzer(cama.PiAnalysisOutput):
         self.rows = None
         self.logger = logger
         self.logger.debug("Queue wird erstellt...")
-        self._queue = queue.Queue(10)
+        self._queue = queue.Queue(30)
         self.disableAnalyzing = False
         self.config = config
         self._shed_task = schedule.every(15).seconds
@@ -96,7 +94,7 @@ class Analyzer(cama.PiAnalysisOutput):
             return
         found = min(ll, key=lambda x: abs(Analyzer.getMin(x[0], x[1], cb) - cb) )
         if found[2] != self.states["zmdata"]:
-            f,n = self.config.getIndependendFile(found[2])
+            f,n = self.config.getIndependendFile(name=found[2], no_watchdog=True)
             d = f["pimotion/data"]
             self.logger.debug("Lade Savedata in C zeroMap von {}".format(n))
             self.__zeromap_data.loadZeroMap(d)
@@ -129,14 +127,15 @@ class Analyzer(cama.PiAnalysisOutput):
             self.logger.debug("Queue ist voll")
 
     def trainZeroMap(self, update=False):
-        self.logger.debug("Erstelle C Object for zeroMap...")
         if not update or self.__zeromap_data is None:
             self.__zeromap_data = Mods.PiCameraMotion.analyze.hotblock.ZeroMap(self.rows, self.cols)
+            self.logger.debug("Erstelle C Object for zeroMap...")
         self.logger.info("Schalte zeroMap ein...")
         self.zeromap_py["enabled"] = True
         self.logger.info("Schalte zeroMap Baustatus um...")
         self.zeromap_py["isBuilding"] = True
-        self.framesToNoMotion *= 15
+        self.states["still_frames"] = 0
+        self.framesToNoMotion = self.framesToNoMotion * 15
         if not update:
             self.states["lowest_brightness"] = 1000000
             self.states["highest_brightness"] = 0
@@ -181,6 +180,7 @@ class Analyzer(cama.PiAnalysisOutput):
         stat = ImageStat.Stat(bio)
         r,g,b = stat.mean
         return math.sqrt(0.299*(r**2) + 0.587*(g**2) + 0.114*(b**2))
+        
 
     def __train_zero(self, a: cama.motion_dtype):
         if self.__zeromap_data is None:
@@ -272,7 +272,7 @@ class Analyzer(cama.PiAnalysisOutput):
                     self.zeromap_py["isBuilding"] = False
                     self.logger.info("ZeroMap gebaut. Sicherung wird erstellt")
                     self.framesToNoMotion = self.framesToNoMotion / 15
-                    c, name = self.config.getIndependendFile(None)
+                    c, name = self.config.getIndependendFile(name=None, no_watchdog=True)
                     c["pimotion/data"] = self.__zeromap_data.saveZeroMap()
                     c.save()
                     new_calib = [

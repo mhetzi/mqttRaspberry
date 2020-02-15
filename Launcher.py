@@ -68,6 +68,8 @@ class Launcher:
         self.config.post_reload = self.pm_reload
         self.mqtt_client = None
 
+        threading.current_thread().setName("Main/MQTT")
+
         try:
             self.pm.needed_plugins()
             self.mqtt_client, deviceID = self.pm.start_mqtt_client()
@@ -78,8 +80,7 @@ class Launcher:
             except:
                 self._log.info("Remote Debugging (ptvsd) nicht verfügbar")
             self.pm.enable_mods()
-            self.mqtt_client.loop_start()
-            self.mqtt_client._thread.join()
+            self.mqtt_client.loop_forever(timeout=30,retry_first_connection=True)
             return True
         except ConnectionRefusedError:
             self._log.info("Server hat die Verbindung nicht angenommen. Läuft die Server Anwendung?")
@@ -189,6 +190,9 @@ class Launcher:
         self.pm.shutdown()
         self._log.info("MQTT Thread wird gestoppt...")
         self.mqtt_client.loop_stop()
+        self._log.info("Config wird entladen...")
+        self.config.save()
+        self.config.stop()
         self._log.info("Beende mich...")
         exit(0)
 

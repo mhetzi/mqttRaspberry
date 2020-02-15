@@ -365,7 +365,7 @@ class PiMotionMain(threading.Thread):
                                 self.__logger.info(
                                     "Stream wird sich normalisiert haben. Queue wird angeschlossen...")
                                 anal.run_queue()
-                            t = threading.Thread(target=first_run)
+                            t = threading.Thread(target=first_run, name="Analyzer bootstrap")
                             t.setDaemon(True)
                             t.run()
                             firstFrames = False
@@ -448,6 +448,7 @@ class PiMotionMain(threading.Thread):
                 self.__logger.debug("Aufname timer wird zurückgesetzt")
             self._postRecordTimer = threading.Timer(interval=self._config.get(
                 "motion/recordPost", 1), function=self.stop_record)
+            self._postRecordTimer.setName("RecordTimer")
             self._postRecordTimer.start()
             self.__logger.debug("Aufnahme wird in {} Sekunden beendet.".format(
                 self._config.get("motion/recordPost", 1)))

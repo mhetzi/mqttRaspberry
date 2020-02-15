@@ -78,11 +78,12 @@ class BleTag:
         return json.dumps(self.toDict())
 
 
-class BleTrack:
+class BleTrack(threading.Thread):
     _pluginManager = None
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         threading.Thread.__init__(self)
+        self.setName("BleTracker")
         self.__client = client
         self.__logger = logger.getChild("BleTrack")
         self._config = opts

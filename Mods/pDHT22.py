@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import re
-import threading
 import math
 
 import paho.mqtt.client as mclient

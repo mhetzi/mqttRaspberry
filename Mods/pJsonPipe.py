@@ -39,8 +39,9 @@ class JsonPipe(threading.Thread):
         self._doExit = False
         self._lastData = None
 
-    def register(self):
-        self.start()
+    def register(self, was_connected=False):
+        if not was_connected:
+            self.start()
 
     def stop(self):
         self._doExit = True

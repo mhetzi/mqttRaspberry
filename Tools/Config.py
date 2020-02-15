@@ -254,7 +254,7 @@ class BasicConfig:
                 del d
             i += 1
     
-    def getIndependendFile(self, name:str):
+    def getIndependendFile(self, name:str, no_watchdog=False):
         if name is None:
             self._logger.info("Kein Name angegeben.")
             import uuid
@@ -263,7 +263,7 @@ class BasicConfig:
             self._logger.info("Name {} wurde generiert.".format(name))
         self._logger.debug("Generiere Configpath von {} + {}".format(self._conf_path.parent, "{}.config".format(name)))
         new_path = self._conf_path.parent.joinpath("{}.config".format(name))
-        c = config_factory(new_path, self._logger, do_load=True)
+        c = config_factory(pfad=new_path, logger=self._logger, do_load=True, filesystem_listen=not no_watchdog)
         return (c, name)
 
     def stop(self):
@@ -300,8 +300,7 @@ if FILEWATCHING:
 
         def stop(self):
             try:
-                if self._observer.isAlive():
-                    self._observer.stop()
+                self._observer.stop()
                 print("Observer killed")
             except:
                 pass
@@ -310,6 +309,7 @@ if FILEWATCHING:
         def _register_watchdog(self):
             try:
                 self._observer = Observer()
+                self._observer.setName("ConfigWatchdog")
                 self._observer.schedule(self, str(self._conf_path.parent), recursive=False)
                 self._observer.start()
             except OSError:
