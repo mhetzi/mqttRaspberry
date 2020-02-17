@@ -9,13 +9,14 @@ from http import server
 import urllib
 import threading
 import time
+import cgi
 
 try:
     import json as json
 except ImportError:
     import simplejson as json
 
-PAGE = u"""\
+PAGE = u"""
 <html>
 <head>
 <title>PiCamera Plugin</title>
@@ -26,6 +27,7 @@ PAGE = u"""\
 <a href="calibrate.run">Minimalen Block Noise ermitteln</a>
 <a href="zeromap.run">ZeroMap erstellen</a>
 <a href="zeromapUpdate.run"> ZeroMap update </a>
+<a href="uploadTraing.html"> Lerndaten hochladen <a/>
 <a href="stream.mjpg">Stream in Vollbild</a>
 <a href="snap.jpg">Snapshot erstellen</a>
 <a href="info.json">Debug JSON abrufen</a>
@@ -38,7 +40,7 @@ PAGE = u"""\
 </html>
 """
 
-SETTINGS = u"""\
+SETTINGS = u"""
 <html><head><title>PiCamera Plugin Settings</title></head><body><h1>mqtt PiCamera Plugin Settings</h1><p>
 <form action="/updateMotion.data" method="get">  Ueber Blockanzahl
 <input type="number" name="maxCount" value="{}"> ignorieren<br>  Minimale Blockanzahl
@@ -55,6 +57,14 @@ SETTINGS = u"""\
 <input type="submit" value="Übernehmen"></form>
 """
 
+UPLOAD = u"""
+<html><head><title>PiCamera Plugin Training Upload</title></head><body><h1>mqtt PiCamera Plugin Training Upload</h1><p>
+<form action="/uploadTraining.files" method="post" enctype="multipart/form-data">  Ueber Blockanzahl
+<label>Wählen Sie die hochzuladenden Dateien von Ihrem Rechner aus:
+  <input name="datei[]" type="file" multiple> 
+</label>
+<input type="submit" value="Lernen"></form>
+"""
 
 class StreamingOutput(object):
     def __init__(self):
@@ -98,8 +108,6 @@ class StreamingPictureOutput(object):
 
     def do_talkback(self, force=False):
         if not self.requested or force:
-            print("do_talkback({}): wasRequested: {}".format(
-                force, self.requested))
             self.requested = True
             self.talkback()
 
@@ -123,6 +131,7 @@ class StreamingPictureOutput(object):
 def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
     class StreamingHandler(server.BaseHTTPRequestHandler):
         HTML_BACK_TO_MAIN = u"""<html><head><title>PiCamera Plugin</title></head><body><h1><OK Einstellungen gespeichert</h1><p>In Kürze wird die die Hauptseite geladen...<p><meta http-equiv="refresh" content="3;url=/index.html" /><p></body></html>""".encode('utf-8')
+        logger = None
 
         def meassure_call(self, type):
             logging.warning("meassure_call nicht überladen")
@@ -133,6 +142,9 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
 
         def update_settings_call(self, countMaxNoise, countMinNoise, blockMaxNoise, frameToTriggerMotion, framesToNoMotion):
             logging.warning("update_settings_call nicht überladen")
+        
+        def jpegUpload_call(self, data:io.BytesIO):
+            logging.warning("jpegUpload_call ist nicht überladen")
 
         def do_GET(self):
             if self.path == '/':
@@ -254,7 +266,7 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
                     return
                 
                 self.send_response(200)
-                print("Habe von Client {} bekommen.".format(data))
+                self.logger.info("Habe von Client {} bekommen.".format(data))
                 # {'mF': ['2'], 'minBlock': ['2500'], 'minCount': ['3'], 'maxCount': ['6000'], 'sF': ['300']}
                 self.update_settings_call(
                     int(data.get("maxCount", [None])[0]),
@@ -270,7 +282,7 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
                 self.end_headers()
                 self.wfile.write(StreamingHandler.HTML_BACK_TO_MAIN)
             elif self.path == "/settings.html":
-                print("Generiere SETTINGS:")
+                self.logger.debug("Generiere SETTINGS:")
                 content = self.fill_setting_html(SETTINGS)
                 content = content.encode('utf-8')
                 self.send_response(200)
@@ -279,9 +291,70 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
                 self.send_header('Content-Length', len(content))
                 self.end_headers()
                 self.wfile.write(content)
+            elif self.path == "/uploadTraing.html":
+                self.logger.debug("Empfange Daten:")
+                content = UPLOAD.encode("utf-8")
+                self.send_response(200)
+                self.send_header('Age', 0)
+                self.send_header('Content-Type', 'text/html; charset=utf-8')
+                self.send_header('Content-Length', len(content))
+                self.end_headers()
+                self.wfile.write(content)
+
             else:
                 self.send_error(404)
                 self.end_headers()
+
+        def do_POST(self):        
+            r, info = self.deal_post_data()
+            self.logger.info("Anfrage mit erfolg: {} mit {} von {} beendet.".format("JA" if r else "NEIN", str(info), str(self.client_address)))
+            ret = ""
+            if r:
+                ret = self.HTML_BACK_TO_MAIN
+            else:
+                ret = u"""<html><head><title>PiCamera Plugin</title></head><body><h1><Fehler!</h1><p>In Kürze wird die die Hauptseite geladen...<p><meta http-equiv="refresh" content="3;url=/index.html" /><p></body></html>""".encode('utf-8')
+            self.send_response(200)
+            self.send_header("Content-type", "text/html")
+            self.send_header("Content-Length", len(ret))
+            self.end_headers() 
+            self.wfile.write(ret)
+
+        def deal_post_data(self):
+            try:
+                ctype, pdict = cgi.parse_header(self.headers['Content-Type'])
+                pdict['boundary'] = bytes(pdict['boundary'], "utf-8")
+                pdict['CONTENT-LENGTH'] = int(self.headers['Content-Length'])
+                if ctype == 'multipart/form-data':
+                    form = cgi.FieldStorage( fp=self.rfile, headers=self.headers, environ={'REQUEST_METHOD':'POST', 'CONTENT_TYPE':self.headers['Content-Type'], })
+                    #self.logger.debug(type(form))
+                    try:
+                        if isinstance(form.list, list):
+                            for v in form.list:
+                                bio = io.BytesIO()
+                                bio.write( v.file.read() )
+                                self.jpegUpload_call(bio)
+                        elif isinstance(form.file, list):
+                            for record in form.file:
+                                bio = io.BytesIO()
+                                bio.write( record.file.read() )
+                                self.jpegUpload_call(bio)
+                        else:
+                            bio = io.BytesIO()
+                            bio.write( form.file.read() )
+                            self.jpegUpload_call(bio)
+                    except IOError:
+                        self.logger.exception("Fehler beim download der daten!")
+                        return (False, "IOError")
+                self.jpegUpload_call(None)
+                return (True, "Files uploaded")
+            except:
+                self.logger.exception("Fehler beim verarbeiten der Lerndaten")
+                try:
+                    import ptvsd
+                    ptvsd.break_into_debugger()
+                except:
+                    pass
+                return (False, "General Error")
     return StreamingHandler
 
 

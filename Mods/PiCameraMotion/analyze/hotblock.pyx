@@ -1,3 +1,5 @@
+# cython: language_level=3
+# cython: cdivision=True
 import numpy as np
 cimport numpy as np
 cimport cython
@@ -5,6 +7,7 @@ from libc.stdint cimport uintptr_t
 from libc.stdlib cimport malloc, free
 from libc.string cimport memset
 from cpython.mem cimport PyMem_Malloc, PyMem_Realloc, PyMem_Free
+from libc.math cimport floor, ceil, round
 
 cdef packed struct sBLOCK:
     np.int8_t x
@@ -93,8 +96,10 @@ cdef class ZeroMap:
                 PyMem_Free(self.zeroMapData[r])
             PyMem_Free(self.zeroMapData)
 
+    @cython.boundscheck(False) # turn off bounds-checking for entire function
+    @cython.wraparound (False) # turn off negative index wrapping for entire function
     def trainZeroMap(self, np.ndarray[BLOCK, ndim=2] arr):
-        hasChanged = False
+        cdef bint hasChanged = False
         cdef np.uint16_t v = 0
 
         if self.zeroMapData != NULL:
@@ -102,13 +107,15 @@ cdef class ZeroMap:
                 for c in range(self.cols):
                     v = arr[r,c].sad
                     if v > self.zeroMapData[r][c]:
-                        self.zeroMapData[r][c] = v + ( v / 100 * 15 )
+                        self.zeroMapData[r][c] =  <np.uint16_t> ceil(v + ( v / 100 * 15 ))
                         #print(self.zeroMapData[r][c])
                         hasChanged = True
 
         return hasChanged
 
-    def saveZeroMap(self):
+    @cython.boundscheck(False) # turn off bounds-checking for entire function
+    @cython.wraparound (False) # turn off negative index wrapping for entire function
+    def saveZeroMap(self) -> dict:
         if self.zeroMapData == NULL:
             print("!!! SAVE FAILED zeroMapData is NULL !!!")
             return {}
@@ -119,6 +126,25 @@ cdef class ZeroMap:
                 arr[str(r)][str(c)] = self.zeroMapData[r][c]
                 #print(self.zeroMapData[r][c])
         return arr
+
+    @cython.boundscheck(False) # turn off bounds-checking for entire function
+    @cython.wraparound (False) # turn off negative index wrapping for entire function
+    def trainConvertToDict(self, np.ndarray[BLOCK, ndim=2] arr):
+        d = {}
+        for r in range(self.rows):
+            d[str(r)] = {}
+            for c in range(self.cols):
+                d[str(r)][str(c)] = arr[r,c].sad
+                #print(self.zeroMapData[r][c])
+        return d
+    
+    def trainFromDict(self, d: dict):
+        for r in range(self.rows):
+            for c in range(self.cols):
+                v = d[str(r)][str(c)]
+                if v > self.zeroMapData[r][c]:
+                    self.zeroMapData[r][c] = <np.uint16_t> ceil(v + ( v / 100 * 15 ))
+
 
     def loadZeroMap(self, arr: dict):
         if self.zeroMapData == NULL:

@@ -8,9 +8,11 @@ import Tools.PluginManager as pm
 import paho.mqtt.client as mclient
 
 from  Tools.Config import BasicConfig, PluginConfig
+from Tools.ResettableTimer import ResettableTimer
 import Tools.Autodiscovery as autodisc
 import logging
 import io
+import shutil
 
 try:
     import picamera as cam
@@ -35,6 +37,17 @@ except ImportError as ie:
         err.try_install_package('numpy', throw=ie, ask=True)
     except err.RestartError:
         import numpy
+
+try:
+    import piexif
+    import piexif.helper
+except ImportError as ie:
+    try:
+        import Tools.error as err
+        err.try_install_package('piexif', throw=ie, ask=True)
+    except err.RestartError:
+        import piexif
+        import piexif.helper
 
 import threading
 import Mods.PiCameraMotion.etc as etc
@@ -224,6 +237,7 @@ class PiMotionMain(threading.Thread):
         self._pluginManager = p
 
     def stop(self):
+        self.stop_record()
         self._doExit = True
         if self._pilQueue is not None and self._pilThread is not None:
             self.__logger.info("Stoppe PIL queue...")
@@ -237,7 +251,6 @@ class PiMotionMain(threading.Thread):
             self._http_server.stop()
         if self._rtsp_split is not None:
             self._rtsp_split.shutdown()
-        self.stop_record()
         self.__client.publish(self._motion_topic.ava_topic,
                               "offline", retain=True)
 
@@ -331,10 +344,11 @@ class PiMotionMain(threading.Thread):
                         self._config.get("http/port", 8083)
                     )   
                     streamingHandle = httpc.makeStreamingHandler(http_out, self._jsonOutput)
+                    streamingHandle.logger = self.__logger.getChild("HTTPHandler")
                     streamingHandle.meassure_call = lambda s,i: self.meassure_call(i)
-                    streamingHandle.fill_setting_html = lambda s, html: self.fill_settings_html(
-                        html)
+                    streamingHandle.fill_setting_html = lambda s, html: self.fill_settings_html(html)
                     streamingHandle.update_settings_call = lambda s, a,b,c,d,e: self.update_settings_call(a,b,c,d,e)
+                    streamingHandle.jpegUpload_call = lambda s,d: self.parseTrainingPictures(d)
 
                     server = httpc.StreamingServer(address, streamingHandle)
                     server.logger = self.__logger.getChild("HTTP_srv")
@@ -349,7 +363,13 @@ class PiMotionMain(threading.Thread):
 
                 anal.disableAnalyzing = not self._config.get("motion/doAnalyze", True)
 
-                firstFrames = True
+                def first_run():
+                    time.sleep(2)
+                    self.__logger.info(
+                        "Stream wird sich normalisiert haben. Queue wird angeschlossen...")
+                    anal.run_queue()
+                threading.Thread(target=first_run, name="Analyzer bootstrap", daemon=True).run()
+                
                 while not self._doExit:
                     try:
                         camera.wait_recording(5)
@@ -359,16 +379,6 @@ class PiMotionMain(threading.Thread):
 
                         if anal.disableAnalyzing:
                             camera.annotate_text = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-                        if firstFrames:
-                            def first_run():
-                                self.__logger.info(
-                                    "Stream wird sich normalisiert haben. Queue wird angeschlossen...")
-                                anal.run_queue()
-                            t = threading.Thread(target=first_run, name="Analyzer bootstrap")
-                            t.setDaemon(True)
-                            t.run()
-                            firstFrames = False
                     except:
                         self.__logger.exception("Kamera Fehler")
                         exit(-1)
@@ -446,10 +456,11 @@ class PiMotionMain(threading.Thread):
                 self._postRecordTimer.cancel()
                 self._postRecordTimer = None
                 self.__logger.debug("Aufname timer wird zurückgesetzt")
-            self._postRecordTimer = threading.Timer(interval=self._config.get(
-                "motion/recordPost", 1), function=self.stop_record)
-            self._postRecordTimer.setName("RecordTimer")
-            self._postRecordTimer.start()
+            self._postRecordTimer = ResettableTimer(
+                interval=self._config.get("motion/recordPost", 1),
+                function=self.stop_record,
+                autorun=True
+            )
             self.__logger.debug("Aufnahme wird in {} Sekunden beendet.".format(
                 self._config.get("motion/recordPost", 1)))
 
@@ -460,7 +471,7 @@ class PiMotionMain(threading.Thread):
         # x y val count
         self._lastState = {"motion": 1 if self._inMotion else 0, "x": data["hotest"][0],
                            "y": data["hotest"][1], "val": data["hotest"][2], "c": data["noise_count"], "dbg_on": self._sendDebug,
-                           "brightness": self._analyzer.brightness()}
+                           "ext": data["extendet"], "brightness": data["brightness"]}
         self._jsonOutput.write(self._lastState)
         self.update_anotation()
         if self._analyzer is not None and not self._analyzer._calibration_running:
@@ -515,18 +526,19 @@ class PiMotionMain(threading.Thread):
             ).clip(0, 255).astype(np.uint8)
             Bimg = Image.fromarray(d)
             img = Bimg.convert(mode="RGB", dither=Image.FLOYDSTEINBERG)
-            self.__logger.debug(data)
+            #self.__logger.debug(data)
             if data is not None:
                 ig = ImageDraw.Draw(img)
                 ig.point(
                     [(data["object"][4]["col"], data["object"][4]["row"])],
                     fill=(255, 0, 0, 200)
                 )
-            path = self._config.get("record/path", "~/Videos")
-            if not path.endswith("/"):
-                path += "/"
-            path = "{}/magnitude/{}.png".format(
-                path, dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            path = pathlib.Path(self._config.get("record/path", "~/Videos"))
+            path = path.joinpath(
+                "magnitude",
+                "{}.jpeg".format(dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            )
+            path = path.expanduser().absolute()
             self.__logger.debug('Writing %s' % path)
             if background is not None:
                 self.__logger.debug("Habe Snapshot. Vermische Bilder...")
@@ -535,13 +547,76 @@ class PiMotionMain(threading.Thread):
                 background = background.convert("RGBA")
                 img = Image.blend(background, foreground, 0.5)
             
+            exif_bytes = None
             if data is not None:
                 draw = ImageDraw.Draw(img)
                 draw.text((0, 0), "X: {} Y: {} VAL: {} C: {}".format(data["hotest"][0], data["hotest"][1], data["hotest"][2], data["noise_count"]),
                         fill=(255, 255, 0, 155), font=self._image_font)
-                draw.text((20, 20), "R: {} C: {}".format(data["object"][4]["row"], data["object"][4]["col"]),
+                draw.text((0, 20), "R: {} C: {}".format(data["object"][4]["row"], data["object"][4]["col"]),
                         fill=(255, 255, 0, 155), font=self._image_font)
-            img.save(path)
+                draw.text((0, 40), "B: {} Zdata: {}".format(data.get("brightness", -1), data.get("zmdata", "KEINE")), fill=(255, 255, 0, 155), font=self._image_font)
+                draw.text((0,60), dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), fill=(255, 255, 0, 155), font=self._image_font)
+
+            with path.open(mode="wb") as file:
+                if data is not None:
+                    cimg = img.convert('RGB')
+                    bio = io.BytesIO()
+                    cimg.save(bio, "jpeg")
+
+                    encoded = data #### OK Daten sind zu groß für exif villeicht anhängen?
+                    extendet_data = {}
+                    try:
+                        extendet_data = data.get("exif_zeromap", None)
+                        if extendet_data is not None:
+                            del data["exif_zeromap"]
+                            data["extendet_data_appendet"] = True
+                        encoded = json.dumps(data)
+                        user_comment = piexif.helper.UserComment.dump(encoded, encoding="unicode")
+
+                        bio.seek(0)
+                        exif_dict = piexif.load(bio.read())
+                        exif_dict["Exif"][piexif.ExifIFD.UserComment] = user_comment
+                        exif_bytes = piexif.dump(exif_dict)
+                    except:
+                        self.__logger.exception("exif_json failed")
+
+                    if exif_bytes is not None:
+                        bio = io.BytesIO()
+                        cimg.save(bio, "jpeg", exif=exif_bytes)
+                    if extendet_data is not None and len(extendet_data.keys()) > 0:
+                        bio.write(b"=======EXTENDET_DATA=======") 
+                        js_Data = json.dumps(extendet_data)
+                        bio.write(js_Data.encode("utf-8"))
+
+                    bio.seek(0)
+                    shutil.copyfileobj(bio, file)
+
+    def getExtenetData(self, data: io.BytesIO):
+        data.seek(0)
+        buf = data.read()
+        buf = buf.split(b"=======EXTENDET_DATA=======")
+        if len(buf) > 1:
+            js = json.loads(buf[1])
+            return js
+        return {}
+
+
+    def parseTrainingPictures(self, data: io.BytesIO):
+        if data is None:
+            self._analyzer.trainZeroMap(data=False)
+            return
+        try:
+            data.seek(0)
+            exif_dict = piexif.load(data.read())
+            ucb = exif_dict["Exif"][piexif.ExifIFD.UserComment]
+            ucr = piexif.helper.UserComment.load(ucb)
+            ucj = json.loads(ucr)
+            if ucj.get("extendet_data_appendet", False):
+                ucj["exif_zeromap"] = self.getExtenetData(data)
+                self._analyzer.trainZeroMap(data=ucj)
+        except:
+            self.__logger.exception("parseTrainingPictures()")
+
 
     def fill_settings_html(self, html: str):
         cv = self._camera.color_effects

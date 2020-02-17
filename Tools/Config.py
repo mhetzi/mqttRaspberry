@@ -65,7 +65,7 @@ class BasicConfig:
         self._conf_path = pfad.expanduser()
         self._logger = logger.getChild("BasicConfig")
         self._config = {}
-        if do_load: self.load()
+        if do_load: self.load(fileNotFoundOK=True)
         if filesystem_listen and FILEWATCHING:
             self._register_watchdog()
         elif filesystem_listen and not FILEWATCHING:
@@ -77,7 +77,7 @@ class BasicConfig:
         self.autoSave = rtimer.ResettableTimer(30,function=self.save, userval=None, autorun=False)
         self.file_is_dirty = False
 
-    def load(self) -> None:
+    def load(self, fileNotFoundOK=True) -> None:
         try:
             self._logger.info("[1/2] Öffne Konfigurationsdatei zum laden " + str(self._conf_path.absolute()))
             self._config = None
@@ -94,10 +94,15 @@ class BasicConfig:
                 with backup.open("r") as json_file:
                     self._config = json.load(json_file)
                     self._logger.info("[4/4] Geladen...")
-            except:
-                self._logger.error("[4/4] Backuo konne ebenfalls nicht geladen werden!")
+            except FileNotFoundError as e:
+                if not fileNotFoundOK:
+                    raise e
+                else:
+                    self._logger.error("[4/4] Backup konne ebenfalls nicht geladen werden!")
+                    self._config = {}
+            except Exception:
+                self._logger.error("[4/4] Backup konne ebenfalls nicht geladen werden!")
                 self._config = {}
-
 
         if self._config.get("PLUGINS", None) is None:
             self._config["PLUGINS"] = {}
@@ -254,7 +259,7 @@ class BasicConfig:
                 del d
             i += 1
     
-    def getIndependendFile(self, name:str, no_watchdog=False):
+    def getIndependendFile(self, name:str, no_watchdog=False, do_load=True):
         if name is None:
             self._logger.info("Kein Name angegeben.")
             import uuid
@@ -263,7 +268,7 @@ class BasicConfig:
             self._logger.info("Name {} wurde generiert.".format(name))
         self._logger.debug("Generiere Configpath von {} + {}".format(self._conf_path.parent, "{}.config".format(name)))
         new_path = self._conf_path.parent.joinpath("{}.config".format(name))
-        c = config_factory(pfad=new_path, logger=self._logger, do_load=True, filesystem_listen=not no_watchdog)
+        c = config_factory(pfad=new_path, logger=self._logger, do_load=do_load, filesystem_listen=not no_watchdog)
         return (c, name)
 
     def stop(self):
@@ -272,24 +277,24 @@ class BasicConfig:
 
 if FILEWATCHING:
     class FileWatchingConfig(watchevents.FileSystemEventHandler, BasicConfig):
-        def load(self, reload=False):
+        def load(self, reload=False, fileNotFoundOK=True):
             if self._is_in_saving:
                 return
             if reload:
                 self._logger.info("Konfiguration wird neu geladen. Wurde verändert.")
                 self.pre_reload()
-                super().load()
+                super().load(fileNotFoundOK=fileNotFoundOK)
                 self.post_reload()
             else:
                 super().load()
 
         def on_modified(self, event: watchevents.DirModifiedEvent):
             if self._conf_path.samefile(event.src_path):
-                self.load(True)
+                self.load(reload=True, fileNotFoundOK=True)
 
         def on_moved(self, event: watchevents.DirMovedEvent):
             if self._conf_path.samefile(event.src_path):
-                self.load(True)
+                self.load(reload=True, fileNotFoundOK=True)
 
         def __init__(self, pfad: pathlib.Path, logger: logging.Logger, do_load=False, filesystem_listen=True):
             super().__init__(pfad, logger, do_load, filesystem_listen)
