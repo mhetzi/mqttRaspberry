@@ -53,7 +53,7 @@ class PluginManager:
                     try:
                         newNextRun = schedule.next_run()
                         if newNextRun != nextRun:
-                            self.logger.info("Der nächste SchedulerThread Job läuft um {}".format(newNextRun))
+                            #self.logger.info("Der nächste SchedulerThread Job läuft um {}".format(newNextRun))
                             nextRun = newNextRun
                         schedule.run_pending()
                         time.sleep(interval)

@@ -280,16 +280,12 @@ class PiMotionMain(threading.Thread):
             
             with analyzers.Analyzer(camera, logger=self.__logger.getChild("Analyzer"), config=self._config) as anal:
                 self.__logger.debug("Analyzer erstellt")
-                anal.frameToTriggerMotion = self._config.get(
-                    "motion/motion_frames", 4)
-                anal.framesToNoMotion = self._config.get(
-                    "motion/still_frames", 4)
-                anal.blockMinNoise = self._config.get(
-                    "motion/blockMinNoise", 0)
-                anal.countMinNoise = self._config.get(
-                    "motion/frameMinNoise", 0)
-                anal.countMaxNoise = self._config.get(
-                    "motion/frameMaxNoise", 0)
+                anal.frameToTriggerMotion = self._config.get("motion/motion_frames", 4)
+                anal.framesToNoMotion = self._config.get("motion/still_frames", 4)
+                anal.blockMinNoise = self._config.get("motion/blockMinNoise", 0)
+                anal.countMinNoise = self._config.get("motion/frameMinNoise", 0)
+                anal.countMaxNoise = self._config.get("motion/frameMaxNoise", 0)
+                anal.lightDiffBlock = self._config.get("motion/lightDiffBlock", -1)
                 anal.motion_call = lambda motion, data, mes: self.motion(
                     motion, data, mes)
                 anal.motion_data_call = lambda data: self.motion_data(data)
@@ -347,7 +343,7 @@ class PiMotionMain(threading.Thread):
                     streamingHandle.logger = self.__logger.getChild("HTTPHandler")
                     streamingHandle.meassure_call = lambda s,i: self.meassure_call(i)
                     streamingHandle.fill_setting_html = lambda s, html: self.fill_settings_html(html)
-                    streamingHandle.update_settings_call = lambda s, a,b,c,d,e: self.update_settings_call(a,b,c,d,e)
+                    streamingHandle.update_settings_call = lambda s, a,b,c,d,e,f: self.update_settings_call(a,b,c,d,e,f)
                     streamingHandle.jpegUpload_call = lambda s,d: self.parseTrainingPictures(d)
 
                     server = httpc.StreamingServer(address, streamingHandle)
@@ -471,7 +467,7 @@ class PiMotionMain(threading.Thread):
         # x y val count
         self._lastState = {"motion": 1 if self._inMotion else 0, "x": data["hotest"][0],
                            "y": data["hotest"][1], "val": data["hotest"][2], "c": data["noise_count"], "dbg_on": self._sendDebug,
-                           "ext": data["extendet"], "brightness": data["brightness"]}
+                           "ext": data["extendet"], "brightness": data["brightness"], "lightDiff": data["lightDiff"]}
         self._jsonOutput.write(self._lastState)
         self.update_anotation()
         if self._analyzer is not None and not self._analyzer._calibration_running:
@@ -555,7 +551,8 @@ class PiMotionMain(threading.Thread):
                 draw.text((0, 20), "R: {} C: {}".format(data["object"][4]["row"], data["object"][4]["col"]),
                         fill=(255, 255, 0, 155), font=self._image_font)
                 draw.text((0, 40), "B: {} Zdata: {}".format(data.get("brightness", -1), data.get("zmdata", "KEINE")), fill=(255, 255, 0, 155), font=self._image_font)
-                draw.text((0,60), dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), fill=(255, 255, 0, 155), font=self._image_font)
+                draw.text((0,60), "BDiff: {}".format(data["lightDiff"]), fill=(255, 255, 0, 155), font=self._image_font)
+                draw.text((0,80), dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), fill=(255, 255, 0, 155), font=self._image_font)
 
             with path.open(mode="wb") as file:
                 if data is not None:
@@ -628,6 +625,7 @@ class PiMotionMain(threading.Thread):
                 self._analyzer.blockMinNoise,
                 self._analyzer.frameToTriggerMotion,
                 self._analyzer.framesToNoMotion,
+                self._analyzer.lightDiffBlock,
                 self._camera.shutter_speed,
                 self._camera.exposure_speed,
                 self._camera.exposure_mode,
@@ -636,16 +634,20 @@ class PiMotionMain(threading.Thread):
             )
         return html
 
-    def update_settings_call(self, countMaxNoise, countMinNoise, blockMinNoise, frameToTriggerMotion, framesToNoMotion):
+    def update_settings_call(self, countMaxNoise, countMinNoise, blockMinNoise, frameToTriggerMotion, framesToNoMotion, lightDiff):
+        self.__logger.debug("HTTP Einstellungen werden gespeichert...")
         self._analyzer.countMaxNoise       = countMaxNoise
-        self._analyzercountMinNoise        = countMinNoise
-        self._analyzerblockMinNoise        = blockMinNoise
-        self._analyzerframeToTriggerMotion = frameToTriggerMotion
-        self._analyzerframesToNoMotion     = framesToNoMotion
+        self._analyzer.countMinNoise        = countMinNoise
+        self._analyzer.blockMinNoise        = blockMinNoise
+        self._analyzer.frameToTriggerMotion = frameToTriggerMotion
+        self._analyzer.framesToNoMotion     = framesToNoMotion
+        self._analyzer.lightDiffBlock      = lightDiff
+
 
         self._config["motion/motion_frames"] = frameToTriggerMotion
         self._config["motion/still_frames" ] = framesToNoMotion
         self._config["motion/blockMinNoise"] = blockMinNoise
         self._config["motion/frameMinNoise"] = countMinNoise
         self._config["motion/frameMaxNoise"] = countMaxNoise
+        self._config["motion/lightDiffBlock"] = lightDiff
         self._config.save()

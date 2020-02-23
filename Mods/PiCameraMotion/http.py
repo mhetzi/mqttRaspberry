@@ -47,7 +47,8 @@ SETTINGS = u"""
 <input type="number" name="minCount" value="{}"><br>  Minimaler Veränderungswert
 <input type="number" name="minBlock" value="{}"><br>Bilder bis zur Bewegungserkennung
 <input type="number" name="mF" value="{}"><br>  Bilder ohne Bewegung
-<input type="number" name="sF" value="{}"><br>  Shutterspeed
+<input type="number" name="sF" value="{}"><br>  Zu hohe Helligkeitsänderung
+<input type="number" name="lb" value="{}"> ignorieren<br>  Shutterspeed
 <input type="number" name="shutter" value="{}"><br> exposure
 <input type="number" name="exposure ReadOnly" value="{}"><br> exposure_mode
 <input type="" name="exposure_mode" value="{}"><br> color_effect_u
@@ -140,7 +141,7 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
             logging.warning("fill_setting_html nicht überladen")
             return html
 
-        def update_settings_call(self, countMaxNoise, countMinNoise, blockMaxNoise, frameToTriggerMotion, framesToNoMotion):
+        def update_settings_call(self, countMaxNoise, countMinNoise, blockMaxNoise, frameToTriggerMotion, framesToNoMotion, lightBlock):
             logging.warning("update_settings_call nicht überladen")
         
         def jpegUpload_call(self, data:io.BytesIO):
@@ -273,7 +274,8 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
                     int(data.get("minCount", [None])[0]),
                     int(data.get("minBlock", [None])[0]),
                     int(data.get("mF"      , [None])[0]),
-                    int(data.get("sF"      , [None])[0])
+                    int(data.get("sF"      , [None])[0]),
+                    int(data.get("lb"      , [None])[0])
                 )
                 self.send_response(200)
                 self.send_header('Age', 0)
