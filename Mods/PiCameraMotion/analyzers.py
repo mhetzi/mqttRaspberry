@@ -32,7 +32,7 @@ class Analyzer(cama.PiAnalysisOutput):
     countMaxNoise = -1
     framesToNoMotion = 0
     frameToTriggerMotion = 0
-    lightDiffBlock = 0
+    lightDiffBlock = 0.0
     _calibration_running = False
     _thread = None
     __thread_do_run = True
@@ -79,6 +79,7 @@ class Analyzer(cama.PiAnalysisOutput):
             if self.zeromap_py["enabled"]:
                 self.logger.debug("Erstelle C Object for zeroMap...")
                 self.__zeromap_data = Mods.PiCameraMotion.analyze.hotblock.ZeroMap(self.rows, self.cols)
+                self.__zeromap_data.activateLastFrame(True)
         self.analyze(
             np.frombuffer(b, dtype=cama.motion_dtype).
             reshape((self.rows, self.cols)))
@@ -167,13 +168,22 @@ class Analyzer(cama.PiAnalysisOutput):
             return
         not_subtracted = a
         if self.zeromap_py["enabled"] and self.__zeromap_data != None and not self.zeromap_py["isBuilding"]:
-            a = self.__zeromap_data.subtractMask(a)
+            try:
+                a = self.__zeromap_data.subtractMask(a)
+            except:
+                self.logger.exception("Subtract failed")
+                    
         hottestBlock = Mods.PiCameraMotion.analyze.hotblock.hotBlock(
             a, self.rows, self.cols, self.blockMinNoise)
         try:
             self._queue.put_nowait((hottestBlock, a, not_subtracted))
         except queue.Full:
             self.logger.debug("Queue ist voll")
+            self.states["still_frames"] = 0
+            self.states["motion_frames"] = 0
+            try:
+                self.motion_call(False, self.states, False)
+            except:pass
 
     def trainZeroMap(self, update=False, data=None):
         with self._analyzer_lock:
@@ -211,32 +221,6 @@ class Analyzer(cama.PiAnalysisOutput):
                 self.states["lowest_brightness"] = 1000000
                 self.states["highest_brightness"] = 0
                 self.states["zmdata"] = None
-
-
-    def __calibrate(self, hottestBlock: dict):
-        self.states["extendet"] = "Kalibiere..."
-        if self.countMinNoise <= hottestBlock[3] and self.states["motion_frames"] >= self.frameToTriggerMotion:
-            add = math.floor((hottestBlock[3] - self.blockMinNoise) / 1.25)
-            self.countMinNoise += add if add >= 2 else 2
-            if random.randrange(0, 100) < 25:
-                self.blockMinNoise -= 35
-                if self.blockMinNoise < 0:
-                    self.blockMinNoise = 0
-            self.states["still_frames"] = 0
-            self.states["motion_frames"] = 0
-            self.logger.info(
-                "Kalibriere derzeit bei {} +countMinNoise".format(self.countMinNoise))
-        if hottestBlock[2] >= self.blockMinNoise and self.states["motion_frames"] >= self.frameToTriggerMotion:
-            add = math.floor((hottestBlock[2] - self.blockMinNoise) / 5)
-            self.blockMinNoise += add if add >= 2 else 2
-            if random.randrange(0, 100) < 25:
-                self.countMinNoise -= 2
-                if self.countMinNoise < 0:
-                    self.countMinNoise = 0
-            self.states["still_frames"] = 0
-            self.states["motion_frames"] = 0
-            self.logger.info(
-                "Kalibriere derzeit bei {} +blockNoise".format(self.blockMinNoise))
     
     def brightness(self):
         frame = self.cal_getMjpeg_Frame()
@@ -301,9 +285,6 @@ class Analyzer(cama.PiAnalysisOutput):
                 except queue.Empty:
                     self.logger.debug("Queue ist leer")
             self.logger.debug("QueueReader läuft")
-            if self.blockMinNoise < 0 and self.countMinNoise < 0:
-                self._calibration_running = True
-                self.blockMinNoise = 0
 
             while True:
                 with self._analyzer_lock:
@@ -318,21 +299,12 @@ class Analyzer(cama.PiAnalysisOutput):
 
                 if self.zeromap_py["isBuilding"]:
                     self.__train_zero(a)
-                    #self.logger.debug("still_frame {} von {}".format(
-                    #    self.states["still_frames"], self.framesToNoMotion))
 
                 elif self.countMinNoise > hottestBlock[3] and self.countMaxNoise > hottestBlock[3] and hottestBlock[2] < self.blockMinNoise:
                     self.states["still_frames"] += 1
                     self.states["motion_frames"] = 0
-                    #if self._calibration_running:
-                    #    self.logger.debug("still_frame {} von {}".format(
-                    #        self.states["still_frames"], self.framesToNoMotion))
                 else:
                     self.states["motion_frames"] += 1
-                    #self.logger.debug("Bewegung! {} von {}".format(
-                    #    self.states["motion_frames"], self.frameToTriggerMotion))
-                    if self._calibration_running:
-                        self.__calibrate(hottestBlock)
                     try:
                         if self.states["motion_frames"] >= self.frameToTriggerMotion and not self.__motion_triggered:
                             self.pil_magnitude_save_call(a, self.__old_States)
@@ -381,7 +353,7 @@ class Analyzer(cama.PiAnalysisOutput):
                             ld = self.states["brightness"] - new_light
                             if ld < 0:
                                 ld = ld *-1
-                            if self.lightDiffBlock > 0 and self.lightDiffBlock >= new_light:
+                            if self.lightDiffBlock > -1 and self.lightDiffBlock >= ld:
                                 self.logger.debug("Brightness changed too much!")
                                 self.__motion_triggered = False
                             else:
@@ -419,10 +391,11 @@ class Analyzer(cama.PiAnalysisOutput):
             try:
                 self._queue.get_nowait()
             except queue.Empty:
-                pass
+                return
 
     def stop_queue(self):
         self.__thread_do_run = False
         self._queue.put_nowait((None, None, None))
         schedule.cancel_job(self._shed_task)
         self.config["zeroMap"] = self.zeromap_py
+        self.motion_call(False, self.states, False)

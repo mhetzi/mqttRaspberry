@@ -76,25 +76,38 @@ def hotBlock(a, np.int16_t rows, np.int16_t cols, np.int16_t minNoise):
     return meh.b.x, meh.b.y, meh.b.sad, meh.c, meh
 
 cdef class ZeroMap:
+
     cdef np.uint16_t** zeroMapData
+    cdef np.uint16_t** lastFrame
     cdef np.int16_t rows, cols
+    cdef bint subtractLast
 
     def __init__(self, rows, cols):
-        self.zeroMapData = NULL
         cdef size_t size = sizeof(np.uint16_t) * rows * cols
 
         self.rows = rows
         self.cols = cols
         self.zeroMapData = <np.uint16_t**> PyMem_Malloc(sizeof(np.uint16_t*) * rows)
+        self.lastFrame = <np.uint16_t**> PyMem_Malloc(sizeof(np.uint16_t*) * rows)
+        
         if self.zeroMapData != NULL:
             for r in range(self.rows):
                 self.zeroMapData[r] =  <np.uint16_t*> PyMem_Malloc(sizeof(np.uint16_t) * cols)
+                self.lastFrame[r] =  <np.uint16_t*> PyMem_Malloc(sizeof(np.uint16_t) * cols)
 
     def __del__(self):
         if self.zeroMapData != NULL:
             for r in range(self.rows):
                 PyMem_Free(self.zeroMapData[r])
             PyMem_Free(self.zeroMapData)
+        
+        if self.lastFrame != NULL:
+            for r in range(self.rows):
+                PyMem_Free(self.lastFrame[r])
+            PyMem_Free(self.lastFrame)
+    
+    def activateLastFrame(self, bint active):
+        self.subtractLast = active
 
     @cython.boundscheck(False) # turn off bounds-checking for entire function
     @cython.wraparound (False) # turn off negative index wrapping for entire function
@@ -159,15 +172,23 @@ cdef class ZeroMap:
 
     @cython.boundscheck(False) # turn off bounds-checking for entire function
     @cython.wraparound (False) # turn off negative index wrapping for entire function
-    def subtractMask(self, np.ndarray[BLOCK, ndim=2] arr):
+    cdef _subtractMask(self, np.ndarray[BLOCK, ndim=2] arr):
         if self.zeroMapData == NULL:
             return arr
 
         cdef np.int32_t v = 0
         for r in range(self.rows):
             for c in range(self.cols):
+                if self.subtractLast > 0:
+                    v -= self.lastFrame[r][c]
+                    self.lastFrame[r][c] = arr[r,c].sad
+                    if v < 0:
+                        v *= -1
                 v = arr[r,c].sad - self.zeroMapData[r][c]
                 if v < 0:
                     v = 0
                 arr[r,c].sad = v
         return arr
+
+    def subtractMask(self, np.ndarray[BLOCK, ndim=2] arr):
+        return self._subtractMask(arr)

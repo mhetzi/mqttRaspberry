@@ -55,6 +55,10 @@ import Mods.PiCameraMotion.http as httpc
 
 import Mods.PiCameraMotion.rtsp as rtsp
 import Mods.PiCameraMotion.analyzers as analyzers
+
+from Mods.PiCameraMotion.gstreamer.SplitStream import CameraSplitter
+from Mods.PiCameraMotion.gstreamer.RTSPServer import GstServer, PiCameraMediaFactory
+from Mods.PiCameraMotion.gstreamer.PreRecordBuffer import PreRecordBuffer
 try:
     import pyximport
 except ImportError as ie:
@@ -90,13 +94,14 @@ class PiMotionMain(threading.Thread):
     _debug_topic = None
     _do_record_topic = None
     _lastState = {"motion": 0, "x": 0, "y": 0, "val": 0, "c": 0}
-    _rtsp_recorder = None
     _analyzer = None
     _postRecordTimer = None
     _pilQueue = None
     _pilThread = None
     _http_out = None
     _sendDebug = False
+    _splitStream = None
+    _record_factory = None
 
     def __init__(self, client: mclient.Client, opts: BasicConfig, logger: logging.Logger, device_id: str):
         threading.Thread.__init__(self)
@@ -131,6 +136,7 @@ class PiMotionMain(threading.Thread):
         )
 
         self._pilQueue = queue.Queue(5)
+        self._splitStream = None  
 
     def set_do_record(self, recording: bool):
         self.__logger.info(
@@ -148,8 +154,10 @@ class PiMotionMain(threading.Thread):
     def on_message(self, client, userdata, message: mclient.MQTTMessage):
         if self._do_record_topic.command == message.topic:
             if message.payload.decode('utf-8') == "ON":
-                self.set_do_record(True)
+                #self.set_do_record(True)
+                self.do_record(True)
             elif message.payload.decode('utf-8') == "OFF":
+                #self.do_record(False)
                 self.set_do_record(False)
 
     def on_dbg_message(self, client, userdata, message: mclient.MQTTMessage):
@@ -249,8 +257,6 @@ class PiMotionMain(threading.Thread):
             self._rtsp_server.stopServer()
         if self._http_server is not None:
             self._http_server.stop()
-        if self._rtsp_split is not None:
-            self._rtsp_split.shutdown()
         self.__client.publish(self._motion_topic.ava_topic,
                               "offline", retain=True)
 
@@ -262,123 +268,132 @@ class PiMotionMain(threading.Thread):
             self._pilThread.join(10)
             self._pilQueue = None
 
+    def setupAnalyzer(self, camera: cam.PiCamera):
+        anal = analyzers.Analyzer(camera, logger=self.__logger.getChild("Analyzer"), config=self._config)
+        # SET SETTINGS
+        anal.frameToTriggerMotion = self._config.get("motion/motion_frames", 4)
+        anal.framesToNoMotion = self._config.get("motion/still_frames", 4)
+        anal.blockMinNoise = self._config.get("motion/blockMinNoise", 0)
+        anal.countMinNoise = self._config.get("motion/frameMinNoise", 0)
+        anal.countMaxNoise = self._config.get("motion/frameMaxNoise", 0)
+        anal.lightDiffBlock = self._config.get("motion/lightDiffBlock", -1)
+        anal.zeromap_py = self._config.get("zeroMap", {"enabled": False, "isBuilding": False, "dict": None})
+        anal.disableAnalyzing = not self._config.get("motion/doAnalyze", True)
+        # SET CALLBACKS
+        anal.motion_call = lambda motion, data, mes: self.motion(motion, data, mes)
+        anal.motion_data_call = lambda data: self.motion_data(data)
+        anal.pil_magnitude_save_call = lambda img, data: self.pil_magnitude_save_call(img, data)
+        anal.cal_getMjpeg_Frame = self.getMjpegFrame
+        self._analyzer = anal
+
+    def setupRTSP(self):
+        factory = PiCameraMediaFactory(
+            fps=self._config["camera/fps"],
+            CamName=self._config["motion/sensorName"],
+            log=self.__logger,
+            splitter=self._splitStream #,wh=(self._config["camera/width"], self._config["camera/height"])
+        )
+        
+        server = GstServer(factory=factory, logger=self.__logger)
+        server.runServer()
+        self._rtsp_server = server
+
+    def setupRecordFactory(self) -> PreRecordBuffer:
+        factory = PreRecordBuffer(
+            secs_pre=self._config["motion/recordPre"],
+            fps=self._config["camera/fps"],
+            camName=self._config["motion/sensorName"],
+            logger=self.__logger, 
+            splitter=self._splitStream,
+            path=pathlib.Path(self._config["record/path"]),
+            wh=(self._config["camera/width"], self._config["camera/height"])
+        )
+        factory.start()
+        self._record_factory = factory
+        return factory
+
+    def setupHttpServer(self):
+        self.__logger.info("Aktiviere HTTP...")
+        http_out = httpc.StreamingOutput()
+        self._http_out = http_out
+
+        self._jsonOutput = httpc.StreamingJsonOutput()
+        address = (
+            self._config.get("http/addr", "0.0.0.0"),
+            self._config.get("http/port", 8083)
+        )   
+        streamingHandle = httpc.makeStreamingHandler(http_out, self._jsonOutput)
+        streamingHandle.logger = self.__logger.getChild("HTTPHandler")
+        streamingHandle.meassure_call = lambda s,i: self.meassure_call(i)
+        streamingHandle.fill_setting_html = lambda s, html: self.fill_settings_html(html)
+        streamingHandle.update_settings_call = lambda s, a,b,c,d,e,f: self.update_settings_call(a,b,c,d,e,f)
+        streamingHandle.jpegUpload_call = lambda s,d: self.parseTrainingPictures(d)
+
+        server = httpc.StreamingServer(address, streamingHandle)
+        server.logger = self.__logger.getChild("HTTP_srv")
+        self._http_server = server
+
     def run(self):
         import time
         time.sleep(5)
         self.__logger.debug("PiMotion.run()")
         with cam.PiCamera(clock_mode='raw', framerate=self._config.get("camera/fps", 23)) as camera:
             self._camera = camera
+            self._splitStream = CameraSplitter(camera=camera, log=self.__logger)  
             # Init Kamera
-            camera.resolution = (
-                self._config["camera/width"], self._config["camera/height"])
-            camera.video_denoise = self._config.get(
-                "camera/denoise", True)
+            camera.resolution = (self._config["camera/width"], self._config["camera/height"])
+            camera.video_denoise = self._config.get("camera/denoise", True)
             self.__logger.debug("Kamera erstellt")
 
             camera.annotate_background = cam.Color('black')
             camera.annotate_text = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+            self.setupAnalyzer(camera)
             
-            with analyzers.Analyzer(camera, logger=self.__logger.getChild("Analyzer"), config=self._config) as anal:
+            with  self._analyzer:
                 self.__logger.debug("Analyzer erstellt")
-                anal.frameToTriggerMotion = self._config.get("motion/motion_frames", 4)
-                anal.framesToNoMotion = self._config.get("motion/still_frames", 4)
-                anal.blockMinNoise = self._config.get("motion/blockMinNoise", 0)
-                anal.countMinNoise = self._config.get("motion/frameMinNoise", 0)
-                anal.countMaxNoise = self._config.get("motion/frameMaxNoise", 0)
-                anal.lightDiffBlock = self._config.get("motion/lightDiffBlock", -1)
-                anal.motion_call = lambda motion, data, mes: self.motion(
-                    motion, data, mes)
-                anal.motion_data_call = lambda data: self.motion_data(data)
-                anal.pil_magnitude_save_call = lambda img, data: self.pil_magnitude_save_call(
-                    img, data)
-                anal.cal_getMjpeg_Frame = self.getMjpegFrame
-
-                anal.zeromap_py = self._config.get("zeroMap", {"enabled": False, "isBuilding": False, "dict": None})
-
-                self._analyzer = anal
-
-                self._circularStream = cam.PiCameraCircularIO(
-                    camera, seconds=self._config["motion/recordPre"])
-
+                
                 if self._config.get("rtsp/enabled", True):
-                    self.__logger.debug("Erstelle CameraSplitIO")
-                    rtsp_split = rtsp.CameraSplitIO(camera)
-                    self._rtsp_split = rtsp_split
-                    rtsp_split.logger = self.__logger
-                    rtsp_split.initAndRun(self._circularStream, file=None)
-                    self.__logger.info("Aktiviere RTSP...")
-                    rtsp_server = rtsp.GstRtspPython(
-                        self._config.get("camera/fps", 23),
-                        self._config["motion/sensorName"]
-                    )
-                    rtsp_server.logger = self.__logger.getChild("RTSP_srv")
-                    self.__logger.info("Starte RTSP...")
+                    self.setupRTSP()
 
-                    def run():
-                        try:
-                            rtsp_server.runServer()
-                        except KeyboardInterrupt:
-                            self._pluginManager.shutdown()
+                self.setupRecordFactory()    
 
-                    t = threading.Thread(name="rtsp_server", target=run)
-                    t.start()
-                    self._rtsp_server = rtsp_server
-
-                camera.start_recording(self._circularStream, format='h264',
-                                       motion_output=anal, quality=25, sps_timing=True,
-                                       intra_period=self._config.get("camera/fps", 23) * 5,
+                self._splitStream.splitter_port = 1
+                camera.start_recording(self._splitStream, format='h264', splitter_port=1,
+                                       motion_output=self._analyzer, quality=25, sps_timing=True,
+                                       intra_period=int(self._config.get("camera/fps", 23) / 1.5),
                                        sei=True, inline_headers=True, bitrate=0)
 
                 if self._config.get("http/enabled", False):
-                    self.__logger.info("Aktiviere HTTP...")
-                    http_out = httpc.StreamingOutput()
-                    self._http_out = http_out
-
-                    self._jsonOutput = httpc.StreamingJsonOutput()
-                    address = (
-                        self._config.get("http/addr", "0.0.0.0"),
-                        self._config.get("http/port", 8083)
-                    )   
-                    streamingHandle = httpc.makeStreamingHandler(http_out, self._jsonOutput)
-                    streamingHandle.logger = self.__logger.getChild("HTTPHandler")
-                    streamingHandle.meassure_call = lambda s,i: self.meassure_call(i)
-                    streamingHandle.fill_setting_html = lambda s, html: self.fill_settings_html(html)
-                    streamingHandle.update_settings_call = lambda s, a,b,c,d,e,f: self.update_settings_call(a,b,c,d,e,f)
-                    streamingHandle.jpegUpload_call = lambda s,d: self.parseTrainingPictures(d)
-
-                    server = httpc.StreamingServer(address, streamingHandle)
-                    server.logger = self.__logger.getChild("HTTP_srv")
-                    self._http_server = server
+                    self.setupHttpServer()
 
                     camera.start_recording(
-                        http_out, format='mjpeg', splitter_port=2)
-                    t = threading.Thread(name="http_server", target=server.run)
+                        self._http_out, format='mjpeg', splitter_port=2)
+                    t = threading.Thread(name="http_server", target=self._http_server.run)
                     self.__logger.info("Starte HTTP...")
                     t.start()
                 # Und jetzt einfach warten
-
-                anal.disableAnalyzing = not self._config.get("motion/doAnalyze", True)
 
                 def first_run():
                     time.sleep(2)
                     self.__logger.info(
                         "Stream wird sich normalisiert haben. Queue wird angeschlossen...")
-                    anal.run_queue()
-                threading.Thread(target=first_run, name="Analyzer bootstrap", daemon=True).run()
+                    self._analyzer.run_queue()
+                threading.Thread(target=first_run, name="Analyzer bootstrap", daemon=True).start()
                 
                 while not self._doExit:
                     try:
-                        camera.wait_recording(5)
-                        pps = anal.processed / 5
-                        anal.processed = 0
+                        camera.wait_recording(5, splitter_port=1)
+                        pps = self._analyzer.processed / 5
+                        self._analyzer.processed = 0
                         self.__logger.debug("Pro Sekunde verarbeitet: %d", pps)
 
-                        if anal.disableAnalyzing:
+                        if self._analyzer.disableAnalyzing:
                             camera.annotate_text = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     except:
                         self.__logger.exception("Kamera Fehler")
                         exit(-1)
-                anal.stop_queue()
+                self._analyzer.stop_queue()
         try:
             server.stop()
         except:
@@ -420,11 +435,37 @@ class PiMotionMain(threading.Thread):
         self._analyzer.framesToNoMotion *= 15
 
     def stop_record(self):
-        if self._rtsp_recorder is not None:
-            self._rtsp_recorder.shutdown()
-            self._rtsp_recorder = None
-            self._rtsp_split._restore_append()
+        self._record_factory.stop_recording()
         self._postRecordTimer = None
+
+    def do_record(self, record: bool, stopInsta=False):
+        if record:
+            if self._config.get("record/enabled", True):
+                path = self._config.get("record/path", "~/Videos")
+                if not path.endswith("/"):
+                    path += "/"
+                path = "{}/aufnahmen/{}.h264".format(
+                    path, dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                if self._postRecordTimer is None:
+                    self._record_factory.record()
+                    self._postRecordTimer = ResettableTimer(
+                        interval=self._config.get("motion/recordPost", 1),
+                        function=self.stop_record,
+                        autorun=False
+                    )
+                elif self._postRecordTimer is not None:
+                    self._postRecordTimer.cancel()
+                    self.__logger.debug("Aufnahme timer wird zurückgesetzt")
+        else:
+            self.__logger.info("No Motion")
+            if self._postRecordTimer is not None:
+                if stopInsta:
+                    self._postRecordTimer._interval = 1
+                self._postRecordTimer.reset()
+                self.__logger.debug("Aufname timer wird zurückgesetzt")
+            
+            self.__logger.debug("Aufnahme wird in {} Sekunden beendet.".format(
+                self._config.get("motion/recordPost", 1)))
 
     def motion(self, motion: bool, data: dict, wasMeassureing: bool):
         if wasMeassureing:
@@ -432,36 +473,12 @@ class PiMotionMain(threading.Thread):
             self._config["motion/frameMinNoise"] = self._analyzer.countMinNoise
             self._config["zeroMap"] = self._analyzer.zeromap_py
             self._config.save()
-        if motion:
-            self.__logger.info("Motion")
-            if self._config.get("record/enabled", True):
-                path = self._config.get("record/path", "~/Videos")
-                if not path.endswith("/"):
-                    path += "/"
-                path = "{}/aufnahmen/{}.h264".format(
-                    path, dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-                if self._postRecordTimer is None and self._rtsp_recorder is None:
-                    self._rtsp_recorder = self._rtsp_split.recordTo(path=path)
-                elif self._postRecordTimer is not None:
-                    self._postRecordTimer.cancel()
-                    self._postRecordTimer = None
-                    self.__logger.debug("Aufname timer wird zurückgesetzt")
-        else:
-            self.__logger.info("No Motion")
-            if self._postRecordTimer is not None:
-                self._postRecordTimer.cancel()
-                self._postRecordTimer = None
-                self.__logger.debug("Aufname timer wird zurückgesetzt")
-            self._postRecordTimer = ResettableTimer(
-                interval=self._config.get("motion/recordPost", 1),
-                function=self.stop_record,
-                autorun=True
-            )
-            self.__logger.debug("Aufnahme wird in {} Sekunden beendet.".format(
-                self._config.get("motion/recordPost", 1)))
+
+        self.do_record(motion)
 
         self._inMotion = motion
         self.motion_data(data=data, changed=True)
+        #self.set_do_record(motion)
 
     def motion_data(self, data: dict, changed=False):
         # x y val count
@@ -491,10 +508,12 @@ class PiMotionMain(threading.Thread):
 
     def getMjpegFrame(self):
         frame = None
-        with self._http_out.condition:
-            frame = self._http_out.frame
-        return frame
-
+        try:
+            with self._http_out.condition:
+                frame = self._http_out.frame
+            return frame
+        except AttributeError:
+            return None
 
     def pil_magnitude_save(self):
         while True:
@@ -503,6 +522,7 @@ class PiMotionMain(threading.Thread):
             except queue.Empty:
                 if self._doExit:
                     self.__logger.warning("PIL Magnitude Save Thread wird beendet")
+                    return
                 continue
             if self._doExit or a is None and data is None:
                 self.__logger.warning("PIL Magnitude Save Thread wird beendet")

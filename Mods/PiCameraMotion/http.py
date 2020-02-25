@@ -48,7 +48,7 @@ SETTINGS = u"""
 <input type="number" name="minBlock" value="{}"><br>Bilder bis zur Bewegungserkennung
 <input type="number" name="mF" value="{}"><br>  Bilder ohne Bewegung
 <input type="number" name="sF" value="{}"><br>  Zu hohe Helligkeitsänderung
-<input type="number" name="lb" value="{}"> ignorieren<br>  Shutterspeed
+<input type="number" name="lb" min="-1" max="10000" step="0.001" value="{}"> ignorieren<br>  Shutterspeed
 <input type="number" name="shutter" value="{}"><br> exposure
 <input type="number" name="exposure ReadOnly" value="{}"><br> exposure_mode
 <input type="" name="exposure_mode" value="{}"><br> color_effect_u
@@ -275,7 +275,7 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
                     int(data.get("minBlock", [None])[0]),
                     int(data.get("mF"      , [None])[0]),
                     int(data.get("sF"      , [None])[0]),
-                    int(data.get("lb"      , [None])[0])
+                    float(data.get("lb"      , [None])[0])
                 )
                 self.send_response(200)
                 self.send_header('Age', 0)
