@@ -304,23 +304,32 @@ class Analyzer(cama.PiAnalysisOutput):
                     self.states["still_frames"] += 1
                     self.states["motion_frames"] = 0
                 else:
-                    self.states["motion_frames"] += 1
-                    try:
-                        if self.states["motion_frames"] >= self.frameToTriggerMotion and not self.__motion_triggered:
-                            self.pil_magnitude_save_call(a, self.__old_States)
-                            if self.zeromap_py["enabled"]:
-                                to_give = copy.deepcopy(self.states)
-                                trainData = self.__zeromap_data.trainConvertToDict(origa)
-                                to_give["exif_zeromap"] = {}
-                                to_give["exif_zeromap"]["zd"] = trainData
-                                to_give["exif_zeromap"]["zn"] = self.states.get("zmdata", "")
-                                self.pil_magnitude_save_call(a, to_give)
+                    new_light = self.brightness()
+                    ld = self.states["brightness"] - new_light
+                    if ld < 0:
+                        ld = ld *-1
+                    if self.lightDiffBlock > -1 and self.lightDiffBlock >= ld:
+                        self.logger.debug("Brightness changed too much!")
+                        self.__motion_triggered = False
+                    else:
+                        self.states["motion_frames"] += 1
+                        try:
+                            if self.states["motion_frames"] >= self.frameToTriggerMotion and not self.__motion_triggered:
+                                self.pil_magnitude_save_call(a, self.__old_States)
+                                if self.zeromap_py["enabled"]:
+                                    to_give = copy.deepcopy(self.states)
+                                    trainData = self.__zeromap_data.trainConvertToDict(origa)
+                                    to_give["exif_zeromap"] = {}
+                                    to_give["exif_zeromap"]["zd"] = trainData
+                                    to_give["exif_zeromap"]["zn"] = self.states.get("zmdata", "")
+                                    self.pil_magnitude_save_call(a, to_give)
+                                else:
+                                    self.pil_magnitude_save_call(a, self.states)
                             else:
-                                self.pil_magnitude_save_call(a, self.states)
-                        else:
-                            self.__old_States = copy.deepcopy(self.states)
-                    except:
-                        self.logger.exception("Kann magnitude nicht speichern!")
+                                self.__old_States = copy.deepcopy(self.states)
+                        except:
+                            self.logger.exception("Kann magnitude nicht speichern!")
+                            
                 if self.zeromap_py["isBuilding"] and self.states["still_frames"] > self.framesToNoMotion:
                     self.saveZeroMap()
                     try:
@@ -345,26 +354,18 @@ class Analyzer(cama.PiAnalysisOutput):
                             "Motion data call Exception: {}".format(str(e)))
                     try:
                         if self.states["motion_frames"] >= self.frameToTriggerMotion and not self.__motion_triggered:
+                            self.states["motion_frames"] = 0
                             self.__motion_triggered = True
                             self.logger.debug("Trigger Motion")
                             self.states["still_frames"] = 0
-                            self.states["motion_frames"] = 0
-                            new_light = self.brightness()
-                            ld = self.states["brightness"] - new_light
-                            if ld < 0:
-                                ld = ld *-1
-                            if self.lightDiffBlock > -1 and self.lightDiffBlock >= ld:
-                                self.logger.debug("Brightness changed too much!")
-                                self.__motion_triggered = False
-                            else:
-                                self.states["lightDiff"] = ld
-                                self.motion_call(True, self.states, False)
-                                try:
-                                    if not self.__zeromap_block_loader:
-                                        self.laodZeroMap()
-                                except:
-                                    self.logger.exception("Neuladen der Zeromap fehlgschlagen")
-                                self.logger.debug("motion_call called")
+                            self.states["lightDiff"] = ld
+                            self.motion_call(True, self.states, False)
+                            try:
+                                if not self.__zeromap_block_loader:
+                                    self.laodZeroMap()
+                            except:
+                                self.logger.exception("Neuladen der Zeromap fehlgschlagen")
+                            self.logger.debug("motion_call called")
                         elif self.states["motion_frames"] >= self.frameToTriggerMotion and self.__motion_triggered:
                             self.states["still_frames"] = 0
                             self.states["motion_frames"] = 0
