@@ -290,7 +290,7 @@ class PiMotionMain(threading.Thread):
         factory = PiCameraMediaFactory(
             fps=self._config["camera/fps"],
             CamName=self._config["motion/sensorName"],
-            log=self.__logger,
+            log=self.__logger.getChild("RTSP_Factory"),
             splitter=self._splitStream #,wh=(self._config["camera/width"], self._config["camera/height"])
         )
         
@@ -381,19 +381,26 @@ class PiMotionMain(threading.Thread):
                     self._analyzer.run_queue()
                 threading.Thread(target=first_run, name="Analyzer bootstrap", daemon=True).start()
                 
+                exception_raised = False
                 while not self._doExit:
                     try:
-                        camera.wait_recording(5, splitter_port=1)
-                        pps = self._analyzer.processed / 5
+                        camera.wait_recording(2, splitter_port=1)
+                        pps = self._analyzer.processed / 2
+                        fps = self._config.get("camera/fps", 23)
                         self._analyzer.processed = 0
-                        self.__logger.debug("Pro Sekunde verarbeitet: %d", pps)
+                        if int(fps) != int(pps):
+                            self.__logger.warning("Pro Sekunde verarbeitet: %d, sollte aber %d sein", pps, fps)
 
                         if self._analyzer.disableAnalyzing:
                             camera.annotate_text = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    except:
+                    except Exception as e:
                         self.__logger.exception("Kamera Fehler")
-                        exit(-1)
-                self._analyzer.stop_queue()
+                        self._doExit = True
+                        exception_raised = True
+                        self._analyzer.stop_queue(e)
+
+                if not exception_raised:
+                    self._analyzer.stop_queue()
         try:
             server.stop()
         except:

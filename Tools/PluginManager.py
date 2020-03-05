@@ -197,7 +197,9 @@ class PluginManager:
             if my_name is None:
                 my_name = "UNSET_DEVICE_NAME"
 
-        client.enable_logger(self.logger.getChild("mqtt"))
+        client_log = self.logger.getChild("mqtt")
+        client_log.setLevel(logging.INFO)
+        client.enable_logger(logger=client_log)
         client.on_connect = self.connect_callback
         client.connect(cc.host, port=cc.port)
         client.on_disconnect = self.disconnect_callback

@@ -83,9 +83,11 @@ class PiCameraMediaFactory(GstRtspServer.RTSPMediaFactory, threading.Thread):
             if not self._sendData.is_set():
                     if not self._sendData.wait(5.0):
                         if self._doShutdown:
+                            self.logger.info("OK Wird beendet")
                             break
                         continue
             if self._doShutdown:
+                self.logger.info("OK Wird beendet")
                 break
             try:
                 data, frame = self._queue.get(timeout=5)
@@ -114,7 +116,10 @@ class PiCameraMediaFactory(GstRtspServer.RTSPMediaFactory, threading.Thread):
                         self.logger.error("push-buffer failed with \"{}\"".format(retval))
             except:
                 self.logger.exception("push-buffer failed!")
-        self._appsrc.emit('end-of-stream')
+        try:
+            self._appsrc.emit('end-of-stream')
+        except AttributeError:
+            pass
 
     def on_need_data(self, src, lenght):
         #self.logger.debug("need_data have approx. {} data packets.".format(self._queue.qsize()))
@@ -151,6 +156,7 @@ class PiCameraMediaFactory(GstRtspServer.RTSPMediaFactory, threading.Thread):
     def writeFrame(self, data: bytes, frame: camf.PiVideoFrame, eof=False):
         with self._lock:
             if eof:
+                self.logger.info("Warning EOF found! Beende Thread...")
                 self.stopThread()
             if frame is not None:
                 if frame.frame_type == camf.PiVideoFrameType.sps_header and not self._hadSPS:

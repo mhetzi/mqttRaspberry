@@ -310,25 +310,10 @@ class Analyzer(cama.PiAnalysisOutput):
                         ld = ld *-1
                     if self.lightDiffBlock > -1 and self.lightDiffBlock >= ld:
                         self.logger.debug("Brightness changed too much!")
-                        self.__motion_triggered = False
+                        self.states["still_frames"] += 1
+                        self.states["motion_frames"] = 0
                     else:
                         self.states["motion_frames"] += 1
-                        try:
-                            if self.states["motion_frames"] >= self.frameToTriggerMotion and not self.__motion_triggered:
-                                self.pil_magnitude_save_call(a, self.__old_States)
-                                if self.zeromap_py["enabled"]:
-                                    to_give = copy.deepcopy(self.states)
-                                    trainData = self.__zeromap_data.trainConvertToDict(origa)
-                                    to_give["exif_zeromap"] = {}
-                                    to_give["exif_zeromap"]["zd"] = trainData
-                                    to_give["exif_zeromap"]["zn"] = self.states.get("zmdata", "")
-                                    self.pil_magnitude_save_call(a, to_give)
-                                else:
-                                    self.pil_magnitude_save_call(a, self.states)
-                            else:
-                                self.__old_States = copy.deepcopy(self.states)
-                        except:
-                            self.logger.exception("Kann magnitude nicht speichern!")
                             
                 if self.zeromap_py["isBuilding"] and self.states["still_frames"] > self.framesToNoMotion:
                     self.saveZeroMap()
@@ -354,6 +339,25 @@ class Analyzer(cama.PiAnalysisOutput):
                             "Motion data call Exception: {}".format(str(e)))
                     try:
                         if self.states["motion_frames"] >= self.frameToTriggerMotion and not self.__motion_triggered:
+                            # Speichere Magnitude Picture
+                            try:
+                                if self.states["motion_frames"] >= self.frameToTriggerMotion and not self.__motion_triggered:
+                                    self.pil_magnitude_save_call(a, self.__old_States)
+                                    if self.zeromap_py["enabled"]:
+                                        to_give = copy.deepcopy(self.states)
+                                        trainData = self.__zeromap_data.trainConvertToDict(origa)
+                                        to_give["exif_zeromap"] = {}
+                                        to_give["exif_zeromap"]["zd"] = trainData
+                                        to_give["exif_zeromap"]["zn"] = self.states.get("zmdata", "")
+                                        self.pil_magnitude_save_call(a, to_give)
+                                    else:
+                                        self.pil_magnitude_save_call(a, self.states)
+                                else:
+                                    self.__old_States = copy.deepcopy(self.states)
+                            except:
+                                self.logger.exception("Kann magnitude nicht speichern!")
+                            
+                            # Motion detector
                             self.states["motion_frames"] = 0
                             self.__motion_triggered = True
                             self.logger.debug("Trigger Motion")
@@ -394,9 +398,14 @@ class Analyzer(cama.PiAnalysisOutput):
             except queue.Empty:
                 return
 
-    def stop_queue(self):
+    def stop_queue(self, exception=None):
         self.__thread_do_run = False
-        self._queue.put_nowait((None, None, None))
+        try:
+            self._queue.put_nowait((None, None, None))
+        except queue.Full:
+            pass
         schedule.cancel_job(self._shed_task)
         self.config["zeroMap"] = self.zeromap_py
+        if exception is not None:
+            self.states["ext"] = str(exception)
         self.motion_call(False, self.states, False)
