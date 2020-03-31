@@ -9,6 +9,7 @@ except ImportError as ie:
         from gpiozero import LED, Button
 import enum
 import time
+import logging
 
 class PinDirection(enum.Enum):
     OUT = 0
@@ -46,18 +47,21 @@ class Pin:
 
     def turnOn(self):
         self._underlying.on()
+        logging.getLogger("Launch").getChild("Tools.Pin").debug("turnON({})".format(self._pin))
 
     def turnOff(self):
+        logging.getLogger("Launch").getChild("Tools.Pin").debug("turnOff({})".format(self._pin))
         self._underlying.off()
 
     def toggle(self):
-        print("Pin ist jetzt {} und wird {}".format(self.input(), not self.input()))
+        logging.getLogger("Launch").getChild("Tools.Pin").debug("Pin {} ist jetzt {} und wird {}".format(self._pin, self.input(), not self.input()))
         self._underlying.toggle()
 
     def set_pulse_width(self, delay):
         self._pulse_width = delay
 
     def pulse(self, delay_ms=250):
+        logging.getLogger("Launch").getChild("Tools.Pin").debug("pulse({}, {}ms)".format(self._pin, delay_ms))
         self._underlying.blink( on_time=delay_ms/1000, off_time=delay_ms/1000, n=1, background=False)
 
     def input(self) -> bool:

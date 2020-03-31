@@ -53,11 +53,24 @@
             "pathMappings": [
                 {
                     "localRoot": "${workspaceFolder}",  // You may also manually specify the directory containing your source code.
-                    "remoteRoot": "./" // Linux example; adjust as necessary for your OS and situation.
+                    "remoteRoot": "/opt/mqttScript/data/" // Linux example; adjust as necessary for your OS and situation.
                 }
             ],
             "port": 3000,                   // Set to the remote port.
             "host": "192.168.55.66"               // Set to your remote host's public IP address.
+        },
+        {
+            "name": "Python Attach (Remote Debug rb-wintergarten.lan)",
+            "type": "python",
+            "request": "attach",
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}",  // You may also manually specify the directory containing your source code.
+                    "remoteRoot": "/opt/mqttScript/data/" // Linux example; adjust as necessary for your OS and situation.
+                }
+            ],
+            "port": 3000,                   // Set to the remote port.
+            "host": "rb-wintergarten.lan"               // Set to your remote host's public IP address.
         },
         {
             "name": "Python Attach (Remote Debug ReservePi1.lan)",
@@ -66,7 +79,7 @@
             "pathMappings": [
                 {
                     "localRoot": "${workspaceFolder}",  // You may also manually specify the directory containing your source code.
-                    "remoteRoot": "./" // Linux example; adjust as necessary for your OS and situation.
+                    "remoteRoot": "/opt/mqttScript/data/" // Linux example; adjust as necessary for your OS and situation.
                 }
             ],
             "port": 3000,                   // Set to the remote port.
@@ -79,7 +92,7 @@
             "pathMappings": [
                 {
                     "localRoot": "${workspaceFolder}",  // You may also manually specify the directory containing your source code.
-                    "remoteRoot": "./" // Linux example; adjust as necessary for your OS and situation.
+                    "remoteRoot": "/opt/mqttScript/data/" // Linux example; adjust as necessary for your OS and situation.
                 }
             ],
             "port": 3000,                   // Set to the remote port.

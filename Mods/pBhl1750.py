@@ -132,6 +132,7 @@ class bhl1750:
             except OSError:
                 self._client.publish(self.topic.ava_topic, "offline", retain=True)
                 self._device_offline = True
+                self._logger.exception("Kann kein update senden!")
 
         if self.topic_alt is not None:
             try:

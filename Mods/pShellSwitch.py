@@ -114,7 +114,8 @@ class ShellSwitch:
             self._name_topic_map[topics.command] = name
             self._state_name_map[name] = topics.state
             self.exec_switch(name, False, True)
-            self.exec_switch(name, self._config["ShellSwitch/entrys"][name]["wasOn"])
+            if self._config["ShellSwitch/entrys"][name].get("setOnLoad", True):
+                self.exec_switch(name, self._config["ShellSwitch/entrys"][name]["wasOn"])
 
     def stop(self):
         for name in self._config.get("ShellSwitch/entrys", {}).keys():
@@ -125,7 +126,8 @@ class ShellSwitch:
 
     def sendStates(self):
         for name in self._config.get("ShellSwitch/entrys", {}).keys():
-            self.exec_switch(name, self._config["ShellSwitch/entrys"][name]["wasOn"])
+            if self._config["ShellSwitch/entrys"][name].get("setOnLoad", True):
+                self.exec_switch(name, self._config["ShellSwitch/entrys"][name]["wasOn"])
 
 
 class ShellSwitchConf:
@@ -170,6 +172,7 @@ class ShellSwitchConf:
                     entry["off_command"] = ConsoleInputTools.get_input("Kommando beim Ausschalten?: ")
                 else:
                     entry["on_command"] = ConsoleInputTools.get_input("Kommando beim Pulsieren?: ")
+                entry["setOnLoad"] = ConsoleInputTools.get_bool_input("Status beim Starten wiederherstellen?")
                 entry["name"] = ConsoleInputTools.get_input("Name des Switches?")
                 entry["icon"] = ConsoleInputTools.get_input("Welches icon soll gesendet werden? (z.B.: mdi:lightbulb")
                 entry["broadcast"] = ConsoleInputTools.get_bool_input("Soll der Switch in HomeAssistant gefunden werden?", True)
