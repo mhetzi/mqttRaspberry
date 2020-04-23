@@ -27,6 +27,7 @@ class WeatherflowPlugin:
     @staticmethod
     def reset_daily_rain(self):
         self._logger.debug("Setze Täglichen Regenzähler & Temperatur Stats zurück...")
+        self._config["Weatherflow/yesterday_daily_rain"] = self._config["Weatherflow/daily_rain"]
         self._config["Weatherflow/daily_rain"] = 0
         self._config["Weatherflow/temp_stats/lmin"] = self._config.get("Weatherflow/temp_stats/min", "n/A")
         self._config["Weatherflow/temp_stats/lmax"] = self._config.get("Weatherflow/temp_stats/max", "n/A")
@@ -154,7 +155,8 @@ class WeatherflowPlugin:
         self.register_new_sensor(serial_number, "Batterie (SKY)", "battery_sky", "%", autodisc.SensorDeviceClasses.BATTERY, deviceInfo,
                                 value_template="{{ value_json.now }}", json_attributes=True)
         self.register_new_sensor(serial_number, "Sonnen einstrahlung", "solar_radiation", "w/m²", autodisc.SensorDeviceClasses.GENERIC_SENSOR, deviceInfo)
-        self.register_new_sensor(serial_number, "Täglicher Regen", "local_day_rain_accumulation", "mm", autodisc.SensorDeviceClasses.GENERIC_SENSOR, deviceInfo)
+        self.register_new_sensor(serial_number, "Täglicher Regen", "local_day_rain_accumulation", "mm", autodisc.SensorDeviceClasses.GENERIC_SENSOR, deviceInfo,
+                                json_attributes=True, value_template="{{ value_json.today }}")
         self.register_new_sensor(serial_number, "Stündlicher Regen", "local_hour_rain_accumulation", "mm",
                                  autodisc.SensorDeviceClasses.GENERIC_SENSOR, deviceInfo)
         self.update_sensor(serial_number, "local_day_rain_accumulation", self._config.get("Weatherflow/daily_rain", 0), autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR)
@@ -401,8 +403,13 @@ class WeatherflowPlugin:
             pass
         self.update_sensor(update.serial_number, "wind_direction", update.wind_direction, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
         self.update_sensor(update.serial_number, "solar_radiation", update.solar_radiation, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
-        self.update_sensor(update.serial_number, "local_day_rain_accumulation", round(self._config["Weatherflow/daily_rain"], 1), autodisc.SensorDeviceClasses.GENERIC_SENSOR)
         self.update_sensor(update.serial_number, "local_hour_rain_accumulation", self._config["Weatherflow/hourly_rain"], autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR)
+        
+        daily_rain_js = {
+            "today": round(self._config["Weatherflow/daily_rain"], 1),
+            "yesterday": round(self._config.get("Weatherflow/yesterday_daily_rain", 0), 1)
+        }
+        self.update_sensor(update.serial_number, "local_day_rain_accumulation", json.dumps(daily_rain_js), autodisc.SensorDeviceClasses.GENERIC_SENSOR)
         self.update_is_windy(update.serial_number, True, update.wind_avg, update.wind_direction)
         
         charging_str = "on battery"
