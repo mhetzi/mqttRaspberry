@@ -73,7 +73,7 @@
             "host": "rb-wintergarten.lan"               // Set to your remote host's public IP address.
         },
         {
-            "name": "Python Attach (Remote Debug ReservePi1.lan)",
+            "name": "Python Attach (Remote Debug rb-kiosk.lan)",
             "type": "python",
             "request": "attach",
             "pathMappings": [
@@ -83,7 +83,8 @@
                 }
             ],
             "port": 3000,                   // Set to the remote port.
-            "host": "192.168.55.74"               // Set to your remote host's public IP address.
+            "host": "192.168.55.110",               // Set to your remote host's public IP address.
+            "justMyCode": false
         },
         {
             "name": "Python Attach (Remote Debug TestPi4.lan)",
