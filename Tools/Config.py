@@ -286,15 +286,19 @@ if FILEWATCHING:
                 super().load(fileNotFoundOK=fileNotFoundOK)
                 self.post_reload()
             else:
-                super().load()
+                super().load(fileNotFoundOK=fileNotFoundOK)
 
         def on_modified(self, event: watchevents.DirModifiedEvent):
-            if self._conf_path.samefile(event.src_path):
-                self.load(reload=True, fileNotFoundOK=True)
+            try:
+                if self._conf_path.samefile(event.src_path):
+                    self.load(reload=True, fileNotFoundOK=False)
+            except: pass
 
         def on_moved(self, event: watchevents.DirMovedEvent):
-            if self._conf_path.samefile(event.src_path):
-                self.load(reload=True, fileNotFoundOK=True)
+            try:
+                if self._conf_path.samefile(event.src_path):
+                    self.load(reload=True, fileNotFoundOK=True)
+            except: pass
 
         def __init__(self, pfad: pathlib.Path, logger: logging.Logger, do_load=False, filesystem_listen=True):
             super().__init__(pfad, logger, do_load, filesystem_listen)
