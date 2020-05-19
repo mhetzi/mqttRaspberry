@@ -6,8 +6,16 @@ import os
 import re
 import schedule
 import json
-from soundmeter import meter
 import threading
+
+try:
+    from soundmeter import meter
+except ImportError as ie:
+    try:
+        import Tools.error as err
+        err.try_install_package('soundmeter', throw=ie, ask=True)
+    except err.RestartError:
+        from soundmeter import meter
 
 class PluginLoader:
 

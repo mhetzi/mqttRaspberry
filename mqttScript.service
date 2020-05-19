@@ -1,9 +1,6 @@
 [Unit]
 Description=MQTTscripts
 
-[Install]
-WantedBy=multi-user.target
-
 [Service]
 TimeoutStartSec=60
 ExecStartPre=-/opt/mqttScripts/data/update.sh update

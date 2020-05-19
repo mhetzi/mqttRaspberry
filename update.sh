@@ -11,6 +11,8 @@ echo "Parameter übergeben: $1"
 
 install_user() {
     sudo cp /opt/mqttScripts/data/mqttScript.service /etc/systemd/user/mqttScript.service
+    sudo bash -c "echo [Install] >> /etc/systemd/user/mqttScript.service"
+    sudo bash -c "echo WantedBy=default.target >> /etc/systemd/user/mqttScript.service"
     systemctl enable --user mqttScript
     read -p "Service starten? " -n 1 -r
     if [[ $REPLY =~ ^[YyJj]$ ]]
@@ -22,6 +24,8 @@ install_user() {
 install_system() {
     sudo bash -c "cp /opt/mqttScripts/data/mqttScript.service /etc/systemd/system/mqttScript@.service"
     sudo bash -c "echo User=%i >> /etc/systemd/system/mqttScript@.service"
+    sudo bash -c "echo [Install] >> /etc/systemd/system/mqttScript@.service"
+    sudo bash -c "echo WantedBy=multi-user.target >> /etc/systemd/system/mqttScript@.service"
     sudo bash -c "systemctl enable mqttScript@$username"
     read -p "Service starten? " -n 1 -r
     if [[ $REPLY =~ ^[YyJj]$ ]]
