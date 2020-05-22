@@ -4,9 +4,10 @@ import Tools.Config as conf
 import logging
 import os
 import re
-import schedule
+from Tools import ResettableTimer
 import json
 import threading
+import datetime
 
 try:
     from soundmeter import meter
@@ -29,7 +30,7 @@ class PluginLoader:
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
-        OneWireConf(conf).run()
+        SoundMeterConf(conf).run()
 
 
 class SoundMeterWrapper:
@@ -46,6 +47,9 @@ class SoundMeterWrapper:
         self._wasTriggered = False
         self._lastRMS = -1000
         self._thread = None
+        self._match_filter = self._config.get("filter/needs_positive_matches", 0)
+        self._neg_match_filter = self._config.get("filter/needs_negativ_matches", 0)
+        self._timeout_shed = None
 
     def register(self, was_connected):
         name = "Soundmeter"
@@ -110,12 +114,40 @@ class SoundMeterWrapper:
         threshold = self._config.get("minimum", None)
         if threshold is not None:
             if not self._wasTriggered and threshold <= rms:
-                self.send_update(True, rms)
+                self.filter(True, rms)
             elif self._wasTriggered and threshold > rms:
-                self.send_update(False, rms)
+                self.filter(False, rms)
         else:
-            self.send_update(False, rms)
+            self.filter(False, rms)
         self._lastRMS = rms
+
+    def filter(self, trigger, rms, **kwargs):
+        if not trigger:
+            if self._neg_match_filter > 0:
+                self._neg_match_filter -= 1
+                return False
+            self._neg_match_filter = self._config.get("filter/needs_negativ_matches", 0)
+            
+            if self._config.get("filter/timeout_secs", 0) > 0:
+                if self._timeout_shed is None:
+                    self._timeout_shed = ResettableTimer.ResettableTimer(
+                        interval=self._config.get("filter/timeout_secs", 0),
+                        function=lambda: self.send_update(False, rms)
+                    )
+                    return False
+                if self._timeout_shed is not None:
+                    return False
+            return self.send_update(False, rms)
+
+        if self._match_filter > 0:
+            self._match_filter -= 1
+            return False
+        self._match_filter = self._config.get("filter/needs_positive_matches", 0)
+        
+        if self._timeout_shed is not None:
+            self._timeout_shed.cancel()
+            self._timeout_shed = None
+        return self.send_update(True, rms)
 
     def stop(self):
         self.meter.graceful()
@@ -135,7 +167,7 @@ class SoundMeterWrapper:
         self._wasTriggered = triggered
 
 
-class OneWireConf:
+class SoundMeterConf:
     def __init__(self, con: conf.BasicConfig):
         self.__ids = []
         self.c = conf.PluginConfig(config=con, plugin_name="soundmeter")
@@ -149,5 +181,9 @@ class OneWireConf:
             self.c["minimum"] = None
         
         self.c["segment"] = ConsoleInputTools.get_number_input("Wie viele Segmente für RMS verwenden? ", 0.5)
+        self.c["filter/needs_positive_matches"] = ConsoleInputTools.get_number_input("Wie oft muss bestätigt werden, dass der RMS Wert erreicht wurde? ", 0)
+        self.c["filter/needs_negativ_matches"] = ConsoleInputTools.get_number_input("Wie oft muss bestätigt werden, dass der RMS Wert nicht erreicht wurde? ", 0)
+        self.c["filter/timeout_secs"] = ConsoleInputTools.get_number_input("Wie viele Sekunden muss es still sein? ", 0)
+        
 
         print("=== Nichts mehr zu konfigurieren. ===\n")
