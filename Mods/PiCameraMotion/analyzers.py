@@ -308,7 +308,7 @@ class Analyzer(cama.PiAnalysisOutput):
                     ld = self.states["brightness"] - new_light
                     if ld < 0:
                         ld = ld *-1
-                    if self.lightDiffBlock > -1 and self.lightDiffBlock >= ld:
+                    if self.lightDiffBlock > -1 and self.lightDiffBlock <= ld:
                         self.logger.debug("Brightness {} changed too much! Config: {}".format(ld, self.lightDiffBlock))
                         self.states["still_frames"] += 1
                         self.states["motion_frames"] = 0
