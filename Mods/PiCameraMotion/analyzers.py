@@ -309,11 +309,12 @@ class Analyzer(cama.PiAnalysisOutput):
                     if ld < 0:
                         ld = ld *-1
                     if self.lightDiffBlock > -1 and self.lightDiffBlock >= ld:
-                        self.logger.debug("Brightness changed too much!")
+                        self.logger.debug("Brightness {} changed too much! Config: {}".format(ld, self.lightDiffBlock))
                         self.states["still_frames"] += 1
                         self.states["motion_frames"] = 0
                     else:
                         self.states["motion_frames"] += 1
+                        self.logger.debug("Brightness {}  OK! Config: {}".format(ld, self.lightDiffBlock))
                             
                 if self.zeromap_py["isBuilding"] and self.states["still_frames"] > self.framesToNoMotion:
                     self.saveZeroMap()
