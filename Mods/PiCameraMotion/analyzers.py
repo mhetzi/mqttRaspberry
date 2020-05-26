@@ -69,9 +69,13 @@ class Analyzer(cama.PiAnalysisOutput):
         self._shed_task = schedule.every(2).seconds
         self._shed_task.do(self.laodZeroMap)
         self._analyzer_lock = threading.Lock()
+        self._on_hold = False
+        self.__frame_drop = 0
 
     def write(self, b):
         result = super(Analyzer, self).write(b)
+        if self._on_hold:
+            return result
         if self.cols is None:
             width, height = self.size or self.camera.resolution
             self.cols = ((width + 15) // 16) + 1
@@ -166,6 +170,12 @@ class Analyzer(cama.PiAnalysisOutput):
     def analyze(self, a: cama.motion_dtype):
         if self.disableAnalyzing:
             return
+        
+        if self.__frame_drop > 0:
+            self.logger.warning("Framedrop")
+            self.__frame_drop -= 1
+            return
+
         not_subtracted = a
         if self.zeromap_py["enabled"] and self.__zeromap_data != None and not self.zeromap_py["isBuilding"]:
             try:
@@ -181,6 +191,7 @@ class Analyzer(cama.PiAnalysisOutput):
             self.logger.debug("Queue ist voll")
             self.states["still_frames"] = 0
             self.states["motion_frames"] = 0
+            self.__frame_drop = 20
             try:
                 self.motion_call(False, self.states, False)
             except:pass
@@ -210,17 +221,15 @@ class Analyzer(cama.PiAnalysisOutput):
             if not update or self.__zeromap_data is None:
                 self.__zeromap_data = Mods.PiCameraMotion.analyze.hotblock.ZeroMap(self.rows, self.cols)
                 self.logger.debug("Erstelle C Object for zeroMap...")
+                self.states["lowest_brightness"] = 1000000
+                self.states["highest_brightness"] = 0
+                self.states["zmdata"] = None
             self.logger.info("Schalte zeroMap ein...")
             self.zeromap_py["enabled"] = True
             self.logger.info("Schalte zeroMap Baustatus um...")
             self.zeromap_py["isBuilding"] = True
             self.states["still_frames"] = 0
             self.states["extendet"] = "ZeroMap aktualisieren" if update else "ZeroMap erstellen"
-            self.motion_call(False, self.states, False)
-            if not update:
-                self.states["lowest_brightness"] = 1000000
-                self.states["highest_brightness"] = 0
-                self.states["zmdata"] = None
     
     def brightness(self):
         frame = self.cal_getMjpeg_Frame()
@@ -244,22 +253,32 @@ class Analyzer(cama.PiAnalysisOutput):
             self.zeromap_py["isBuilding"] = False
             return
         #self.logger.debug("T")
-        changed = self.__zeromap_data.trainZeroMap(a)
+        changed = self.__zeromap_data.trainZeroMap(a, True)
         still_pre_change = self.states["still_frames"]
         br = -1
         if changed:
             self.states["still_frames"] = 0
             self.states["motion_frames"] += 1
-            if self.states.get("brightness_holdoff", 0) <= 0:
-                br = self.brightness()
-                if br > -1:
-                    if self.states.get("lowest_brightness", 1000000) > br:
-                        self.states["lowest_brightness"] = br
-                    if self.states.get("highest_brightness", 0) < br:
-                        self.states["highest_brightness"] = br
-                self.states["brightness_holdoff"] = 60
-            else:
-                self.states["brightness_holdoff"] -= 1
+            # if self.states.get("brightness_holdoff", 0) <= 0:
+            #             self.states["highest_brightness"] = br
+            #     self.states["brightness_holdoff"] = 60
+            # else:
+            #     self.states["brightness_holdoff"] -= 1
+            br = self.brightness()
+            ld = self.states["brightness"] - br
+            self.states["brightness"] = br
+            if br > -1:
+                if self.states.get("lowest_brightness", 1000000) > br:
+                    self.states["lowest_brightness"] = br
+                if self.states.get("highest_brightness", 0) < br:
+                    if self.lightDiffBlock > -1 and self.lightDiffBlock <= ld:
+                        self.logger.debug("Brightness {} changed too much! Config: {}".format(ld, self.lightDiffBlock))
+                        self.states["still_frames"] += 1
+                        self.states["motion_frames"] = 0
+                    else:
+                        self.states["motion_frames"] += 1
+                        self.logger.debug("Brightness {}  OK! Config: {}".format(ld, self.lightDiffBlock))
+                        self.__zeromap_data.trainZeroMap(a, False)
 
         else:
             self.states["still_frames"] += 1

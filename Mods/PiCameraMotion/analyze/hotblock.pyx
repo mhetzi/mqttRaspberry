@@ -111,7 +111,7 @@ cdef class ZeroMap:
 
     @cython.boundscheck(False) # turn off bounds-checking for entire function
     @cython.wraparound (False) # turn off negative index wrapping for entire function
-    def trainZeroMap(self, np.ndarray[BLOCK, ndim=2] arr):
+    def trainZeroMap(self, np.ndarray[BLOCK, ndim=2] arr, bint simulate):
         cdef bint hasChanged = False
         cdef np.uint16_t v = 0
 
@@ -120,7 +120,8 @@ cdef class ZeroMap:
                 for c in range(self.cols):
                     v = arr[r,c].sad
                     if v > self.zeroMapData[r][c]:
-                        self.zeroMapData[r][c] =  <np.uint16_t> ceil(v + ( v / 100 * 15 ))
+                        if not simulate:
+                            self.zeroMapData[r][c] =  <np.uint16_t> ceil(v + ( v / 100 * 15 ))
                         #print(self.zeroMapData[r][c])
                         hasChanged = True
 

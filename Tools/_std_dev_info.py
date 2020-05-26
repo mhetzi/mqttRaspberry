@@ -25,13 +25,17 @@ class DevInfoFactory:
         devInf.sw_version = "{}|APP:{}".format(osRelease, gitVer)
 
     @staticmethod
-    def read_pi_model(MACs:list, devInf:ad.DeviceInfo):
+    def read_pi_model(MACs:list, devInf:ad.DeviceInfo, log:logging.Logger):
         rpi_model = open("/sys/firmware/devicetree/base/model", "r").read().replace("\n","")
         devInf.model = rpi_model
         devInf.mfr = "Raspberry"
-        serial = open("/proc/cpuinfo", "r").read()
-        serial = re.findall("Serial.*?$", serial)[0].replace(" ", "").replace("Serial:", "").replace("\t", "")
-        MACs.append(serial)
+        try:
+            serial = open("/proc/cpuinfo", "r").read()
+            serial = re.findall("Serial.*?$", serial)[0].replace(" ", "").replace("Serial:", "").replace("\t", "")
+            MACs.append(serial)
+        except:
+            log.exception("Kann Seriennummer nicht ermitteln")
+            serial = "Unknown"
         devInf.pi_serial = serial
 
     @staticmethod
@@ -47,7 +51,7 @@ class DevInfoFactory:
         if sys.platform == "linux":
             MACs = []
             try:
-                DevInfoFactory.read_pi_model(MACs, devInf)
+                DevInfoFactory.read_pi_model(MACs, devInf, log)
             except:
                 log.exception("Kein Raspberry Pi Model")
                 try:

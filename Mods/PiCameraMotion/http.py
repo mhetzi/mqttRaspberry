@@ -32,6 +32,7 @@ PAGE = u"""
 <a href="snap.jpg">Snapshot erstellen</a>
 <a href="info.json">Debug JSON abrufen</a>
 <a href="settings.html">Einstellungen</a>
+<a href="analOnHold.html">{}</a>
 <p>
 <img src="stream.mjpg" width="640" height="480" />
 <p>
@@ -147,13 +148,20 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
         def jpegUpload_call(self, data:io.BytesIO):
             logging.warning("jpegUpload_call ist nicht überladen")
 
+        def set_anal_onhold(self, on_hold=None) -> bool:
+            logging.warning("set_anal_onhold nicht überladen!")
+
         def do_GET(self):
             if self.path == '/':
                 self.send_response(301)
                 self.send_header('Location', '/index.html')
                 self.end_headers()
             elif self.path == '/index.html':
-                content = PAGE.encode('utf-8')
+                on_hold_text = "Analyse anhalten"
+                if self.set_anal_onhold(None):
+                    on_hold_text = "Analyse fortsetzen"
+                page = PAGE.format(on_hold_text)
+                content = page.encode('utf-8')
                 self.send_response(200)
                 self.send_header('Age', 0)
                 self.send_header('Content-Type', 'text/html; charset=utf-8')
@@ -302,6 +310,14 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
                 self.send_header('Content-Length', len(content))
                 self.end_headers()
                 self.wfile.write(content)
+            elif self.path == "/analOnHold.html":
+                self.set_anal_onhold(not self.set_anal_onhold(None))
+                self.send_response(200)
+                self.send_header('Age', 0)
+                self.send_header('Content-Type', 'text/html; charset=utf-8')
+                self.send_header('Content-Length', len(StreamingHandler.HTML_BACK_TO_MAIN))
+                self.end_headers()
+                self.wfile.write(StreamingHandler.HTML_BACK_TO_MAIN)
 
             else:
                 self.send_error(404)

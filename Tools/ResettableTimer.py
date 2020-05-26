@@ -37,3 +37,7 @@ class ResettableTimer:
     def reset(self):
         self.cancel()
         self.start()
+
+    def countdown(self):
+        if self._shed_task is None:
+            self.start()

@@ -246,6 +246,8 @@ class PiMotionMain(threading.Thread):
 
     def stop(self):
         self.stop_record()
+        if self._record_factory:
+            self._record_factory.destroy()
         self._doExit = True
         if self._pilQueue is not None and self._pilThread is not None:
             self.__logger.info("Stoppe PIL queue...")
@@ -328,6 +330,7 @@ class PiMotionMain(threading.Thread):
         streamingHandle.fill_setting_html = lambda s, html: self.fill_settings_html(html)
         streamingHandle.update_settings_call = lambda s, a,b,c,d,e,f: self.update_settings_call(a,b,c,d,e,f)
         streamingHandle.jpegUpload_call = lambda s,d: self.parseTrainingPictures(d)
+        streamingHandle.set_anal_onhold = lambda s,x: self.set_anal_onhold(x)
 
         server = httpc.StreamingServer(address, streamingHandle)
         server.logger = self.__logger.getChild("HTTP_srv")
@@ -402,7 +405,11 @@ class PiMotionMain(threading.Thread):
                 if not exception_raised:
                     self._analyzer.stop_queue()
         try:
-            server.stop()
+            self._http_server.stop()
+        except:
+            pass
+        try:
+            self._rtsp_server.stopServer()
         except:
             pass
         try:
@@ -468,8 +475,8 @@ class PiMotionMain(threading.Thread):
             if self._postRecordTimer is not None:
                 if stopInsta:
                     self._postRecordTimer._interval = 1
-                self._postRecordTimer.reset()
-                self.__logger.debug("Aufname timer wird zurückgesetzt")
+                    self._postRecordTimer.reset()
+                self._postRecordTimer.countdown()
             
             self.__logger.debug("Aufnahme wird in {} Sekunden beendet.".format(
                 self._config.get("motion/recordPost", 1)))
@@ -612,8 +619,11 @@ class PiMotionMain(threading.Thread):
                         js_Data = json.dumps(extendet_data)
                         bio.write(js_Data.encode("utf-8"))
 
+                    bio.flush()
                     bio.seek(0)
                     shutil.copyfileobj(bio, file)
+                    file.flush()
+                    file.close()
 
     def getExtenetData(self, data: io.BytesIO):
         data.seek(0)
@@ -678,3 +688,8 @@ class PiMotionMain(threading.Thread):
         self._config["motion/frameMaxNoise"] = countMaxNoise
         self._config["motion/lightDiffBlock"] = lightDiff
         self._config.save()
+
+    def set_anal_onhold(self, on_hold=None) -> bool:
+        if on_hold is not None:
+            self._analyzer._on_hold = on_hold
+        return self._analyzer._on_hold
