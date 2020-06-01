@@ -93,8 +93,10 @@ class Session:
     def callback(self, state_requested=False, message=LockState.LOCK):
         if message == LockState.LOCK:
             self.lock()
-        else:
+        elif message == LockState.UNLOCK:
             self.unloock()
+        else:
+            self._log.warning("LockState Requested, but it´s invalid.")
 
 class logindDbus:
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):

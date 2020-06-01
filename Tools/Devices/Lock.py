@@ -45,4 +45,5 @@ class Lock(Switch):
         msg = message.payload.decode('utf-8')
         if msg == "LOCK":
             return self._cb(message=LockState.LOCK, state_requested=False)
-        self._cb(message=LockState.UNLOCK, state_requested=False)
+        if msg == "UNLOCK":
+            return self._cb(message=LockState.UNLOCK, state_requested=False)

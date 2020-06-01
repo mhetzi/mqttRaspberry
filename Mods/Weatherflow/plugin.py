@@ -63,6 +63,7 @@ class WeatherflowPlugin:
         self._online_states = {}
         self._pluginManager = None
         self._deviceUpdates = {}
+        self.wasWindy = 0
 
     def set_pluginManager(self, pm):
         self._pluginManager = pm
@@ -214,13 +215,19 @@ class WeatherflowPlugin:
         if km == 0 and deg == 0:
             return
         if is_windy and self._config["Weatherflow/events"]:
-            self.update_sensor(serial, "windy", 1, autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR)
+            self.wasWindy += 1
+            if self.wasWindy == 1:
+                self.update_sensor(serial, "windy", 1, autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR)
+            elif self.wasWindy > 120:
+                self.wasWindy = 0
+
             if self._wind_info.get(serial, None) is None:
                 self._wind_info[serial] = rTimer.ResettableTimer(60, self.update_is_windy, serial)
             else:
                 self._wind_info[serial].reset()
         else:
             self.update_sensor(serial, "windy", 0, autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR)
+            self.wasWindy = 0
             self._wind_info[serial] = None
 
     def stop(self):
