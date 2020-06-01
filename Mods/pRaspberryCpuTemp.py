@@ -27,7 +27,7 @@ class RaspberryPiCpuTemp:
     _shed_Job = None
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        self._config = opts
+        self._config = conf.PluginConfig(opts, "rpiCPUtemp")
         self.__client = client
         self.__logger = logger.getChild("PiCpuTemp")
         self._prev_deg = 0
@@ -36,7 +36,7 @@ class RaspberryPiCpuTemp:
 
     def register(self):
         t = ad.Topics.get_std_devInf()
-        n = self._config.get("rpiCPUtemp/name", "CPU Temp")
+        n = self._config.get("name", "CPU Temp")
         unique_id = "sensor.PiCpuTemp-{}.{}".format(t.pi_serial, n)
         topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, n, conf.autodisc.SensorDeviceClasses.TEMPERATURE)
         if topics.config is not None:
@@ -45,7 +45,9 @@ class RaspberryPiCpuTemp:
         self.__client.will_set(topics.ava_topic, "offline", retain=True)
         self.__client.publish(topics.ava_topic, "online", retain=True)
         self._topic = topics
-        self._shed_Job = schedule.every(2).minutes
+        self._shed_Job = schedule.every(
+            self._config.get("update_secs", 5)
+        ).minutes
         self._shed_Job.do(self.send_update)
 
     def stop(self):

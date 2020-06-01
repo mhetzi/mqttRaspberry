@@ -103,6 +103,8 @@ class PiMotionMain(threading.Thread):
     _splitStream = None
     _record_factory = None
 
+    bitrate = 2000000
+
     def __init__(self, client: mclient.Client, opts: BasicConfig, logger: logging.Logger, device_id: str):
         threading.Thread.__init__(self)
         self.__client = client
@@ -449,8 +451,8 @@ class PiMotionMain(threading.Thread):
         self._analyzer.framesToNoMotion *= 15
 
     def stop_record(self):
-        self._record_factory.stop_recording()
         self._postRecordTimer = None
+        self._record_factory.stop_recording()
 
     def do_record(self, record: bool, stopInsta=False):
         if record:
@@ -476,10 +478,13 @@ class PiMotionMain(threading.Thread):
                 if stopInsta:
                     self._postRecordTimer._interval = 1
                     self._postRecordTimer.reset()
-                self._postRecordTimer.countdown()
+                self._postRecordTimer.reset()
             
-            self.__logger.debug("Aufnahme wird in {} Sekunden beendet.".format(
-                self._config.get("motion/recordPost", 1)))
+                self.__logger.debug("Aufnahme wird in {} Sekunden beendet.".format(
+                    self._config.get("motion/recordPost", 1)))
+            else:
+                self.__logger.info("Kein Timer vorhanden. Stoppe sofort")
+                self.stop_record()
 
     def motion(self, motion: bool, data: dict, wasMeassureing: bool):
         if wasMeassureing:
@@ -490,8 +495,10 @@ class PiMotionMain(threading.Thread):
 
         self.do_record(motion)
 
+        last = self._inMotion
         self._inMotion = motion
-        self.motion_data(data=data, changed=True)
+        
+        self.motion_data(data=data, changed=last is not motion)
         #self.set_do_record(motion)
 
     def motion_data(self, data: dict, changed=False):
