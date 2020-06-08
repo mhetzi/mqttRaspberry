@@ -129,7 +129,14 @@ class OneWireTemp:
             topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, d["n"], conf.autodisc.SensorDeviceClasses.TEMPERATURE)
 
             if new_temp != self._prev_deg[i] or force:
+
                 ii = d["i"]
+
+                if self._config.get("w1t/diff/{}".format(ii), None) is not None:
+                    diff = self._config["w1t/diff/{}".format(ii)]
+                    if not (new_temp > (self._prev_deg[i] + diff)) and not (new_temp < (self._prev_deg[i] - diff)):
+                        self.__logger.debug("Neue Temperatur {} hat sich nicht über {} verändert.".format(new_temp, diff))
+                        return
 
                 path_min = "w1t/stat/{}/min".format(ii)
                 path_max = "w1t/stat/{}/max".format(ii)
@@ -184,6 +191,7 @@ class OneWireConf:
         return ids
 
     def run(self):
+        from Tools import ConsoleInputTools
         ids = self.get_available_ids()
         if len(ids) == 0:
             print(" === Keine Temperatur Sensoren gefunden. ===\n")
@@ -191,8 +199,9 @@ class OneWireConf:
             return
         for i in ids:
             r = input("Welchen Namen soll {} mit {}°C haben? ".format(i[0], OneWireTemp.get_temperatur(i[1])))
-            self.c.get("w1t", []).append({
+            self.c.get("w1t/dev", []).append({
                 "id": i[0],
                 "name": r
             })
+            self.c["w1t/diff/{}".format(i[0])] = ConsoleInputTools.get_number_input("Wie viel Temperatur unterschied muss sein um zu senden? ", map_no_input_to=None)
         print("=== Alle Temperatur Sensoren benannt. ===\n")

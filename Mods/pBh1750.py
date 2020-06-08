@@ -21,18 +21,18 @@ class PluginLoader:
 
     @staticmethod
     def getConfigKey():
-        return "BHL1750"
+        return "BH1750"
 
     @staticmethod
     def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        return bhl1750(client, opts, logger, device_id)
+        return bh1750(client, opts, logger, device_id)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
-        bhl1750Conf(conf).run()
+        bh1750Conf(conf).run()
 
 
-class bhl1750:
+class bh1750:
     topic = None
     topic_alt = None
 
@@ -47,13 +47,19 @@ class bhl1750:
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         self._client = client
-        self._conf = opts
-        self._logger = logger.getChild("BHL1750")
+        self._logger = logger.getChild("BH1750")
         self._devID = device_id
         
         self._job_inst = []
+
+        if opts.get("BHL1750", None) is not None:
+            opts["BH1750"] = opts["BHL1750"]
+            del opts["BHL1750"]
+
+        self._conf = conf.PluginConfig(opts, "BH1750")
+
         try:
-            self._bus = smbus.SMBus(self._conf["BHL1750/bus"])
+            self._bus = smbus.SMBus(self._conf["BH1750/bus"])
         except:
             self._logger.warning("SMBus wurde nicht gefunden")
             self.__broken = True
@@ -61,7 +67,7 @@ class bhl1750:
     def register(self):
         if self.__broken:
             return
-        if self._conf["BHL1750/device"]:
+        if self._conf["device"]:
             self._logger.info("Erzeuge Autodiscovery Config für Addresse 1")
             unique_id = "sensor.bht1750-{}.{}".format(self._devID, "addr")
             self.topic = self._conf.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, "Licht", conf.autodisc.SensorDeviceClasses.ILLUMINANCE)
@@ -69,7 +75,7 @@ class bhl1750:
             if (self.topic.config is not None):
                 self._client.publish(self.topic.config, payload=payload, qos=0, retain=True)
 
-        if self._conf["BHL1750/device_alt"]:
+        if self._conf["device_alt"]:
             self._logger.info("Erzeuge Autodiscovery Config für Addresse 2")
             unique_id = "sensor.bht1750-{}.{}".format(self._devID, "addr_alt")
             self.topic_alt = self._conf.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, "Licht a", conf.autodisc.SensorDeviceClasses.ILLUMINANCE)
@@ -77,8 +83,8 @@ class bhl1750:
             if (self.topic_alt.config is not None):
                 self._client.publish(self.topic_alt.config, payload=payload, qos=0, retain=True)
 
-        self._job_inst.append(schedule.every().second.do(bhl1750.send_update, self))
-        self._job_inst.append(schedule.every(5).minutes.do(bhl1750.update_threshhold, self))
+        self._job_inst.append(schedule.every().second.do(bh1750.send_update, self))
+        self._job_inst.append(schedule.every(5).minutes.do(bh1750.update_threshhold, self))
 
     def stop(self):
         for job in self._job_inst:
@@ -86,24 +92,24 @@ class bhl1750:
         self._client.publish(self.topic.ava_topic, "offline", retain=True)
 
     def update_threshhold(self):
-        if self._conf["BHL1750/device"]:
+        if self._conf["device"]:
             if self._dev_last > 900:
-                self._threasholds[0] = 250
+                self._threasholds[0] = 500
             elif self._dev_last > 500:
-                self._threasholds[0] = 50
+                self._threasholds[0] = 100
             elif self._dev_last > 250:
-                self._threasholds[0] = 25
+                self._threasholds[0] = 30
             elif self._dev_last > 10:
                 self._threasholds[0] = 2
             else:
                 self._threasholds[0] = 0.5
-        if self._conf["BHL1750/device_alt"]:
+        if self._conf["device_alt"]:
             if self._dev_alt_last > 900:
-                self._threasholds[1] = 150
+                self._threasholds[1] = 500
             elif self._dev_alt_last > 500:
-                self._threasholds[1] = 50
+                self._threasholds[1] = 100
             elif self._dev_alt_last > 250:
-                self._threasholds[1] = 10
+                self._threasholds[1] = 30
             elif self._dev_alt_last > 10:
                 self._threasholds[1] = 2
             else:
@@ -122,7 +128,7 @@ class bhl1750:
             try:
                 lux = bhref.convertToNumber( self._bus.read_i2c_block_data(bhref.DEVICE, bhref.CONTINUOUS_HIGH_RES_MODE_2) )
                 lux = round(lux, 1)
-                if bhl1750.inbetween(lux, self._dev_last, self._threasholds[0]):
+                if bh1750.inbetween(lux, self._dev_last, self._threasholds[0]):
                     self._dev_last = lux
                     self._client.publish(self.topic.state, lux)
                     if self._device_offline:
@@ -138,7 +144,7 @@ class bhl1750:
             try:
                 lux = bhref.convertToNumber( self._bus.read_i2c_block_data(bhref.DEVICE_ALT, bhref.CONTINUOUS_HIGH_RES_MODE_2) )
                 lux = round(lux, 1)
-                if bhl1750.inbetween(lux, self._dev_alt_last, self._threasholds[1]):
+                if bh1750.inbetween(lux, self._dev_alt_last, self._threasholds[1]):
                     self._dev_alt_last = lux
                     self._client.publish(self.topic_alt.state, lux)
                     if (self._devAlt_offline):
@@ -156,26 +162,26 @@ class bhl1750:
         return toTest < min or toTest > max
 
 
-class bhl1750Conf:
+class bh1750Conf:
     def __init__(self, conf: conf.BasicConfig):
-        self.c = conf
-        self.c["BHL1750/device"] = False
-        self.c["BHL1750/device_alt"] = False
-        self.c["BHL1750/bus"] = -1
+        self.c = conf.PluginConfig(opts, "BH1750")
+        self.c["device"] = False
+        self.c["device_alt"] = False
+        self.c["bus"] = -1
 
     def run(self):
         from Tools import ConsoleInputTools
         print(" Bekannte Busnummern: Bei Raspberry Rev1 = 0, Rev2 = 1 ")
         bus_nr = ConsoleInputTools.get_number_input("smbus nummer", 1)
         bus = smbus.SMBus(bus_nr)
-        self.c["BHL1750/bus"] = bus_nr
+        self.c["bus"] = bus_nr
         try:
             measument = bhref.convertToNumber(bus.read_i2c_block_data(bhref.DEVICE, bhref.ONE_TIME_HIGH_RES_MODE_1))
-            self.c["BHL1750/device"] = ConsoleInputTools.get_bool_input("Auf Adresse wurden {} Lux gemessen. Verwenden?".format(measument))
+            self.c["device"] = ConsoleInputTools.get_bool_input("Auf Adresse wurden {} Lux gemessen. Verwenden?".format(measument))
         except OSError:
             pass
         try:
             measument = bhref.convertToNumber(bus.read_i2c_block_data(bhref.DEVICE_ALT, bhref.ONE_TIME_HIGH_RES_MODE_1))
-            self.c["BHL1750/device_alt"] = ConsoleInputTools.get_bool_input("Auf Adresse_ALT wurden {} Lux gemessen. Verwenden?".format(measument))
+            self.c["device_alt"] = ConsoleInputTools.get_bool_input("Auf Adresse_ALT wurden {} Lux gemessen. Verwenden?".format(measument))
         except OSError:
             pass   
