@@ -33,6 +33,8 @@ class RaspberryPiCpuTemp:
         self._prev_deg = 0
         self.__lastTemp = 0.0
         self.__ava_topic = device_id
+        if self._config.get("diff".format(ii), None) is None:
+            self._config["diff"] = 1.5
 
     def register(self):
         t = ad.Topics.get_std_devInf()
@@ -46,7 +48,7 @@ class RaspberryPiCpuTemp:
         self.__client.publish(topics.ava_topic, "online", retain=True)
         self._topic = topics
         self._shed_Job = schedule.every(
-            self._config.get("update_secs", 5)
+            self._config.get("update_secs", 1)
         ).minutes
         self._shed_Job.do(self.send_update)
 
@@ -69,6 +71,12 @@ class RaspberryPiCpuTemp:
     def send_update(self, force=False):
         new_temp = self.get_temperatur("/sys/class/thermal/thermal_zone0/temp")
 
+        if self._config.get("diff".format(ii), None) is not None:
+                    diff = self._config["diff"]
+                    if not (new_temp > (self._prev_deg[i] + diff)) and not (new_temp < (self._prev_deg[i] - diff)):
+                        self.__logger.debug("Neue Temperatur {} hat sich nicht über {} verändert.".format(new_temp, diff))
+                        return
+
         if new_temp != self._prev_deg or force:
             if new_temp != -1000 and self._prev_deg == -1000:
                 self.__client.publish(self._topic.ava_topic, "online", retain=True)
@@ -87,3 +95,4 @@ class RaspberryPiCpuTempConfig:
     def run(self):
         from Tools import ConsoleInputTools as cit
         self.c["rpiCPUtemp/name"] = cit.get_input("Unter welchem Namen soll die CPU Temperatur angegeben werden. \n-> ", require_val=True, std_val="CPU Temperatur")
+        self.c["rpiCPUtemp/diff"] = cit.get_number_input("Wie viel muss sich die Temperatur ändern, um neue Temperatur zu senden= ", 0.5)

@@ -132,12 +132,6 @@ class OneWireTemp:
 
                 ii = d["i"]
 
-                if self._config.get("w1t/diff/{}".format(ii), None) is not None:
-                    diff = self._config["w1t/diff/{}".format(ii)]
-                    if not (new_temp > (self._prev_deg[i] + diff)) and not (new_temp < (self._prev_deg[i] - diff)):
-                        self.__logger.debug("Neue Temperatur {} hat sich nicht über {} verändert.".format(new_temp, diff))
-                        return
-
                 path_min = "w1t/stat/{}/min".format(ii)
                 path_max = "w1t/stat/{}/max".format(ii)
                 path_lmin = "w1t/stat/{}/lmin".format(ii)
@@ -157,6 +151,12 @@ class OneWireTemp:
 
                 self._config[path_min] = cmin
                 self._config[path_max] = cmax
+
+                if self._config.get("w1t/diff/{}".format(ii), None) is not None:
+                    diff = self._config["w1t/diff/{}".format(ii)]
+                    if not (new_temp > (self._prev_deg[i] + diff)) and not (new_temp < (self._prev_deg[i] - diff)):
+                        self.__logger.debug("Neue Temperatur {} hat sich nicht über {} verändert.".format(new_temp, diff))
+                        return
 
                 js = {
                     "now": str(new_temp),
