@@ -33,8 +33,9 @@ class RaspberryPiCpuTemp:
         self._prev_deg = 0
         self.__lastTemp = 0.0
         self.__ava_topic = device_id
-        if self._config.get("diff".format(ii), None) is None:
+        if self._config.get("diff", None) is None:
             self._config["diff"] = 1.5
+        
 
     def register(self):
         t = ad.Topics.get_std_devInf()
@@ -71,11 +72,11 @@ class RaspberryPiCpuTemp:
     def send_update(self, force=False):
         new_temp = self.get_temperatur("/sys/class/thermal/thermal_zone0/temp")
 
-        if self._config.get("diff".format(ii), None) is not None:
-                    diff = self._config["diff"]
-                    if not (new_temp > (self._prev_deg[i] + diff)) and not (new_temp < (self._prev_deg[i] - diff)):
-                        self.__logger.debug("Neue Temperatur {} hat sich nicht über {} verändert.".format(new_temp, diff))
-                        return
+        if self._config.get("diff", None) is not None and not force:
+            diff = self._config["diff"]
+            if not (new_temp > (self._prev_deg + diff)) and not (new_temp < (self._prev_deg - diff)):
+                self.__logger.debug("Neue Temperatur {} hat sich nicht über {} verändert.".format(new_temp, diff))
+                return
 
         if new_temp != self._prev_deg or force:
             if new_temp != -1000 and self._prev_deg == -1000:

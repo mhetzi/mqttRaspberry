@@ -152,7 +152,7 @@ class OneWireTemp:
                 self._config[path_min] = cmin
                 self._config[path_max] = cmax
 
-                if self._config.get("w1t/diff/{}".format(ii), None) is not None:
+                if self._config.get("w1t/diff/{}".format(ii), None) is not None and not force:
                     diff = self._config["w1t/diff/{}".format(ii)]
                     if not (new_temp > (self._prev_deg[i] + diff)) and not (new_temp < (self._prev_deg[i] - diff)):
                         self.__logger.debug("Neue Temperatur {} hat sich nicht über {} verändert.".format(new_temp, diff))

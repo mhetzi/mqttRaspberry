@@ -59,9 +59,9 @@ class bh1750:
         self._conf = conf.PluginConfig(opts, "BH1750")
 
         try:
-            self._bus = smbus.SMBus(self._conf["BH1750/bus"])
+            self._bus = smbus.SMBus(self._conf["bus"])
         except:
-            self._logger.warning("SMBus wurde nicht gefunden")
+            self._logger.exception("SMBus wurde nicht gefunden")
             self.__broken = True
 
     def register(self):
@@ -94,9 +94,9 @@ class bh1750:
     def update_threshhold(self):
         if self._conf["device"]:
             if self._dev_last > 900:
-                self._threasholds[0] = 500
+                self._threasholds[0] = 325
             elif self._dev_last > 500:
-                self._threasholds[0] = 100
+                self._threasholds[0] = 75
             elif self._dev_last > 250:
                 self._threasholds[0] = 30
             elif self._dev_last > 10:
@@ -105,9 +105,9 @@ class bh1750:
                 self._threasholds[0] = 0.5
         if self._conf["device_alt"]:
             if self._dev_alt_last > 900:
-                self._threasholds[1] = 500
+                self._threasholds[1] = 325
             elif self._dev_alt_last > 500:
-                self._threasholds[1] = 100
+                self._threasholds[1] = 75
             elif self._dev_alt_last > 250:
                 self._threasholds[1] = 30
             elif self._dev_alt_last > 10:
@@ -164,7 +164,7 @@ class bh1750:
 
 class bh1750Conf:
     def __init__(self, conf: conf.BasicConfig):
-        self.c = conf.PluginConfig(opts, "BH1750")
+        self.c = conf.PluginConfig(conf, "BH1750")
         self.c["device"] = False
         self.c["device_alt"] = False
         self.c["bus"] = -1

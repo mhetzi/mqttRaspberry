@@ -65,8 +65,23 @@ class WeatherflowPlugin:
         self._deviceUpdates = {}
         self.wasWindy = 0
 
+        self._wind_filter = {
+            "avg": -1, "max": -1, "min": -1, "temp": -1
+        }
+
+        if self._config.get("Weatherflow/wind_diff", None) is None:
+            self._config["Weatherflow/wind_diff"] = 0.2
+
+        if self._config.get("Weatherflow/temp_diff", None) is None:
+            self._config["Weatherflow/temp_diff"] = 0.2
+
     def set_pluginManager(self, pm):
         self._pluginManager = pm
+
+    def sendStates(self):
+        self._wind_filter = {
+            "avg": -1, "max": -1, "min": -1, "temp": -1
+        }
 
     def register(self, wasConnected=False):
         if self._config.get("Weatherflow/deregister", False):
@@ -337,7 +352,14 @@ class WeatherflowPlugin:
                             }
 
         self.update_sensor(update.serial_number, "station_pressure", update.station_pressure, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
-        self.update_sensor(update.serial_number, "air_temperature", temperature_json, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
+        
+        if self._config.get("Weatherflow/temp_diff", None) is not None:
+            diff = self._config["Weatherflow/temp_diff"]
+            if update.air_temperatur > (self._wind_filter["temp"] + diff) or update.air_temperatur < (self._wind_filter["temp"] - diff):
+                self._wind_filter["temp"] = update.air_temperatur
+                self.update_sensor(update.serial_number, "air_temperature", temperature_json, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
+        else:
+            self.update_sensor(update.serial_number, "air_temperature", temperature_json, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
         self.update_sensor(update.serial_number, "relative_humidity", update.relative_humidity, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
         self.update_sensor(update.serial_number, "lightning_count", update.lightning_strike_count, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
         self.update_sensor(update.serial_number, "lightning_dist", update.lightning_strike_avg_distance, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
@@ -397,15 +419,36 @@ class WeatherflowPlugin:
         self.update_sensor(update.serial_number, "uv_index", update.uv_index, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
         self.update_sensor(update.serial_number, "accumulated_rain", update.accumulated_rain, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
         try:
-            self.update_sensor(update.serial_number, "wind_gust",
-                {"ms": update.wind_gust, "km/h": update.wind_gust * 3.6}
-                , autodisc.SensorDeviceClasses.GENERIC_SENSOR)
-            self.update_sensor(update.serial_number, "wind_average", 
-                {"ms": update.wind_avg, "km/h": update.wind_avg * 3.6}
-                , autodisc.SensorDeviceClasses.GENERIC_SENSOR)
-            self.update_sensor(update.serial_number, "wind_lull", 
-                {"ms": update.wind_lull, "km/h": update.wind_lull * 3.6}
-                , autodisc.SensorDeviceClasses.GENERIC_SENSOR)
+            if self._config.get("Weatherflow/wind_diff", None) is not None:
+                diff = self._config["Weatherflow/wind_diff"]
+                if update.wind_gust > (self._wind_filter["max"] + diff) or update.wind_gust < (self._wind_filter["max"] - diff):
+                    self.update_sensor(update.serial_number, "wind_gust",
+                        {"ms": update.wind_gust, "km/h": update.wind_gust * 3.6}
+                        , autodisc.SensorDeviceClasses.GENERIC_SENSOR)
+                    self._wind_filter["max"] = update.wind_gust
+                        
+                if update.wind_avg > (self._wind_filter["avg"] + diff) or update.wind_avg < (self._wind_filter["avg"] - diff):
+                    self.update_sensor(update.serial_number, "wind_average", 
+                        {"ms": update.wind_avg, "km/h": update.wind_avg * 3.6}
+                        , autodisc.SensorDeviceClasses.GENERIC_SENSOR)
+                    self._wind_filter["avg"] = update.wind_avg
+
+                if update.wind_lull > (self._wind_filter["min"] + diff) or update.wind_lull < (self._wind_filter["min"] - diff):
+                    self.update_sensor(update.serial_number, "wind_lull", 
+                        {"ms": update.wind_lull, "km/h": update.wind_lull * 3.6}
+                        , autodisc.SensorDeviceClasses.GENERIC_SENSOR)
+                    self._wind_filter["min"] = update.wind_lull
+            else:
+                self.update_sensor(update.serial_number, "wind_gust",
+                    {"ms": update.wind_gust, "km/h": update.wind_gust * 3.6}
+                    , autodisc.SensorDeviceClasses.GENERIC_SENSOR)
+                self.update_sensor(update.serial_number, "wind_average", 
+                    {"ms": update.wind_avg, "km/h": update.wind_avg * 3.6}
+                    , autodisc.SensorDeviceClasses.GENERIC_SENSOR)
+                self.update_sensor(update.serial_number, "wind_lull", 
+                    {"ms": update.wind_lull, "km/h": update.wind_lull * 3.6}
+                    , autodisc.SensorDeviceClasses.GENERIC_SENSOR)
+
         except TypeError:
             pass
         self.update_sensor(update.serial_number, "wind_direction", update.wind_direction, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
