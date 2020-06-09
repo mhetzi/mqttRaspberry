@@ -49,6 +49,15 @@ except ImportError as ie:
         import piexif
         import piexif.helper
 
+try:
+    import scipy
+except ImportError as ie:
+    try:
+        import Tools.error as err
+        err.try_install_package('scipy', throw=ie, ask=True)
+    except err.RestartError:
+        import scipy
+
 import threading
 import Mods.PiCameraMotion.etc as etc
 import Mods.PiCameraMotion.http as httpc
@@ -103,7 +112,9 @@ class PiMotionMain(threading.Thread):
     _splitStream = None
     _record_factory = None
 
-    bitrate = 2000000
+    bitrate = 17000000
+    _area = 25 # number of connected MV blocks (each 16x16 pixels) to count as a moving object
+    _frames = 4 # number of frames which must contain movement to trigger
 
     def __init__(self, client: mclient.Client, opts: BasicConfig, logger: logging.Logger, device_id: str):
         threading.Thread.__init__(self)
@@ -273,7 +284,13 @@ class PiMotionMain(threading.Thread):
             self._pilQueue = None
 
     def setupAnalyzer(self, camera: cam.PiCamera):
-        anal = analyzers.Analyzer(camera, logger=self.__logger.getChild("Analyzer"), config=self._config)
+        anal = analyzers.Analyzer(
+            camera,
+            logger=self.__logger.getChild("Analyzer"),
+            config=self._config,
+            fps=self._config["camera/fps"],
+            postSecs=self._config.get("motion/recordPost", 1)
+        )
         # SET SETTINGS
         anal.frameToTriggerMotion = self._config.get("motion/motion_frames", 4)
         anal.framesToNoMotion = self._config.get("motion/still_frames", 4)
@@ -364,10 +381,14 @@ class PiMotionMain(threading.Thread):
                 self.setupRecordFactory()    
 
                 self._splitStream.splitter_port = 1
-                camera.start_recording(self._splitStream, format='h264', splitter_port=1,
-                                       motion_output=self._analyzer, quality=25, sps_timing=True,
-                                       intra_period=int(self._config.get("camera/fps", 23) / 1.5),
-                                       sei=True, inline_headers=True, bitrate=0)
+                camera.start_recording(
+                    self._splitStream,
+                    format='h264', profile='high', level='4.1',
+                    splitter_port=1,
+                    motion_output=self._analyzer, quality=25, sps_timing=True,
+                    intra_period=int(self._config.get("camera/fps", 23) / 1.5),
+                    sei=True, inline_headers=True, bitrate=self.bitrate
+                )
 
                 if self._config.get("http/enabled", False):
                     self.setupHttpServer()
@@ -453,6 +474,10 @@ class PiMotionMain(threading.Thread):
     def stop_record(self):
         self._postRecordTimer = None
         self._record_factory.stop_recording()
+        try:
+            self.motion(False, self._lastState, False, True)
+        except KeyError:
+            self.__logger.exception("Sending no motion failed!")
 
     def do_record(self, record: bool, stopInsta=False):
         if record:
@@ -486,14 +511,20 @@ class PiMotionMain(threading.Thread):
                 self.__logger.info("Kein Timer vorhanden. Stoppe sofort")
                 self.stop_record()
 
-    def motion(self, motion: bool, data: dict, wasMeassureing: bool):
+    def motion(self, motion: bool, data: dict, wasMeassureing: bool, delayed=False):
         if wasMeassureing:
             self._config["motion/blockMinNoise"] = self._analyzer.blockMaxNoise
             self._config["motion/frameMinNoise"] = self._analyzer.countMinNoise
             self._config["zeroMap"] = self._analyzer.zeromap_py
             self._config.save()
 
-        self.do_record(motion)
+        if not delayed:
+            self.do_record(motion)
+
+        if not motion and not delayed:
+            #delay the stop motion
+            self._lastState = data
+            return
 
         last = self._inMotion
         self._inMotion = motion
@@ -503,9 +534,20 @@ class PiMotionMain(threading.Thread):
 
     def motion_data(self, data: dict, changed=False):
         # x y val count
-        self._lastState = {"motion": 1 if self._inMotion else 0, "x": data["hotest"][0],
-                           "y": data["hotest"][1], "val": data["hotest"][2], "c": data["noise_count"], "dbg_on": self._sendDebug,
-                           "ext": data["extendet"], "brightness": data["brightness"], "lightDiff": data["lightDiff"]}
+        if data["type"] == "MotionDedector":
+            self._lastState = {
+                "motion": data["motion"], "val": data["val"],
+                "type": data["type"]
+            }
+        elif data["type"] == "hotblock":
+            self._lastState = {
+                "motion": 1 if self._inMotion else 0,
+                "x": data["hotest"][0], "y": data["hotest"][1],
+                "val": data["hotest"][2], "c": data["noise_count"],
+                "dbg_on": self._sendDebug, "ext": data["extendet"],
+                "brightness": data["brightness"], "lightDiff": data["lightDiff"],
+                "type": "hotBlock"
+            }
         self._jsonOutput.write(self._lastState)
         self.update_anotation()
         if self._analyzer is not None and not self._analyzer._calibration_running:

@@ -239,7 +239,7 @@ class GstRtspPython:
         mounts = self.__srv.get_mount_points()
         self.__fac = GstRtspServer.RTSPMediaFactory()
         self.__srv.set_address("0.0.0.0")
-        self.__fac.set_shared(False)
+        self.__fac.set_shared(True)
         # Bitrate * Sekunden // 8
         self.__fac.set_buffer_size((17000000 * 1 // 8) ) # was // 8 )/2)
         self.__fac.set_latency(250)

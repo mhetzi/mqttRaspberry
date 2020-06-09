@@ -115,6 +115,7 @@ class OneWireTemp:
             data = None
             with open(p) as f:
                 data = f.read()
+                f.close()
             if data is not None:
                 tmp = re.search("t=.*", data)
                 if tmp is not None:

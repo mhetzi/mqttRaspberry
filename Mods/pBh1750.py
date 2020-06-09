@@ -99,7 +99,7 @@ class bh1750:
                 self._threasholds[0] = 75
             elif self._dev_last > 250:
                 self._threasholds[0] = 30
-            elif self._dev_last > 10:
+            elif self._dev_last > 7:
                 self._threasholds[0] = 2
             else:
                 self._threasholds[0] = 0.5
@@ -110,7 +110,7 @@ class bh1750:
                 self._threasholds[1] = 75
             elif self._dev_alt_last > 250:
                 self._threasholds[1] = 30
-            elif self._dev_alt_last > 10:
+            elif self._dev_alt_last > 7:
                 self._threasholds[1] = 2
             else:
                 self._threasholds[1] = 0.5

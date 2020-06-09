@@ -20,12 +20,16 @@ from PIL import Image, ImageDraw, ImageFont, ImageStat
 import pyximport
 pyximport.install()
 import Mods.PiCameraMotion.analyze.hotblock
+import Mods.PiCameraMotion.analyze.motion
 from Tools.Config import PluginConfig
 
 class Analyzer(cama.PiAnalysisOutput):
     processed = 0
     states = {"motion_frames": 0, "still_frames": 0,
-              "noise_count": 0, "hotest": [], "zmdata": "", "extendet": "init", "brightness": -1, "lightDiff": -1}
+              "noise_count": 0, "hotest": [], "zmdata": "",
+              "extendet": "init",
+              "brightness": -1, "lightDiff": -1,
+              "type": "hotblock"}
     __old_States = None
     blockMinNoise = 0
     countMinNoise = 0
@@ -45,6 +49,8 @@ class Analyzer(cama.PiAnalysisOutput):
     __zeromap_data_trainee_id = ""
     _shed_task = None
 
+    _motion = None
+
     def motion_call(self, motion: bool, data: dict, wasMeassureing: bool):
         self.logger.error("motion_call nicht überschrieben!")
 
@@ -57,7 +63,7 @@ class Analyzer(cama.PiAnalysisOutput):
     def cal_getMjpeg_Frame(self):
         raise NotImplementedError()
 
-    def __init__(self, camera, size=None, logger=None, config=None):
+    def __init__(self, camera, size=None, logger=None, config=None, fps=24, postSecs=1):
         super(Analyzer, self).__init__(camera, size)
         self.cols = None
         self.rows = None
@@ -71,6 +77,8 @@ class Analyzer(cama.PiAnalysisOutput):
         self._analyzer_lock = threading.Lock()
         self._on_hold = False
         self.__frame_drop = 0
+        self._fps = fps
+        self.postsecs = postSecs
 
     def write(self, b):
         result = super(Analyzer, self).write(b)
@@ -182,19 +190,46 @@ class Analyzer(cama.PiAnalysisOutput):
                 a = self.__zeromap_data.subtractMask(a)
             except:
                 self.logger.exception("Subtract failed")
-                    
-        hottestBlock = Mods.PiCameraMotion.analyze.hotblock.hotBlock(
-            a, self.rows, self.cols, self.blockMinNoise)
-        try:
-            self._queue.put_nowait((hottestBlock, a, not_subtracted))
-        except queue.Full:
-            self.logger.debug("Queue ist voll")
-            self.states["still_frames"] = 0
-            self.states["motion_frames"] = 0
-            self.__frame_drop = 20
+
+        if self.config.get("hottestBlock", False):
+            hottestBlock = Mods.PiCameraMotion.analyze.hotblock.hotBlock(
+                a, self.rows, self.cols, self.blockMinNoise)
             try:
-                self.motion_call(False, self.states, False)
-            except:pass
+                self._queue.put_nowait((hottestBlock, a, not_subtracted))
+            except queue.Full:
+                self.logger.debug("Queue ist voll")
+                self.states["still_frames"] = 0
+                self.states["motion_frames"] = 0
+                self.__frame_drop = 20
+                try:
+                    self.motion_call(False, self.states, False)
+                except:pass
+        elif self.config.get("MotionDedector/enabled", True):
+            if self._motion is None and self.rows > 0 and self.cols > 0:
+                self._motion = Mods.PiCameraMotion.analyze.motion.MotionDedector(
+                    rows = self.rows,
+                    cols = self.cols,
+                    window = self.postsecs*self._fps,
+                    area = self.config.get("MotionDedector/area", 25),
+                    frames=self.frameToTriggerMotion
+                )
+            if self._motion is not None:
+                try:
+                    changed, motion = self._motion.analyse(a)
+                    if changed:
+                        self.motion_call(
+                            motion > 0,{
+                                "motion": 1 if  motion > 0 else 0,
+                                "val": motion,
+                                "type": "MotionDedector"
+                            },
+                            False
+                        )
+                    self.processed += 1
+                except:
+                    self.logger.exception("MotionDedector")
+                    self._motion = None
+            
 
     def trainZeroMap(self, update=False, data=None):
         with self._analyzer_lock:

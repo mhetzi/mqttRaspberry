@@ -65,6 +65,7 @@ class RaspberryPiCpuTemp:
             data = None
             with open(p) as f:
                 data = f.read()
+                f.close()
             if data is not None:
                 return round(int(data) / 1000, 2)
         return -1000
