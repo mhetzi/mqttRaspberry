@@ -75,6 +75,7 @@ class PiCameraMediaFactory(GstRtspServer.RTSPMediaFactory, threading.Thread):
         self._hadSPS = False
         self.setName("CameraRTSPFactory")
         self._camera_splitter = ref(splitter)
+        self._split_id = self._camera_splitter().add(self.writeFrame)
         self.set_eos_shutdown(True)
 
     def run(self):
@@ -139,7 +140,6 @@ class PiCameraMediaFactory(GstRtspServer.RTSPMediaFactory, threading.Thread):
         appsrc.connect('need-data', self.on_need_data)
         appsrc.connect('enough-data', self.on_enough_data)
         self._appsrc = appsrc
-        self._split_id = self._camera_splitter().add(self.writeFrame)
     
     def stopThread(self):
         self._camera_splitter().remove(self._split_id)
@@ -197,7 +197,7 @@ class GstServer( GstRtspServer.RTSPServer, threading.Thread ):
         self._mainLoop = GObject.MainLoop()
 
         self.factory = factory
-        self.factory.set_shared(False)
+        self.factory.set_shared(True)
         self.get_mount_points().add_factory("/h264", self.factory)
         self.set_address("0.0.0.0")
         self._gst_id = self.attach(None)
