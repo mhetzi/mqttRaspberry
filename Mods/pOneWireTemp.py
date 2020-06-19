@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import schedule
+import io
 import json
 
 class PluginLoader:
@@ -63,10 +64,12 @@ class OneWireTemp:
             self._config["w1t/dev"] = devices
 
         for temp in self._config.get("w1t/dev", []):
+            path = os.path.join("/sys/bus/w1/devices", temp.get("id", ""), "w1_slave")
             d = {
                 "i": temp.get("id", ""),
                 "n": temp.get("name", ""),
-                "p": os.path.join("/sys/bus/w1/devices", temp.get("id", ""), "w1_slave")
+                "p": path,
+                "f": open("path")
             }
             self._paths.append(d)
             self.__logger.info("Temperaturfühler {} mit der ID {} wird veröffentlicht.".format(d["n"], d["i"]))
@@ -100,6 +103,12 @@ class OneWireTemp:
     def stop(self):
         schedule.cancel_job(self._daily_job)
         schedule.cancel_job(self._job)
+        for i in range(0, len(self._paths)):
+            try:
+                d = self._paths[i]
+                d["f"].close()
+            except:
+                self.__logger.exception("Schlie0en der Datei fehlgeschlagen!")
 
     def sendStates(self):
         self.send_update(True)
@@ -108,6 +117,16 @@ class OneWireTemp:
     def get_temperature_from_id(id: str) -> float:
         p = os.path.join("/sys/bus/w1/devices", id)
         return OneWireTemp.get_temperatur(p)
+
+    @staticmethod
+    def get_temperatur_file(f):
+        data = f.read()
+        f.seek(0)
+        tmp = re.search("t=.*", data)
+        if tmp is not None:
+            tmp = tmp.group(0).replace("t=", "")
+            return round(int(tmp) / 1000, 1)
+        return -1000
 
     @staticmethod
     def get_temperatur(p) -> float:
@@ -126,7 +145,7 @@ class OneWireTemp:
     def send_update(self, force=False):
         for i in range(0, len(self._paths)):
             d = self._paths[i]
-            new_temp = self.get_temperatur(d["p"])
+            new_temp = self.get_temperatur_file(d["f"])
             topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, d["n"], conf.autodisc.SensorDeviceClasses.TEMPERATURE)
 
             if new_temp != self._prev_deg[i] or force:

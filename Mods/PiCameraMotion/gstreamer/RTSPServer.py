@@ -55,28 +55,36 @@ h264parse !
 rtph264pay name=pay0 pt=96
 """
 
-class PiCameraMediaFactory(GstRtspServer.RTSPMediaFactory, threading.Thread):
-    def __init__(self, fps:int, CamName:str, log: logging.Logger, splitter: CameraSplitter, wh=None, **properties):
-        super(PiCameraMediaFactory, self).__init__(**properties)
+class AppSource(threading.Thread):
+    __sleeping = 0
+
+    def __init__(self, fps:int, log: logging.Logger, splitter: CameraSplitter, parent=None, appSrc=None, **properties):
+        super(AppSource, self).__init__(**properties)
         threading.Thread.__init__(self)
         self.number_frames = 0
         self.fps = fps
         self.duration = 1 / self.fps * Gst.SECOND  # duration of a frame in nanoseconds
-        self.launch_string = GST_h264_PIPELINE.format(self.fps)
-        if wh is not None:
-            self.launch_string = GST_h264_PIPELINE_CLOCK.format(self.fps, CamName, wh[0], wh[1], int(self.fps/2))
         self.logger = log
         self._queue = queue.Queue(int(fps*1.5))
         self._doShutdown = False
         self._sendData = threading.Event()
         self._sendData.clear()
         self._lock = threading.Lock()
-        self._appsrc = None
         self._hadSPS = False
-        self.setName("CameraRTSPFactory")
+        self.setName("Camera_RTSP_AppSrc")
         self._camera_splitter = ref(splitter)
+        self.parent = ref(parent)
         self._split_id = self._camera_splitter().add(self.writeFrame)
-        self.set_eos_shutdown(True)
+        self._appsrc = appSrc
+
+    def on_need_data(self, src, lenght):
+        #self.logger.debug("need_data have approx. {} data packets.".format(self._queue.qsize()))
+        self._sendData.set()
+    
+    def on_enough_data(self, src):
+        self._sendData.clear()
+        #self.logger.debug("enough_data")
+        self._hadSPS = True
 
     def run(self):
         while True:
@@ -85,6 +93,10 @@ class PiCameraMediaFactory(GstRtspServer.RTSPMediaFactory, threading.Thread):
                         if self._doShutdown:
                             self.logger.info("OK Wird beendet")
                             break
+                        self.__sleeping += 1
+                        if self.__sleeping > 100:
+                            self.logger.warning("Schlafe seit 100 Warte zyklen. Beende...")
+                            self.stopThread()
                         continue
             if self._doShutdown:
                 self.logger.info("OK Wird beendet")
@@ -109,49 +121,19 @@ class PiCameraMediaFactory(GstRtspServer.RTSPMediaFactory, threading.Thread):
             self.number_frames += 1
             try:
                 retval = self._appsrc.emit('push-buffer', buf)
+                self.__sleeping = 0
                 if retval == Gst.FlowReturn.FLUSHING:
                     self.logger.debug("Gst Flushing")
                     self.on_enough_data(None)
                 elif retval != Gst.FlowReturn.OK:
-                        self.logger.error("push-buffer failed with \"{}\"".format(retval))
+                    self.logger.error("push-buffer failed with \"{}\"".format(retval))
+                    self.stopThread()
             except:
                 self.logger.exception("push-buffer failed!")
         try:
             self._appsrc.emit('end-of-stream')
         except AttributeError:
             pass
-
-    def on_need_data(self, src, lenght):
-        #self.logger.debug("need_data have approx. {} data packets.".format(self._queue.qsize()))
-        self._sendData.set()
-    
-    def on_enough_data(self, src):
-        self._sendData.clear()
-        #self.logger.debug("enough_data")
-        self._hadSPS = True
-
-    def do_create_element(self, url):
-        self.logger.debug("do_create_element url: {} with {}".format(url.decode_path_components(), self.launch_string))
-        return Gst.parse_launch(self.launch_string)
-
-    def do_configure(self, rtsp_media):
-        self.number_frames = 0
-        appsrc = rtsp_media.get_element().get_child_by_name('asrc')
-        appsrc.connect('need-data', self.on_need_data)
-        appsrc.connect('enough-data', self.on_enough_data)
-        self._appsrc = appsrc
-    
-    def stopThread(self):
-        self._camera_splitter().remove(self._split_id)
-        self.logger.info("Beende Thread")
-        self._doShutdown = True
-        self._sendData.set()
-        try:
-            self._appsrc.emit('end-of-stream')
-        except AttributeError:
-            pass
-        self.logger.info("Warte auf beendigung")
-        self.join()
 
     def writeFrame(self, data: bytes, frame: camf.PiVideoFrame, eof=False):
         with self._lock:
@@ -183,6 +165,70 @@ class PiCameraMediaFactory(GstRtspServer.RTSPMediaFactory, threading.Thread):
                 except queue.Empty:
                     #self.logger.debug("Cleared after overrun")
                     pass
+    
+    def stopThread(self):
+        self._camera_splitter().remove(self._split_id)
+        self.logger.info("Beende Thread")
+        self._doShutdown = True
+        self._sendData.set()
+        try:
+            self._appsrc.emit('end-of-stream')
+        except AttributeError:
+            pass
+        self.logger.info("Warte auf beendigung")
+        try:
+            self.join()
+        except RuntimeError:
+            pass
+        self.parent().stopThread(self)
+
+
+class PiCameraMediaFactory(GstRtspServer.RTSPMediaFactory, threading.Thread):
+    def __init__(self, fps:int, CamName:str, log: logging.Logger, splitter: CameraSplitter, wh=None, **properties):
+        super(PiCameraMediaFactory, self).__init__(**properties)
+        threading.Thread.__init__(self)
+        self.number_frames = 0
+        self.fps = fps
+        self.duration = 1 / self.fps * Gst.SECOND  # duration of a frame in nanoseconds
+        self.launch_string = GST_h264_PIPELINE.format(self.fps)
+        if wh is not None:
+            self.launch_string = GST_h264_PIPELINE_CLOCK.format(self.fps, CamName, wh[0], wh[1], int(self.fps/2))
+        self.logger = log
+        self._queue = queue.Queue(int(fps*1.5))
+        self._camera_splitter = ref(splitter)
+        self.set_eos_shutdown(True)
+        self._threads = []
+
+    def do_create_element(self, url):
+        self.logger.debug("do_create_element url: {} with {}".format(url.decode_path_components(), self.launch_string))
+        return Gst.parse_launch(self.launch_string)
+
+    def do_configure(self, rtsp_media):
+        self.number_frames = 0
+        appsrc = rtsp_media.get_element().get_child_by_name('asrc')
+        new_appSrc = AppSource(
+            fps=self.fps,
+            log=self.logger.getChild("AppSrc"),
+            splitter=self._camera_splitter(),
+            parent=self,
+            appSrc=appsrc
+        )
+        appsrc.connect('need-data', new_appSrc.on_need_data)
+        appsrc.connect('enough-data', new_appSrc.on_enough_data)
+        new_appSrc.start()
+        self._threads.append(new_appSrc)
+    
+    def stopThread(self, thread=None):
+
+        if thread:
+            try:
+                self._threads.remove(thread)
+            except ValueError:
+                pass
+            return
+
+        for t in self._threads:
+            t.stopThread()
 
 
 class GstServer( GstRtspServer.RTSPServer, threading.Thread ):

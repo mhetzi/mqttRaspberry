@@ -35,6 +35,7 @@ class RaspberryPiCpuTemp:
         self.__ava_topic = device_id
         if self._config.get("diff", None) is None:
             self._config["diff"] = 1.5
+        self._file = open("/sys/class/thermal/thermal_zone0/temp")
         
 
     def register(self):
@@ -55,9 +56,16 @@ class RaspberryPiCpuTemp:
 
     def stop(self):
         schedule.cancel_job(self._shed_Job)
+        self._file.close()
 
     def sendStates(self):
         self.send_update(True)
+
+    @staticmethod
+    def get_temperatur_file(f):
+        data = f.read()
+        f.seek(0)
+        return round(int(data) / 1000, 1)
 
     @staticmethod
     def get_temperatur(p) -> float:
@@ -71,7 +79,7 @@ class RaspberryPiCpuTemp:
         return -1000
 
     def send_update(self, force=False):
-        new_temp = self.get_temperatur("/sys/class/thermal/thermal_zone0/temp")
+        new_temp = self.get_temperatur_file(self._file)
 
         if self._config.get("diff", None) is not None and not force:
             diff = self._config["diff"]
