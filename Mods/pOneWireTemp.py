@@ -69,7 +69,7 @@ class OneWireTemp:
                 "i": temp.get("id", ""),
                 "n": temp.get("name", ""),
                 "p": path,
-                "f": open("path")
+                "f": open(path)
             }
             self._paths.append(d)
             self.__logger.info("Temperaturfühler {} mit der ID {} wird veröffentlicht.".format(d["n"], d["i"]))
