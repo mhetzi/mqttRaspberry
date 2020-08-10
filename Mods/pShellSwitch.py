@@ -24,7 +24,7 @@ class PluginLoader:
 class ShellSwitch:
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        self._config = opts
+        self._config = conf.PluginConfig(opts, "ShellSwitch")
         self.__client = client
         self.__logger = logger.getChild("ShellSwitch")
         self.__ava_topic = device_id
@@ -33,7 +33,7 @@ class ShellSwitch:
         self._state_name_map = {}
 
     def exec_switch(self, name:str, on:bool, initKill=None):
-        switch = self._config["ShellSwitch/entrys/{}".format(name)]
+        switch = self._config["entrys/{}".format(name)]
         state_js = {
             "on": switch.get("on_command", None),
             "off": switch.get("off_command", None)
@@ -42,13 +42,13 @@ class ShellSwitch:
             if initKill is None:
                 if on:
                     cp = subprocess.run(switch.get("on_command", "False"), shell=True, check=True)
-                    self._config["ShellSwitch/entrys/{}/wasOn".format(name)] = on
+                    self._config["entrys/{}/wasOn".format(name)] = on
                     state_js["state"] = "ON" if switch.get("onOff", True) else "OFF"
                     state_js["error_code"] = cp.returncode
                     self.__logger.info("{} wurde angeschaltet.".format(name))
                 else:
                     cp = subprocess.run(switch.get("off_command", "False"), shell=True, check=True)
-                    self._config["ShellSwitch/entrys/{}/wasOn".format(name)] = on
+                    self._config["entrys/{}/wasOn".format(name)] = on
                     state_js["state"] = "OFF"
                     state_js["error_code"] = cp.returncode
                     self.__logger.info("{} wurde ausgeschaltet.".format(name))
@@ -87,20 +87,20 @@ class ShellSwitch:
                 self.__logger.debug("message.topic ({}) != topics({})".format(message.topic, topics))
 
     def register(self):
-        self._config.get("ShellSwitch/reg_config_topics", [])
-        if self._config.get("ShellSwitch/dereg", False):
-            for command_topic in self._config.get("ShellSwitch/reg_config_topics", []):
+        self._config.get("reg_config_topics", [])
+        if self._config.get("dereg", False):
+            for command_topic in self._config.get("reg_config_topics", []):
                 self.__client.publish(command_topic, "", retain=False)
-            self._config["ShellSwitch/reg_config_topics"] = []
-            self._config["ShellSwitch/dereg"] = False
+            self._config["reg_config_topics"] = []
+            self._config["dereg"] = False
 
         ava_topic = self._config.get_autodiscovery_topic(conf.autodisc.Component.SWITCH, "availibility_switch", conf.autodisc.DeviceClass()).ava_topic
         self.__client.will_set(ava_topic, "offline", retain=True)
         self.__client.publish(ava_topic, "online", retain=True)
 
-        for name in self._config.get("ShellSwitch/entrys", {}).keys():
+        for name in self._config.get("entrys", {}).keys():
             self.__logger.info("Erstelle MQTT zeugs für {}...".format(name))
-            friendly_name = self._config["ShellSwitch/entrys"][name]["name"]
+            friendly_name = self._config["entrys"][name]["name"]
             uid = "switch.ShSw-{}.{}".format(conf.autodisc.Topics.get_std_devInf().pi_serial, name)
             topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SWITCH, name, conf.autodisc.SensorDeviceClasses.GENERIC_SENSOR)
             conf_payload = topics.get_config_payload(friendly_name, "", ava_topic, value_template="{{ value_json.state }}", json_attributes=["on", "off", "error_code"], unique_id=uid)
@@ -108,32 +108,32 @@ class ShellSwitch:
             self.__client.publish(topics.config, conf_payload, retain=True)
             self.__client.subscribe(topics.command)
             self.__client.message_callback_add(topics.command, self.handle_switch)
-            if topics.config not in self._config["ShellSwitch/reg_config_topics"]:
-                self._config["ShellSwitch/reg_config_topics"].append(topics.config)
+            if topics.config not in self._config["reg_config_topics"]:
+                self._config["reg_config_topics"].append(topics.config)
             self._registered_callback_topics.append(topics.command)
             self._name_topic_map[topics.command] = name
             self._state_name_map[name] = topics.state
             self.exec_switch(name, False, True)
-            if self._config["ShellSwitch/entrys"][name].get("setOnLoad", True):
-                self.exec_switch(name, self._config["ShellSwitch/entrys"][name]["wasOn"])
+            if self._config["entrys"][name].get("setOnLoad", True):
+                self.exec_switch(name, self._config["entrys"][name]["wasOn"])
 
     def stop(self):
-        for name in self._config.get("ShellSwitch/entrys", {}).keys():
+        for name in self._config.get("entrys", {}).keys():
             self.exec_switch(name, False, False)
 
         for reg in self._registered_callback_topics:
             self.__client.message_callback_remove(reg)
 
     def sendStates(self):
-        for name in self._config.get("ShellSwitch/entrys", {}).keys():
-            if self._config["ShellSwitch/entrys"][name].get("setOnLoad", True):
-                self.exec_switch(name, self._config["ShellSwitch/entrys"][name]["wasOn"])
+        for name in self._config.get("entrys", {}).keys():
+            if self._config["entrys"][name].get("setOnLoad", True):
+                self.exec_switch(name, self._config["entrys"][name]["wasOn"])
 
 
 class ShellSwitchConf:
-    def __init__(self, conf: conf.BasicConfig):
-        self.c = conf
-        self.c.get("ShellSwitch/entrys", {})
+    def __init__(self, opts: conf.BasicConfig):
+        self.c = conf.PluginConfig(opts, "ShellSwitch")
+        self.c.get("entrys", {})
 
     def run(self):
         from Tools import ConsoleInputTools
@@ -146,10 +146,10 @@ class ShellSwitchConf:
                 print("Diese ShellSwitche stehen zur auswahl.\n 0) Nichts löschen.")
                 indicies = {}
                 index = 1
-                for name in self.c.get("ShellSwitch/entrys", {}).keys():
+                for name in self.c.get("entrys", {}).keys():
                     print("{}) {}\n   On: \"{}\" Off: \"{}\"".format(index, name,
-                                                                     self.c.get("ShellSwitch/entrys/{}/on_command".format(name), ""),
-                                                                     self.c.get("ShellSwitch/entrys/{}/off_command".format(name))))
+                                                                     self.c.get("entrys/{}/on_command".format(name), ""),
+                                                                     self.c.get("entrys/{}/off_command".format(name))))
                     indicies[index] = name
 
                 toDelete = ConsoleInputTools.get_number_input("Bitte die Nummer eingeben.", 0)
@@ -159,7 +159,7 @@ class ShellSwitchConf:
                     if indicies.get(toDelete, None) is None:
                         print("Fehler! Zahl ungültig.")
                     else:
-                        del self.c["ShellSwitch/entrys/{}/off_command".format(indicies[toDelete])]
+                        del self.c["entrys/{}/off_command".format(indicies[toDelete])]
 
             elif action == 1:
                 entry = {"wasOn": False}
@@ -176,7 +176,7 @@ class ShellSwitchConf:
                 entry["name"] = ConsoleInputTools.get_input("Name des Switches?")
                 entry["icon"] = ConsoleInputTools.get_input("Welches icon soll gesendet werden? (z.B.: mdi:lightbulb")
                 entry["broadcast"] = ConsoleInputTools.get_bool_input("Soll der Switch in HomeAssistant gefunden werden?", True)
-                self.c["ShellSwitch/entrys"][entry["name"].replace(" ","")] = entry
+                self.c["entrys"][entry["name"].replace(" ","")] = entry
             elif action == 3:
                 break
-        self.c["ShellSwitch/dereg"] = True
+        self.c["dereg"] = True
