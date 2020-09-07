@@ -23,6 +23,7 @@ class Plugin:
     _is_half   = False
     _is_hc     = False
     _is_closed = False
+    _is_open_overshoot = False
     STOP       = False
     target_pos = 0
     current_pos = 0
@@ -30,6 +31,8 @@ class Plugin:
     do_move   = False
     moves_since = None
     current_job = None
+    open_time = None
+    open_overshoot_delta = datetime.timedelta(seconds=2)
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         from gpiozero.pins.native import NativeFactory
@@ -131,10 +134,18 @@ class Plugin:
             self._is_open = True
             self._is_hc = False
             self._is_ho = False
+            self.open_time = datetime.datetime.now()
         else:
-            self.__logger.info("Tor ist nicht mehr offen")
-            self._is_ho = True
-            self._is_open = False
+            if self.open_time is not None and self.open_time > (datetime.datetime.now() - self.open_overshoot_delta) and not self._is_open_overshoot:
+                self.__logger.info("Tor ist immer noch offen, overshoot entdeckt.")
+                self._is_open_overshoot = True
+                self._is_ho = False
+                self._is_open = True
+            else:
+                self.__logger.info("Tor ist nicht mehr offen")
+                self._is_open_overshoot = False
+                self._is_ho = True
+                self._is_open = False
         self.sendStates()
 
     def stop_handler(self, device, force=False):
@@ -155,7 +166,7 @@ class Plugin:
             pos = 0
         elif self._is_half:
             pos = 50
-        elif self._is_open:
+        elif self._is_open or self._is_open_overshoot:
             pos = 100
         elif self._is_hc and self._is_ho:
             pos = 50
@@ -167,6 +178,7 @@ class Plugin:
         payload_js = {
             "position": pos,
             "offen": self._is_open,
+            "offen übersprungen": self._is_open_overshoot,
             "mitte": self._is_half,
             "zu":    self._is_closed,
             "zuMitte": self._is_hc,
