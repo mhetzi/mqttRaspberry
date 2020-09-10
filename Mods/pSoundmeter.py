@@ -75,8 +75,6 @@ class SoundMeterWrapper:
                 retain=True
             )
         self._topic = topics
-        self.__client.will_set(topics.ava_topic, "offline", retain=True)
-        self.__client.publish(topics.ava_topic, "online", retain=True)
 
         if not was_connected:
             self.meter = meter.Meter(

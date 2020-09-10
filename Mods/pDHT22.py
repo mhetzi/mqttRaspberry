@@ -110,8 +110,6 @@ class DHT22:
                     unique_id=unique_id, value_template="{{ value_json.now }}", json_attributes=True),
                 retain=True
             )
-        self.__client.will_set(self._temp_topic.ava_topic, "offline", retain=True)
-        self.__client.publish(self._temp_topic.ava_topic, "online", retain=True)
 
         # Registriere Luftfeuchte
         unique_id = "sensor.dht-{}.{}.rh".format(
@@ -135,9 +133,6 @@ class DHT22:
                     unique_id=unique_id, value_template="{{ value_json.now }}", json_attributes=True),
                 retain=True
             )
-        
-        self.__client.will_set(self._rh_topic.ava_topic, "offline", retain=True)
-        self.__client.publish(self._rh_topic.ava_topic, "online", retain=True)
 
         self._daily_job = schedule.every().day.at("00:01")
         self._daily_job.do( lambda: self._reset_daily() )

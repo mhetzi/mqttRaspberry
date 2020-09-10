@@ -89,8 +89,6 @@ class OneWireTemp:
                     topics.get_config_payload(d["n"], "°C", unique_id=unique_id, value_template="{{ value_json.now }}", json_attributes=True),
                     retain=True
                 )
-            self.__client.will_set(topics.ava_topic, "offline", retain=True)
-            self.__client.publish(topics.ava_topic, "online", retain=True)
 
         self._daily_job = schedule.every().day.at("00:00")
         self._daily_job.do( lambda: self._reset_daily() )

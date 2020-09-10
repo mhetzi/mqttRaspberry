@@ -252,8 +252,6 @@ class ModemManagerClient:
                     unique_id=unique_id, value_template="{{ value_json.RSSI }}", json_attributes=True),
                 retain=True
             )
-        self.__client.will_set(self._raw_topic.ava_topic, "offline", retain=True)
-        self.__client.publish(self._raw_topic.ava_topic, "online", retain=True)
     
     def register_named(self, id):
         # Registriere Modem Raw
@@ -278,8 +276,6 @@ class ModemManagerClient:
                     unique_id=unique_id, value_template="{{ value_json.RSSI }}", json_attributes=True),
                 retain=True
             )
-        self.__client.will_set(self._named_topic.ava_topic, "offline", retain=True)
-        self.__client.publish(self._named_topic.ava_topic, "online", retain=True)
     
     def register_quality(self, id):
         # Registriere Modem Raw
@@ -304,8 +300,6 @@ class ModemManagerClient:
                     unique_id=unique_id, value_template="{{ value_json.precentage }}", json_attributes=True),
                 retain=True
             )
-        self.__client.will_set(self._quality_topic.ava_topic, "offline", retain=True)
-        self.__client.publish(self._quality_topic.ava_topic, "online", retain=True)
 
     def new_signal(self, id: str, signal: dict, signal_raw: dict, state: dict):
         signal_quality = {

@@ -48,8 +48,6 @@ class DoorOpener:
             self.halleffekt.on_state = self.status_update
             self.halleffekt.on_pulse = lambda: self.relayPin.pulse(self._config.get("rpiDoor/relayPulseLength", 250))
 
-            self.__mqtt.will_set("secure/door/{}/availability".format(self.__door_name), "offline", qos=1, retain=True)
-            self.__mqtt.publish("secure/door/{}/availability".format(self.__door_name), "online", qos=0, retain=True)
             self._thr = thrMsg.MqttMessageThread(self.__mqtt, "secure/door/{}/set".format(self.__door_name), self.do_your_thing, self.logger)
             self._thr.set_cancel_new_while_running(val=True)
             self.halleffekt._startup_check_pos(30)

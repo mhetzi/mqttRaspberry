@@ -103,17 +103,13 @@ class RaspberryPiGpio:
         name = d["n"]
         topic = d["t"]
         meas_val = d["mv"]
-        online_topic = "device_online/piGPIO/{}/onlinePins".format(self._device_id)
         self.__logger.debug("Regestriere {} unter {}".format(name, topic.state))
 
         if pin.get_direction() == Pin.PinDirection.OUT:
             uid = "switch.rPiGPIO-{}.{}".format(Autodiscovery.Topics.get_std_devInf().pi_serial, name.replace(" ", "_"))
             self.__logger.debug("Pushe Config")
             if topic.config is not None:
-                self.__client.publish(topic.config, topic.get_config_payload(name, meas_val, online_topic, unique_id=uid), retain=True)
-            self.__logger.debug("LWT push")
-            self.__client.will_set(online_topic, "offline", retain=True)
-            self.__client.publish(online_topic, "online", retain=True)
+                self.__client.publish(topic.config, topic.get_config_payload(name, meas_val, None, unique_id=uid), retain=True)
             self.__logger.debug("SUB")
             self.__client.subscribe(topic.command)
             time.sleep(2)
@@ -125,9 +121,7 @@ class RaspberryPiGpio:
             self.__logger.debug("Bin kein switch. Brauche kein callback.")
             uid = "binary_sensor.rPiGPIO-{}.{}".format(Autodiscovery.Topics.get_std_devInf().pi_serial,  name.replace(" ", "_"))
             if topic.config is not None:
-                self.__client.publish(topic.config, topic.get_config_payload(name, meas_val, online_topic, unique_id=uid), retain=True)
-            self.__client.will_set(online_topic, "offline", retain=True)
-            self.__client.publish(online_topic, "online", retain=True)
+                self.__client.publish(topic.config, topic.get_config_payload(name, meas_val, None, unique_id=uid), retain=True)
             pin.set_detect(self.send_updates, Pin.PinEventEdge.BOTH)
         self.send_updates()
 

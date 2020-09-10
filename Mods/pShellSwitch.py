@@ -27,7 +27,6 @@ class ShellSwitch:
         self._config = conf.PluginConfig(opts, "ShellSwitch")
         self.__client = client
         self.__logger = logger.getChild("ShellSwitch")
-        self.__ava_topic = device_id
         self._registered_callback_topics = []
         self._name_topic_map = {}
         self._state_name_map = {}
@@ -94,16 +93,12 @@ class ShellSwitch:
             self._config["reg_config_topics"] = []
             self._config["dereg"] = False
 
-        ava_topic = self._config.get_autodiscovery_topic(conf.autodisc.Component.SWITCH, "availibility_switch", conf.autodisc.DeviceClass()).ava_topic
-        self.__client.will_set(ava_topic, "offline", retain=True)
-        self.__client.publish(ava_topic, "online", retain=True)
-
         for name in self._config.get("entrys", {}).keys():
             self.__logger.info("Erstelle MQTT zeugs für {}...".format(name))
             friendly_name = self._config["entrys"][name]["name"]
             uid = "switch.ShSw-{}.{}".format(conf.autodisc.Topics.get_std_devInf().pi_serial, name)
             topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SWITCH, name, conf.autodisc.SensorDeviceClasses.GENERIC_SENSOR)
-            conf_payload = topics.get_config_payload(friendly_name, "", ava_topic, value_template="{{ value_json.state }}", json_attributes=["on", "off", "error_code"], unique_id=uid)
+            conf_payload = topics.get_config_payload(friendly_name, "", None, value_template="{{ value_json.state }}", json_attributes=["on", "off", "error_code"], unique_id=uid)
             self.__logger.debug("Veröffentliche Config Payload {} in Topic {}".format(topics.config, conf_payload))
             self.__client.publish(topics.config, conf_payload, retain=True)
             self.__client.subscribe(topics.command)

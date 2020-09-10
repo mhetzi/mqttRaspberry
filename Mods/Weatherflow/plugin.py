@@ -112,7 +112,6 @@ class WeatherflowPlugin:
 
     def register_new_serial(self, serial):
         online_topic = WeatherflowPlugin.get_device_online_topic(serial)
-        self._client.will_set(online_topic, "offline", retain=True)
         self._client.publish(online_topic, "online", retain=True)
         if serial not in self._config.get("Weatherflow/serial_reg", []):
             self._config["Weatherflow/serial_reg"].append(serial)
@@ -124,6 +123,10 @@ class WeatherflowPlugin:
         deviceInfo.model = "Air"
         deviceInfo.name = "Weatherflow AIR"
         deviceInfo.sw_version = update.firmware_revision
+        std_dev = autodisc.Topics.get_std_devInf()
+        
+        if std_dev.IDs:
+            deviceInfo.via_device = std_dev.IDs[0]
 
         self._logger.info("Regestriere neue Air mit der Seriellen Nummer: {}".format(serial_number))
         self.register_new_serial(serial_number)

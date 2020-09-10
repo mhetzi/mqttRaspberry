@@ -58,10 +58,6 @@ class PortaMatic:
         if self.topic.config is not None:
             self.__client.publish(self.topic.config,
                                   payload=payload, qos=0, retain=True)
-        self.__client.publish(
-            self.topic.ava_topic, "online", retain=True)
-        self.__client.will_set(
-            self.topic.ava_topic, "offline", retain=True)
         self.__client.subscribe(self.topic.command)
         self.__client.message_callback_add(self.topic.command, self.on_message)
         self.check_inputs()

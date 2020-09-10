@@ -48,6 +48,9 @@ class ClientConfig:
         self.username = username
         self.password = password
         self.discorvery_prefix = dpre
+        self.id = client_id if client_id != "" else username
+        self.isOnlineTopic = "online/{}".format(self.id)
+
 
     def is_secure(self) -> bool:
         return self.ca is not None and self.cert is not None and self.key is not None
@@ -172,10 +175,14 @@ class BasicConfig:
 
     def get_autodiscovery_topic(self, component: autodisc.Component, entitiy_id: str, dev_class: autodisc.DeviceClass, node_id=None) -> autodisc.Topics:
         cc = self.get_client_config()
+        topics = None
         if node_id is None:
-            return autodisc.getTopics(cc.discorvery_prefix, component,
+            topics = autodisc.getTopics(cc.discorvery_prefix, component,
                                   cc.client_id if cc.client_id is not None else cc.username, entitiy_id, dev_class)
-        return autodisc.getTopics(cc.discorvery_prefix, component, node_id, entitiy_id, dev_class)
+        else:
+            autodisc.getTopics(cc.discorvery_prefix, component, node_id, entitiy_id, dev_class)
+        topics.ava_topic = cc.isOnlineTopic
+        return topics
 
     def get_plugins_config(self, name) -> dict:
         if self._config.get("PLUGINS", {}).get(name, None) is None:

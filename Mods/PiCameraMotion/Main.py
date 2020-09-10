@@ -195,10 +195,6 @@ class PiMotionMain(threading.Thread):
         if self._motion_topic.config is not None:
             self.__client.publish(self._motion_topic.config,
                                   payload=motion_payload, qos=0, retain=True)
-        self.__client.publish(
-            self._motion_topic.ava_topic, "online", retain=True)
-        self.__client.will_set(
-            self._motion_topic.ava_topic, "offline", retain=True)
         # Setup MQTT debug sensor
         uid_debug = "switch.piMotion-dbg-{}-{}".format(
             self._device_id, sensorName)
@@ -212,10 +208,6 @@ class PiMotionMain(threading.Thread):
         if self._debug_topic.config is not None:
             self.__client.publish(self._debug_topic.config,
                                   payload=debug_payload, qos=0, retain=True)
-        self.__client.publish(
-            self._debug_topic.ava_topic, "online", retain=True)
-        self.__client.will_set(
-            self._debug_topic.ava_topic, "offline", retain=True)
         self.__client.subscribe(self._debug_topic.command)
         self.__client.message_callback_add(
             self._debug_topic.command, self.on_dbg_message)
@@ -236,10 +228,6 @@ class PiMotionMain(threading.Thread):
         if self._do_record_topic is not None:
             self.__client.publish(
                 self._do_record_topic.config, payload=do_record_payload, qos=0, retain=True)
-        self.__client.publish(
-            self._do_record_topic.ava_topic, "online", retain=True)
-        self.__client.will_set(
-            self._do_record_topic.ava_topic, "offline", retain=True)
         self.__client.subscribe(self._do_record_topic.command)
         self.__client.message_callback_add(
             self._do_record_topic.command, self.on_message)

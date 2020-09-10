@@ -151,6 +151,9 @@ class PluginManager:
                 except:
                     self.logger.exception("Fehler beim Regestireren des Plugins")
 
+    def get_plguins_by_config_id(self, id:str):
+        return self.configured_list[id]
+
     def disable_mods(self):
         for x in self.configured_list.keys():
             try:
@@ -171,6 +174,7 @@ class PluginManager:
                     n.runConfig(self.config, self.logger)
                 except KeyboardInterrupt:
                     self.logger.warning("Konfiguration von Plugin abgebrochen.")
+        self.config.save()
 
     def start_mqtt_client(self):
         self.logger.debug("Erstelle MQTT Client...")
@@ -205,6 +209,7 @@ class PluginManager:
         client.on_disconnect = self.disconnect_callback
         self._client = client
         self._client_name = my_name
+        client.will_set(cc.isOnlineTopic, "offline", 0, True)
         return client, my_name
 
     def reSendStates(self, client, userdata, message: mclient.MQTTMessage):
@@ -224,14 +229,20 @@ class PluginManager:
         self.is_connected = False
 
     def connect_callback(self, client, userdata, flags, rc):
-        if rc == 0:
-            self.is_connected = True
-            self.logger.info("Verbunden, regestriere Plugins...")
-            self.register_mods()
-            self._client.subscribe("broadcast/updateAll")
-            self._client.message_callback_add("broadcast/updateAll", self.reSendStates)
-        else:
-            self.logger.warning("Nicht verbunden, Plugins werden nicht regestriert. rc: {}, flags: {}".format(rc, flags))
+        try:
+            if rc == 0:
+                self.is_connected = True
+                self.logger.info("Verbunden, regestriere Plugins...")
+                self.register_mods()
+                self.logger.info("Setze onlinestatus {} auf online".format(self.config.get_client_config().isOnlineTopic))
+                self._client.publish(self.config.get_client_config().isOnlineTopic, "online", 0, True)
+                self._client.subscribe("broadcast/updateAll")
+                self._client.message_callback_add("broadcast/updateAll", self.reSendStates)
+
+            else:
+                self.logger.warning("Nicht verbunden, Plugins werden nicht regestriert. rc: {}, flags: {}".format(rc, flags))
+        except:
+            self.logger.exception("Fehler in on_connect")
 
     def _shutdown(self):
         pass

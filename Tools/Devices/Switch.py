@@ -29,11 +29,6 @@ class Switch:
             )
     
     def register(self):
-        # Setze verfügbarkeit
-        ava_topic = self._ava_topic if self._ava_topic is not None else self._topics.ava_topic
-        self._log.debug("Publish availibility")
-        self._pm._client.will_set(ava_topic, "offline", retain=True)
-        self._pm._client.publish(ava_topic, "online", retain=True)
 
         # Setze Discovery Configuration
         self._log.debug("Publish configuration")
@@ -42,7 +37,7 @@ class Switch:
         zeroc = self._topics.get_config_payload(
             name=self._name,
             measurement_unit=self._munit,
-            ava_topic=self._ava_topic,
+            ava_topic=None,
             value_template=self._vt,
             json_attributes=self._jsattrib,
             device=self._dev,

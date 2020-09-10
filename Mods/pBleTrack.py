@@ -103,8 +103,6 @@ class BleTrack(threading.Thread):
         if tag._topic.config is not None:
             self.__client.publish(
                 tag._topic.config, payload=tag_payload, qos=0, retain=True)
-        self.__client.publish(tag._topic.ava_topic, "online", retain=True)
-        self.__client.will_set(tag._topic.ava_topic, "offline", retain=True)
 
     def register(self):
         pass

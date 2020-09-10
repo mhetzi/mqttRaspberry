@@ -98,8 +98,6 @@ class DoorOpener:
             payload = self.topic.get_config_payload(self._config["rpiDoor/name"], None, unique_id=unique_id,
                             json_attributes=True, value_template="{{ value_json.sw }}")
             self.__client.publish(self.topic.config, payload=payload, qos=0, retain=True)
-            self.__client.will_set(self.topic.ava_topic, "offline", retain=True)
-            self.__client.publish(self.topic.ava_topic, "online", retain=True)
 
             self.__client.message_callback_add(self.topic.command, self.on_message)
             self._registered_callback_topics.append(self.topic.command)

@@ -36,7 +36,11 @@ class RaspberryPiCpuTemp:
         if self._config.get("diff", None) is None:
             self._config["diff"] = 1.5
         self._file = open("/sys/class/thermal/thermal_zone0/temp")
-        
+        self._callables = []
+
+    def add_temperature_call(self, call):
+        if callable(call):
+            self._callables.append(call)
 
     def register(self):
         t = ad.Topics.get_std_devInf()
@@ -46,12 +50,10 @@ class RaspberryPiCpuTemp:
         if topics.config is not None:
             self.__logger.info("Werde AutodiscoveryTopic senden mit der Payload: {}".format(topics.get_config_payload(n, "°C", unique_id=unique_id)))
             self.__client.publish(topics.config, topics.get_config_payload(n, "°C", unique_id=unique_id), retain=True)
-        self.__client.will_set(topics.ava_topic, "offline", retain=True)
-        self.__client.publish(topics.ava_topic, "online", retain=True)
         self._topic = topics
         self._shed_Job = schedule.every(
-            self._config.get("update_secs", 1)
-        ).minutes
+            self._config.get("update_secs", 15)
+        ).seconds
         self._shed_Job.do(self.send_update)
 
     def stop(self):
@@ -84,8 +86,14 @@ class RaspberryPiCpuTemp:
         if self._config.get("diff", None) is not None and not force:
             diff = self._config["diff"]
             if not (new_temp > (self._prev_deg + diff)) and not (new_temp < (self._prev_deg - diff)):
-                self.__logger.debug("Neue Temperatur {} hat sich nicht über {} verändert.".format(new_temp, diff))
+                #self.__logger.debug("Neue Temperatur {} hat sich nicht über {} verändert.".format(new_temp, diff))
                 return
+
+        for call in self._callables:
+            try:
+                call(new_temp)
+            except:
+                self.__logger.exception("Temperature callback error")
 
         if new_temp != self._prev_deg or force:
             if new_temp != -1000 and self._prev_deg == -1000:
