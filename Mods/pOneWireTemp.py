@@ -7,6 +7,7 @@ import re
 import schedule
 import io
 import json
+import math
 
 class PluginLoader:
 
@@ -124,21 +125,14 @@ class OneWireTemp:
         if tmp is not None:
             tmp = tmp.group(0).replace("t=", "")
             return round(int(tmp) / 1000, 1)
-        return -1000
+        return math.nan
 
     @staticmethod
     def get_temperatur(p) -> float:
         if os.path.isfile(p):
-            data = None
             with open(p) as f:
-                data = f.read()
-                f.close()
-            if data is not None:
-                tmp = re.search("t=.*", data)
-                if tmp is not None:
-                    tmp = tmp.group(0).replace("t=", "")
-                    return round(int(tmp) / 1000, 1)
-        return -1000
+                return OneWireTemp.get_temperatur_file(f)
+        return math.nan
 
     def send_update(self, force=False):
         for i in range(0, len(self._paths)):
@@ -146,7 +140,7 @@ class OneWireTemp:
             new_temp = self.get_temperatur_file(d["f"])
             topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, d["n"], conf.autodisc.SensorDeviceClasses.TEMPERATURE)
 
-            if new_temp != self._prev_deg[i] or force:
+            if (new_temp != self._prev_deg[i] or force) and :
 
                 ii = d["i"]
 
@@ -158,13 +152,13 @@ class OneWireTemp:
                 cmin = self._config.get(path_min, "RESET")
                 cmax = self._config.get(path_max, "RESET")
 
-                if cmin == "RESET" or cmin == "n/A":
+                if cmin == "RESET" or cmin == "n/A" or math.isnan(cmin):
                     cmin = new_temp
-                elif cmin > new_temp:
+                elif cmin > new_temp and not math.isnan(new_temp):
                     cmin = new_temp
-                if cmax == "RESET" or cmax == "n/A":
+                if cmax == "RESET" or cmax == "n/A" or math.isnan(cmax):
                     cmax = new_temp
-                elif cmax < new_temp:
+                elif cmax < new_temp and not math.isnan(new_temp):
                     cmax = new_temp
 
                 self._config[path_min] = cmin
@@ -184,12 +178,10 @@ class OneWireTemp:
                     "Gestern tiefster Wert": self._config.get(path_lmin, "n/A")
                 }
                 jstr = json.dumps(js)
-                if new_temp != -1000 and self._prev_deg == -1000:
+                if not math.isnan(new_temp) and not math.isnan(self._prev_deg):
                     self.__client.publish(topics.ava_topic, "online", retain=True)
                     self.__client.publish(topics.state, jstr)
-                elif new_temp != -1000:
-                    self.__client.publish(topics.state, jstr)
-                else:
+                elif math.isnan(new_temp):
                     self.__client.publish(topics.ava_topic, "offline", retain=True)
                 self._prev_deg[i] = new_temp
 
