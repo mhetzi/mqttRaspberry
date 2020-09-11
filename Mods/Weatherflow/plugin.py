@@ -65,16 +65,6 @@ class WeatherflowPlugin:
         self._deviceUpdates = {}
         self.wasWindy = 0
 
-        self._wind_filter = {
-            "avg": -1, "max": -1, "min": -1, "temp": -1
-        }
-
-        if self._config.get("Weatherflow/wind_diff", None) is None:
-            self._config["Weatherflow/wind_diff"] = 0.2
-
-        if self._config.get("Weatherflow/temp_diff", None) is None:
-            self._config["Weatherflow/temp_diff"] = 0.2
-
     def set_pluginManager(self, pm):
         self._pluginManager = pm
 
