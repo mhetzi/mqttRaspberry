@@ -140,7 +140,7 @@ class OneWireTemp:
             new_temp = self.get_temperatur_file(d["f"])
             topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, d["n"], conf.autodisc.SensorDeviceClasses.TEMPERATURE)
 
-            if (new_temp != self._prev_deg[i] or force) and :
+            if new_temp != self._prev_deg[i] or force:
 
                 ii = d["i"]
 
