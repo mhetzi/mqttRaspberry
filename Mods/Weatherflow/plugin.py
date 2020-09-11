@@ -65,6 +65,17 @@ class WeatherflowPlugin:
         self._deviceUpdates = {}
         self.wasWindy = 0
 
+        self._wind_filter = {
+            "avg": -1, "max": -1, "min": -1, "temp": -1
+        }
+
+        if self._config.get("Weatherflow/wind_diff", None) is None:
+            self._config["Weatherflow/wind_diff"] = 0.2
+
+        if self._config.get("Weatherflow/temp_diff", None) is None:
+            self._config["Weatherflow/temp_diff"] = 0.2
+
+
     def set_pluginManager(self, pm):
         self._pluginManager = pm
 
@@ -115,8 +126,11 @@ class WeatherflowPlugin:
         deviceInfo.sw_version = update.firmware_revision
         std_dev = autodisc.Topics.get_std_devInf()
         
-        if std_dev.IDs:
+        if len(std_dev.IDs) > 0:
             deviceInfo.via_device = std_dev.IDs[0]
+        else:
+            self._logger.info("Kein std Device gefunden. Kann kein via erstellen!")
+
 
         self._logger.info("Regestriere neue Air mit der Seriellen Nummer: {}".format(serial_number))
         self.register_new_serial(serial_number)
@@ -148,6 +162,13 @@ class WeatherflowPlugin:
         deviceInfo.model = "Sky"
         deviceInfo.name = "Weatherflow SKY"
         deviceInfo.sw_version = upd.firmware_revision
+
+        std_dev = autodisc.Topics.get_std_devInf()
+        
+        if len(std_dev.IDs) > 0:
+            deviceInfo.via_device = std_dev.IDs[0]
+        else:
+            self._logger.info("Kein std Device gefunden. Kann kein via erstellen!")
 
         self._logger.info("Regestriere neue Sky mit der Seriellen Nummer: {}".format(serial_number))
         self.register_new_serial(serial_number)

@@ -110,6 +110,7 @@ class Topics:
     
     @staticmethod
     def get_std_devInf() -> DeviceInfo:
+        global __global_device_info
         return __global_device_info
 
     def __init__(self, comp: Component, dev_class: DeviceClass, autodiscovery: bool):

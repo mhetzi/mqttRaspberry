@@ -180,7 +180,7 @@ class BasicConfig:
             topics = autodisc.getTopics(cc.discorvery_prefix, component,
                                   cc.client_id if cc.client_id is not None else cc.username, entitiy_id, dev_class)
         else:
-            autodisc.getTopics(cc.discorvery_prefix, component, node_id, entitiy_id, dev_class)
+            topics = autodisc.getTopics(cc.discorvery_prefix, component, node_id, entitiy_id, dev_class)
         topics.ava_topic = cc.isOnlineTopic
         return topics
 

@@ -178,11 +178,13 @@ class OneWireTemp:
                     "Gestern tiefster Wert": self._config.get(path_lmin, "n/A")
                 }
                 jstr = json.dumps(js)
-                if not math.isnan(new_temp) and not math.isnan(self._prev_deg[i]):
-                    self.__client.publish(topics.ava_topic, "online", retain=True)
-                    self.__client.publish(topics.state, jstr)
-                elif math.isnan(new_temp):
-                    self.__client.publish(topics.ava_topic, "offline", retain=True)
+                self.__client.publish(topics.state, jstr)
+
+                # if not math.isnan(new_temp) and not math.isnan(self._prev_deg[i]):
+                #     self.__client.publish(topics.ava_topic, "online", retain=True)
+                #     self.__client.publish(topics.state, jstr)
+                # elif math.isnan(new_temp):
+                #     self.__client.publish(topics.ava_topic, "offline", retain=True)
                 self._prev_deg[i] = new_temp
 
 

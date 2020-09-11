@@ -103,7 +103,7 @@ class SerialFan:
             unique_id="fan.speed.error.{}".format(self._config._main.get_client_config().id)
         )
 
-        cpu: RaspberryPiCpuTemp = self._pm.get_plguins_by_config_id(self._config["provider"])
+        cpu = self._pm.get_plguins_by_config_id(self._config["provider"])
         cpu.add_temperature_call( self.new_temp )
         schedule.every(15).minutes.do(SerialFan.send_updates, self)
         try:
