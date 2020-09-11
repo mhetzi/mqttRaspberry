@@ -140,7 +140,7 @@ class OneWireTemp:
             new_temp = self.get_temperatur_file(d["f"])
             topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, d["n"], conf.autodisc.SensorDeviceClasses.TEMPERATURE)
 
-            if (new_temp != self._prev_deg[i] or force) and :
+            if new_temp != self._prev_deg[i] or force:
 
                 ii = d["i"]
 
@@ -178,7 +178,7 @@ class OneWireTemp:
                     "Gestern tiefster Wert": self._config.get(path_lmin, "n/A")
                 }
                 jstr = json.dumps(js)
-                if not math.isnan(new_temp) and not math.isnan(self._prev_deg):
+                if not math.isnan(new_temp) and not math.isnan(self._prev_deg[i]):
                     self.__client.publish(topics.ava_topic, "online", retain=True)
                     self.__client.publish(topics.state, jstr)
                 elif math.isnan(new_temp):
