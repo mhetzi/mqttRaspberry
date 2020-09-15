@@ -4,6 +4,7 @@ import json
 import logging
 import threading
 import time
+import math
 
 import paho.mqtt.client as mclient
 import schedule
@@ -382,7 +383,7 @@ class WeatherflowPlugin:
             self.update_sensor(update.serial_number, "lightning_last_dist", "0", autodisc.SensorDeviceClasses.GENERIC_SENSOR)
             self.update_sensor(update.serial_number, "lightning_last_nrg", "0", autodisc.SensorDeviceClasses.GENERIC_SENSOR)
 
-        battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 1.6, 2.95), 1)
+        battery_str = math.floor(WeatherflowPlugin.percentageMinMax(update.battery, 1.6, 2.95), 0)
         sensor_ok = ""
         if self._deviceUpdates[update.serial_number]._sensor_status == DeviceStatus.SensorStatus.OK:
             sensor_ok = "OK"
@@ -477,7 +478,7 @@ class WeatherflowPlugin:
         self.update_is_windy(update.serial_number, True, update.wind_avg, update.wind_direction)
         
         charging_str = "on battery"
-        battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 1.6, 3.18), 1)
+        battery_str = math.floor(WeatherflowPlugin.percentageMinMax(update.battery, 1.6, 3.18), 0)
         sensors = ""
 
         if update.battery > 3.32:
