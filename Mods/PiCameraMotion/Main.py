@@ -404,6 +404,12 @@ class PiMotionMain(threading.Thread):
                         self._analyzer.processed = 0
                         if int(fps) != int(pps):
                             self.__logger.warning("Pro Sekunde verarbeitet: %d, sollte aber %d sein", pps, fps)
+                            
+                        if pps > 0:
+                            import sys, traceback
+                            for thread_id, frame in sys._current_frames().items():
+                                print('\n--- Stack for thread {t} ---'.format(t=thread_id))
+                                traceback.print_stack(frame, file=sys.stdout)
 
                         if self._analyzer.disableAnalyzing:
                             camera.annotate_text = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
