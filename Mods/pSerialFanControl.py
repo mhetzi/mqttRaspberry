@@ -151,19 +151,25 @@ class SerialFan:
             s = s.replace(";","").replace("\r","").replace("\n","").split(":")
             if s[0] == "RPM":
                 #self.__logger.debug("Found RPM")
-                self._rpm = float(s[1])
-                if self._rpm > 0:
-                    self._err = None
-                self.send_updates()
+                try:
+                    self._rpm = float(s[1])
+                    if self._rpm > 0:
+                        self._err = None
+                    self.send_updates()
+                except ValueError:
+                    pass
             elif s[0] == "ERR":
                 #self.__logger.debug("Found ERR")
                 self._err = s[1]
                 self.send_updates()
             elif s[0] == "DCP":
-                #self.__logger.debug("Found DutyCycle Percent")
-                self._pct = float(s[1])
-                self.err = None
-                self.send_updates()
+                try:
+                    #self.__logger.debug("Found DutyCycle Percent")
+                    self._pct = float(s[1])
+                    self.err = None
+                    self.send_updates()
+                except ValueError:
+                    pass
             else:
                 self.__logger.info('Nachricht von Controller: "{}"'.format(s))
 
