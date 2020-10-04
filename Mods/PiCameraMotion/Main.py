@@ -356,7 +356,7 @@ class PiMotionMain(threading.Thread):
             self.__logger.debug("Kamera erstellt")
 
             camera.annotate_background = cam.Color('black')
-            camera.annotate_text = dt.datetime.now().strftime('Gestartet am %Y-%m-%d um %H:%M:%S')
+            camera.annotate_text = dt.datetime.now().strftime('Gestartet am %d.%m.%Y um %H:%M:%S')
 
             self.setupAnalyzer(camera)
             
@@ -413,7 +413,7 @@ class PiMotionMain(threading.Thread):
                                     traceback.print_stack(frame, file=f)
 
                         if self._analyzer.disableAnalyzing:
-                            camera.annotate_text = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                            camera.annotate_text = dt.datetime.now().strftime('%d.%m.%Y %H:%M:%S')
                     except Exception as e:
                         self.__logger.exception("Kamera Fehler")
                         self._doExit = True
@@ -442,7 +442,7 @@ class PiMotionMain(threading.Thread):
 
     def update_anotation(self, aps=0):
         if self._camera is not None:
-            txt_motion = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S REC') if self._inMotion else dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S STILL')
+            txt_motion = dt.datetime.now().strftime('%d.%m.%Y %H:%M:%S REC') if self._inMotion else dt.datetime.now().strftime('%d.%m.%Y %H:%M:%S STILL')
 
             self._camera.annotate_text = txt_motion
 

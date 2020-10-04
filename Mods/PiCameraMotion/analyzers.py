@@ -216,12 +216,17 @@ class Analyzer(cama.PiAnalysisOutput):
             if self._motion is not None:
                 try:
                     changed, motion = self._motion.analyse(a)
+                    br = self.brightness()
+                    ld = self.states.get("brightness", 0) - br
+                    self.states["brightness"] = br
                     if changed:
                         self.motion_call(
                             motion > 0,{
                                 "motion": 1 if  motion > 0 else 0,
                                 "val": motion,
-                                "type": "MotionDedector"
+                                "type": "MotionDedector",
+                                "brightness": br,
+                                "brightness_change": ld
                             },
                             False
                         )
