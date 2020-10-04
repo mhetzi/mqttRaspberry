@@ -33,6 +33,7 @@ PAGE = u"""
 <a href="info.json">Debug JSON abrufen</a>
 <a href="settings.html">Einstellungen</a>
 <a href="analOnHold.html">{}</a>
+<a href="saveSnap.html">Snapshot speichern</a>
 <p>
 <img src="stream.mjpg" width="640" height="480" />
 <p>
@@ -150,6 +151,9 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
 
         def set_anal_onhold(self, on_hold=None) -> bool:
             logging.warning("set_anal_onhold nicht überladen!")
+        
+        def save_snapshot(self):
+            logging.warning("save_snapshot nicht überladen!")
 
         def do_GET(self):
             if self.path == '/':
@@ -312,6 +316,14 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
                 self.wfile.write(content)
             elif self.path == "/analOnHold.html":
                 self.set_anal_onhold(not self.set_anal_onhold(None))
+                self.send_response(200)
+                self.send_header('Age', 0)
+                self.send_header('Content-Type', 'text/html; charset=utf-8')
+                self.send_header('Content-Length', len(StreamingHandler.HTML_BACK_TO_MAIN))
+                self.end_headers()
+                self.wfile.write(StreamingHandler.HTML_BACK_TO_MAIN)
+            elif self.path == "/saveSnap.html":
+                self.save_snapshot()
                 self.send_response(200)
                 self.send_header('Age', 0)
                 self.send_header('Content-Type', 'text/html; charset=utf-8')

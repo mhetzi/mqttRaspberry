@@ -111,6 +111,7 @@ class PiMotionMain(threading.Thread):
     _sendDebug = False
     _splitStream = None
     _record_factory = None
+    _snapper = None
 
     bitrate = 17000000
     _area = 25 # number of connected MV blocks (each 16x16 pixels) to count as a moving object
@@ -338,6 +339,7 @@ class PiMotionMain(threading.Thread):
         streamingHandle.update_settings_call = lambda s, a,b,c,d,e,f: self.update_settings_call(a,b,c,d,e,f)
         streamingHandle.jpegUpload_call = lambda s,d: self.parseTrainingPictures(d)
         streamingHandle.set_anal_onhold = lambda s,x: self.set_anal_onhold(x)
+        streamingHandle.save_snapshot = lambda s: self.takeSnapshot()
 
         server = httpc.StreamingServer(address, streamingHandle)
         server.logger = self.__logger.getChild("HTTP_srv")
@@ -489,6 +491,14 @@ class PiMotionMain(threading.Thread):
                         function=self.stop_record,
                         autorun=False
                     )
+
+                    if self._config.get("motion/takeSnapshot", False):
+                        self._snapper = threading.Timer(
+                            interval=self._config.get("motion/takeSnapshotSeconds", 2),
+                            function=self.takeSnapshot
+                        )
+                        self._snapper.setName("PiMotionSnapshot")
+                        self._snapper.start()
                 elif self._postRecordTimer is not None:
                     self._postRecordTimer.cancel()
                     self.__logger.debug("Aufnahme timer wird zurückgesetzt")
@@ -505,6 +515,18 @@ class PiMotionMain(threading.Thread):
             else:
                 self.__logger.info("Kein Timer vorhanden. Stoppe sofort")
                 self.stop_record()
+
+    def takeSnapshot(self):
+        if self._snapper is not None:
+            self._snapper.cancel()
+            self._snapper = None
+        path = self._config.get("record/path", "~/Videos")
+        if not path.endswith("/"):
+            path += "/"
+        path = "{}/aufnahmen/{}.jpeg".format(
+            path, dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        self._camera.capture(path, "jpeg", thumbnail=(64, 48, 35))
+
 
     def motion(self, motion: bool, data: dict, wasMeassureing: bool, delayed=False):
         if wasMeassureing:

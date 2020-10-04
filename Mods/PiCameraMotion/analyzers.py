@@ -79,6 +79,7 @@ class Analyzer(cama.PiAnalysisOutput):
         self.__frame_drop = 0
         self._fps = fps
         self.postsecs = postSecs
+        self._framecount = 0
 
     def write(self, b):
         result = super(Analyzer, self).write(b)
@@ -215,11 +216,17 @@ class Analyzer(cama.PiAnalysisOutput):
                 )
             if self._motion is not None:
                 try:
+                    if self._framecount > 60:
+                        br = self.brightness()
+                        ld = self.states.get("brightness", 0) - br
+                        self.states["brightness"] = br
+                        self._framecount = 0
+
                     changed, motion = self._motion.analyse(a)
-                    br = self.brightness()
-                    ld = self.states.get("brightness", 0) - br
-                    self.states["brightness"] = br
                     if changed:
+                        br = self.brightness()
+                        ld = self.states.get("brightness", 0) - br
+                        self.states["brightness"] = br
                         self.motion_call(
                             motion > 0,{
                                 "motion": 1 if  motion > 0 else 0,
