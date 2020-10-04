@@ -112,6 +112,7 @@ class PiMotionMain(threading.Thread):
     _splitStream = None
     _record_factory = None
     _snapper = None
+    _annotation_updater = None
 
     bitrate = 17000000
     _area = 25 # number of connected MV blocks (each 16x16 pixels) to count as a moving object
@@ -414,8 +415,10 @@ class PiMotionMain(threading.Thread):
                                     print('\n--- Stack for thread {t} ---'.format(t=thread_id), file=f)
                                     traceback.print_stack(frame, file=f)
 
-                        if self._analyzer.disableAnalyzing:
-                            camera.annotate_text = dt.datetime.now().strftime('%d.%m.%Y %H:%M:%S')
+                        self.update_anotation = ResettableTimer(
+                            1, self.update_anotation
+                        )
+                        
                     except Exception as e:
                         self.__logger.exception("Kamera Fehler")
                         self._doExit = True
@@ -568,7 +571,7 @@ class PiMotionMain(threading.Thread):
         self._jsonOutput.write(self._lastState)
         if self._analyzer is not None and not self._analyzer._calibration_running:
             self.sendStates(changed=changed)
-        self.update_anotation()
+        #self.update_anotation()
 
     def sendStates(self, changed=None):
         if changed is None:
