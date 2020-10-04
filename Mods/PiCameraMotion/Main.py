@@ -356,7 +356,7 @@ class PiMotionMain(threading.Thread):
             self.__logger.debug("Kamera erstellt")
 
             camera.annotate_background = cam.Color('black')
-            camera.annotate_text = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            camera.annotate_text = dt.datetime.now().strftime('Gestartet am %Y-%m-%d um %H:%M:%S')
 
             self.setupAnalyzer(camera)
             
@@ -442,14 +442,14 @@ class PiMotionMain(threading.Thread):
 
     def update_anotation(self, aps=0):
         if self._camera is not None:
-            txt_motion = "" if self._inMotion else ""
+            txt_motion = dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S REC') if self._inMotion else dt.datetime.now().strftime('%Y-%m-%d %H:%M:%S STILL')
 
             self._camera.annotate_text = txt_motion
 
-            # self._camera.annotate_text = text1 + " {} {}APS {} {} {} {}".format(
-            #    txt_motion, aps,
-            #    self._lastState["x"], self._lastState["y"], self._lastState["val"], self._lastState["c"]
-            # )
+            #self._camera.annotate_text = text1 + " {} {}APS {} {} {} {}".format(
+            #   txt_motion, aps,
+            #   self._lastState["x"], self._lastState["y"], self._lastState["val"], self._lastState["c"]
+            #)
 
     def meassure_call(self, i):
         if i == 0:
@@ -544,9 +544,9 @@ class PiMotionMain(threading.Thread):
                 "type": "hotBlock"
             }
         self._jsonOutput.write(self._lastState)
-        self.update_anotation()
         if self._analyzer is not None and not self._analyzer._calibration_running:
             self.sendStates(changed=changed)
+        self.update_anotation()
 
     def sendStates(self, changed=None):
         if changed is None:
