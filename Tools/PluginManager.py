@@ -225,13 +225,14 @@ class PluginManager:
 
     def disconnect_callback(self, client, userdata, rc):
         self.logger.info("Verbindung getrennt")
-        self._wasConnected = self.is_connected
+        self._wasConnected = self.is_connected or self._wasConnected
         self.is_connected = False
 
     def connect_callback(self, client, userdata, flags, rc):
         try:
             if rc == 0:
                 self.is_connected = True
+                self._wasConnected = False
                 self.logger.info("Verbunden, regestriere Plugins...")
                 self.register_mods()
                 self.logger.info("Setze onlinestatus {} auf online".format(self.config.get_client_config().isOnlineTopic))

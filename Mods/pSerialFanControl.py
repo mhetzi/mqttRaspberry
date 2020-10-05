@@ -103,15 +103,16 @@ class SerialFan:
             unique_id="fan.speed.error.{}".format(self._config._main.get_client_config().id)
         )
 
-        cpu = self._pm.get_plguins_by_config_id(self._config["provider"])
-        cpu.add_temperature_call( self.new_temp )
-        schedule.every(15).minutes.do(SerialFan.send_updates, self)
-        try:
-            self._serial.open()
-        except serial.SerialException:
-            self.__logger.warning("Serieller Port konnte nicht geöffnet werden!")
-        self._serial_thr = threading.Thread(target=self.serial_read, name="SerialFanRead")
-        self._serial_thr.start()
+        if not wasConnected:
+            cpu = self._pm.get_plguins_by_config_id(self._config["provider"])
+            cpu.add_temperature_call( self.new_temp )
+            schedule.every(15).minutes.do(SerialFan.send_updates, self)
+            try:
+                self._serial.open()
+            except serial.SerialException:
+                self.__logger.warning("Serieller Port konnte nicht geöffnet werden!")
+            self._serial_thr = threading.Thread(target=self.serial_read, name="SerialFanRead")
+            self._serial_thr.start()
 
         self.__client.subscribe(self._speed_topics.command)
         self.__client.message_callback_add(self._speed_topics.command, self.on_message)
@@ -212,7 +213,7 @@ class SerialFan:
         if self._last_err != self._err:
             js = json.dumps({
                     "err":  0 if self._err is None else 1,
-                    "txt": "OK" if self._err is None else self._err
+                    "Grund": "OK" if self._err is None else self._err
             })
             self.__logger.debug("Sende Error: {}".format(js))
             self.__client.publish(self._err_topics.state, js)

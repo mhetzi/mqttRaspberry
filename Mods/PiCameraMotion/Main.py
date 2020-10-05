@@ -258,6 +258,7 @@ class PiMotionMain(threading.Thread):
                 "Grund": "Starting..."
             })
         )
+        self.was_errored = True
 
         # Starte thread
         if not wasConnected:
@@ -447,8 +448,6 @@ class PiMotionMain(threading.Thread):
                                 for thread_id, frame in sys._current_frames().items():
                                     print('\n--- Stack for thread {t} ---'.format(t=thread_id), file=f)
                                     traceback.print_stack(frame, file=f)
-
-                            
 
                         elif self.was_errored:
                             self.was_errored = False
