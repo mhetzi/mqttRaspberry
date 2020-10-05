@@ -143,8 +143,11 @@ class AppSource(threading.Thread):
             if frame is not None:
                 if frame.frame_type == camf.PiVideoFrameType.sps_header and not self._hadSPS:
                     #self.logger.debug("SPS")
-                    self._queue.put((data, frame))
                     self._hadSPS = True
+                    try:
+                        self._queue.put((data, frame), timeout=1000)
+                    except queue.Full:
+                        self._hadSPS = False
                     return
                 elif frame.frame_type != camf.PiVideoFrameType.sps_header and not self._hadSPS:
                     #self.logger.debug("Ignoreing frame cause no sps and had no sps")

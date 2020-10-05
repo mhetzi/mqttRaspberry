@@ -448,6 +448,8 @@ class PiMotionMain(threading.Thread):
                                     print('\n--- Stack for thread {t} ---'.format(t=thread_id), file=f)
                                     traceback.print_stack(frame, file=f)
 
+                            
+
                         elif self.was_errored:
                             self.was_errored = False
                             self.__client.publish(

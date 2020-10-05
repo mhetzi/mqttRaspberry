@@ -88,18 +88,27 @@ class PreRecordBuffer(threading.Thread):
             if frame is not None:
                 if frame.frame_type == camf.PiVideoFrameType.sps_header and not self._hadSPS:
                     self._hadSPS = True
-                    self._queue.put((data, frame))
+                    try:
+                        self._queue.put((data, frame), timeout=1500)
+                    except:
+                        try:
+                            self._queue.get_nowait()
+                        except queue.Empty:
+                            self.logger.warning("Queue geleert!")
+                            self._hadSPS = False
+                        self._queue.put((data, frame), timeout=1500)
+
                     #self.logger.debug("SPS")
                 elif frame.frame_type != camf.PiVideoFrameType.sps_header and not self._hadSPS:
                     return
             
             try:
-                self._queue.put(item=(data, frame), block=self._do_transmit.is_set())
+                self._queue.put(item=(data, frame), block=self._do_transmit.is_set(), timeout=1500)
             except queue.Full:
-                self._hadSPS = False
                 #self.logger.debug("NO_SPS")
                 try:
-                    while True:
-                        self._queue.get_nowait()
+                    self._queue.get_nowait()
+                    self._queue.put(item=(data, frame), block=self._do_transmit.is_set(), timeout=1500)
                 except queue.Empty:
-                    pass
+                    #self.logger.warning("Queue geleert!")
+                    self._hadSPS = False
