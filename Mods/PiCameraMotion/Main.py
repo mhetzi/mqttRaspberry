@@ -153,6 +153,8 @@ class PiMotionMain(threading.Thread):
 
         self._pilQueue = queue.Queue(5)
         self._splitStream = None  
+        self._err_topics = None
+        self.was_errored = True
 
     def set_do_record(self, recording: bool):
         self.__logger.info(
@@ -235,6 +237,27 @@ class PiMotionMain(threading.Thread):
         self.__client.message_callback_add(
             self._do_record_topic.command, self.on_message)
         self.set_do_record(self._config.get("record/enabled", True))
+
+        self._err_topics = self._config.get_autodiscovery_topic(
+            autodisc.Component.BINARY_SENROR,
+            "Kamera Error",
+            autodisc.BinarySensorDeviceClasses.PROBLEM
+        )
+        self._err_topics.register(
+            self.__client,
+            "Kamera Error",
+            "",
+            value_template="{{value_json.err}}",
+            json_attributes=True,
+            unique_id="cam.main.error.{}".format(self._config._main.get_client_config().id)
+        )
+        self.__client.publish(
+            self._err_topics.state,
+            json.dumps({
+                "err": 1,
+                "Grund": "Starting..."
+            })
+        )
 
         # Starte thread
         if not wasConnected:
@@ -409,13 +432,30 @@ class PiMotionMain(threading.Thread):
                         if int(fps) != int(pps):
                             self.__logger.warning("Pro Sekunde verarbeitet: %d, sollte aber %d sein", pps, fps)
 
-                        if pps == 0:
+                        if pps == 0 and not self.was_errored:
+                            self.was_errored = True
+                            self.__client.publish(
+                                self._err_topics.state,
+                                json.dumps({
+                                    "err": 1,
+                                    "Grund": "FPS ist 0"
+                                })
+                            )
                             import sys, traceback
                             with open("/tmp/piMotion_last_traces", "w") as f:
                                 for thread_id, frame in sys._current_frames().items():
                                     print('\n--- Stack for thread {t} ---'.format(t=thread_id), file=f)
                                     traceback.print_stack(frame, file=f)
 
+                        elif self.was_errored:
+                            self.was_errored = False
+                            self.__client.publish(
+                                self._err_topics.state,
+                                json.dumps({
+                                    "err": 0,
+                                    "Grund": "Fehler verschwunden"
+                                })
+                            )
                         self._annotation_updater = schedule.every().second
                         self._annotation_updater.do(self.update_anotation)
                         
