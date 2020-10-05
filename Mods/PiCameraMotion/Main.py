@@ -420,6 +420,7 @@ class PiMotionMain(threading.Thread):
                     self.__logger.info(
                         "Stream wird sich normalisiert haben. Queue wird angeschlossen...")
                     self._analyzer.run_queue()
+                    self.update_anotation()
                 threading.Thread(target=first_run, name="Analyzer bootstrap", daemon=True).start()
                 
                 exception_raised = False
@@ -456,8 +457,6 @@ class PiMotionMain(threading.Thread):
                                     "Grund": "Fehler verschwunden"
                                 })
                             )
-                        self._annotation_updater = schedule.every().second
-                        self._annotation_updater.do(self.update_anotation)
                         
                     except Exception as e:
                         self.__logger.exception("Kamera Fehler")
@@ -486,10 +485,15 @@ class PiMotionMain(threading.Thread):
         self._camera = None
 
     def update_anotation(self, aps=0):
+        self._annotation_updater = None
         if self._camera is not None:
             txt_motion = dt.datetime.now().strftime('%d.%m.%Y %H:%M:%S REC') if self._inMotion else dt.datetime.now().strftime('%d.%m.%Y %H:%M:%S STILL')
 
             self._camera.annotate_text = txt_motion
+            self._annotation_updater = threading.Timer(
+                interval=1, function=self.update_anotation
+            )
+            self._annotation_updater.start()
 
             #self._camera.annotate_text = text1 + " {} {}APS {} {} {} {}".format(
             #   txt_motion, aps,
