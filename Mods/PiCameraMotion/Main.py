@@ -6,6 +6,7 @@ import datetime as dt
 import json
 import Tools.PluginManager as pm
 import paho.mqtt.client as mclient
+import schedule
 
 from  Tools.Config import BasicConfig, PluginConfig
 from Tools.ResettableTimer import ResettableTimer
@@ -415,9 +416,8 @@ class PiMotionMain(threading.Thread):
                                     print('\n--- Stack for thread {t} ---'.format(t=thread_id), file=f)
                                     traceback.print_stack(frame, file=f)
 
-                        self.update_anotation = ResettableTimer(
-                            1, self.update_anotation
-                        )
+                        self._annotation_updater = schedule.every().second
+                        self._annotation_updater.do(self.update_anotation)
                         
                     except Exception as e:
                         self.__logger.exception("Kamera Fehler")
