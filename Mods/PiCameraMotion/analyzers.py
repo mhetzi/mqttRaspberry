@@ -216,7 +216,7 @@ class Analyzer(cama.PiAnalysisOutput):
                 )
             if self._motion is not None:
                 try:
-                    if self._framecount > 60:
+                    if self._framecount > 120:
                         br = self.brightness()
                         ld = self.states.get("brightness", 0) - br
                         self.states["brightness"] = br
@@ -238,6 +238,7 @@ class Analyzer(cama.PiAnalysisOutput):
                             False
                         )
                     self.processed += 1
+                    self._framecount += 1
                 except:
                     self.logger.exception("MotionDedector")
                     self._motion = None

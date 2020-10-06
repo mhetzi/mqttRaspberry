@@ -14,6 +14,7 @@ import Tools.Autodiscovery as autodisc
 import logging
 import io
 import shutil
+from math import nan, isnan
 
 try:
     import picamera as cam
@@ -114,6 +115,9 @@ class PiMotionMain(threading.Thread):
     _record_factory = None
     _snapper = None
     _annotation_updater = None
+    _err_topics = None
+    _brightness_topic = None
+    __last_brightness = nan
 
     bitrate = 17000000
     _area = 25 # number of connected MV blocks (each 16x16 pixels) to count as a moving object
@@ -257,6 +261,21 @@ class PiMotionMain(threading.Thread):
                 "err": 1,
                 "Grund": "Starting..."
             })
+        )
+        
+        self._brightness_topic = self._config.get_autodiscovery_topic(
+            autodisc.Component.SENSOR,
+            "Bildhelligkeit",
+            autodisc.SensorDeviceClasses.ILLUMINANCE
+        )
+        
+        self._brightness_topic.register(
+            self.__client,
+            "Bildhelligkeit",
+            "pxLux",
+            value_template="{{value_json.brightness}}",
+            json_attributes=True,
+            unique_id="cam.main.bright.{}".format(self._config._main.get_client_config().id)
         )
         self.was_errored = True
 
@@ -450,7 +469,6 @@ class PiMotionMain(threading.Thread):
                                     traceback.print_stack(frame, file=f)
 
                         elif self.was_errored:
-                            self.was_errored = False
                             self.__client.publish(
                                 self._err_topics.state,
                                 json.dumps({
@@ -458,7 +476,8 @@ class PiMotionMain(threading.Thread):
                                     "Grund": "Fehler verschwunden"
                                 })
                             )
-                        
+                            self.was_errored = False
+                        self.sendBrightness()
                     except Exception as e:
                         self.__logger.exception("Kamera Fehler")
                         self._doExit = True
@@ -602,7 +621,9 @@ class PiMotionMain(threading.Thread):
         if data["type"] == "MotionDedector":
             self._lastState = {
                 "motion": data["motion"], "val": data["val"],
-                "type": data["type"]
+                "type": data["type"],
+                "brightness": data["brightness"],
+                "lightDiff": data["brightness_change"]
             }
         elif data["type"] == "hotblock":
             self._lastState = {
@@ -618,12 +639,26 @@ class PiMotionMain(threading.Thread):
             self.sendStates(changed=changed)
         #self.update_anotation()
 
+    def sendBrightness(self):
+        if self.__last_brightness != self._lastState.get("brightness", nan) and not isnan(self._lastState.get("brightness", nan)):
+            self.__last_brightness = self._lastState.get("brightness", nan)
+
+            self.__client.publish(
+                self._brightness_topic.state,
+                json.dumps({
+                    "brightness": self._lastState.get("brightness", nan),
+                    "diff": self._lastState.get("lightDiff", 0)
+                })
+            )
+
     def sendStates(self, changed=None):
         if changed is None:
             self.__client.publish(self._motion_topic.state, json.dumps(self._lastState))
             self.__client.publish(self._debug_topic.state, json.dumps(self._lastState))
+            self.sendBrightness()
         elif changed:
             self.__client.publish(self._motion_topic.state, json.dumps(self._lastState))
+            self.sendBrightness()
         elif self._sendDebug:
             self.__client.publish(self._debug_topic.state, json.dumps(self._lastState))
 
