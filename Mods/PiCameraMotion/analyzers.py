@@ -216,27 +216,41 @@ class Analyzer(cama.PiAnalysisOutput):
                 )
             if self._motion is not None:
                 try:
-                    if self._framecount > 120:
-                        br = self.brightness()
-                        ld = self.states.get("brightness", 0) - br
-                        self.states["brightness"] = br
-                        self._framecount = 0
-
                     changed, motion = self._motion.analyse(a)
                     if changed:
                         br = self.brightness()
                         ld = self.states.get("brightness", 0) - br
                         self.states["brightness"] = br
+                        if self.config.get("MotionDedector/lightDiffBlock", None) is not None and ld < self.config.get("MotionDedector/lightDiffBlock", None):
+                            self.logger.info("Bewegung blockiert. Grund: Helligkeit rapide gefallen.")
+                        else:
+                            self.motion_call(
+                                motion > 0,{
+                                    "motion": 1 if  motion > 0 else 0,
+                                    "val": motion,
+                                    "type": "MotionDedector",
+                                    "brightness": br,
+                                    "brightness_change": ld
+                                },
+                                False
+                            )
+                    elif self._framecount > 120:
+                        br = self.brightness()
+                        ld = self.states.get("brightness", 0) - br
+                        self.states["brightness"] = br
+                        self._framecount = 0
+                        self.logger.debug("Neue Helligkeit: {}".format(br))
                         self.motion_call(
-                            motion > 0,{
-                                "motion": 1 if  motion > 0 else 0,
-                                "val": motion,
-                                "type": "MotionDedector",
-                                "brightness": br,
-                                "brightness_change": ld
-                            },
-                            False
-                        )
+                                None,{
+                                    "motion": None,
+                                    "val": motion,
+                                    "type": "MotionDedector",
+                                    "brightness": br,
+                                    "brightness_change": ld
+                                },
+                                False
+                            )
+
                     self.processed += 1
                     self._framecount += 1
                 except:

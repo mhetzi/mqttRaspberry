@@ -596,6 +596,9 @@ class PiMotionMain(threading.Thread):
 
 
     def motion(self, motion: bool, data: dict, wasMeassureing: bool, delayed=False):
+        if motion is None:
+            motion = self._lastState["motion"]
+            data["motion"] = self._lastState["motion"]
         if wasMeassureing:
             self._config["motion/blockMinNoise"] = self._analyzer.blockMaxNoise
             self._config["motion/frameMinNoise"] = self._analyzer.countMinNoise
