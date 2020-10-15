@@ -336,7 +336,7 @@ class PiMotionMain(threading.Thread):
         anal.disableAnalyzing = not self._config.get("motion/doAnalyze", True)
         # SET CALLBACKS
         anal.motion_call = lambda motion, data, mes: self.motion(motion, data, mes)
-        anal.motion_data_call = lambda data: self.motion_data(data)
+        anal.motion_data_call = lambda data, changed: self.motion_data(data, changed)
         anal.pil_magnitude_save_call = lambda img, data: self.pil_magnitude_save_call(img, data)
         anal.cal_getMjpeg_Frame = self.getMjpegFrame
         self._analyzer = anal
@@ -596,9 +596,6 @@ class PiMotionMain(threading.Thread):
 
 
     def motion(self, motion: bool, data: dict, wasMeassureing: bool, delayed=False):
-        if motion is None:
-            motion = self._lastState["motion"]
-            data["motion"] = self._lastState["motion"]
         if wasMeassureing:
             self._config["motion/blockMinNoise"] = self._analyzer.blockMaxNoise
             self._config["motion/frameMinNoise"] = self._analyzer.countMinNoise
@@ -637,6 +634,10 @@ class PiMotionMain(threading.Thread):
                 "brightness": data["brightness"], "lightDiff": data["lightDiff"],
                 "type": "hotBlock"
             }
+        elif data["tyoe"] == "brightness":
+            self._lastState["brightness"] = data["brightness"]
+            self._lastState["lightDiff"]  = data["brightness_change"]
+            self.sendBrightness()
         self._jsonOutput.write(self._lastState)
         if self._analyzer is not None and not self._analyzer._calibration_running:
             self.sendStates(changed=changed)

@@ -54,7 +54,7 @@ class Analyzer(cama.PiAnalysisOutput):
     def motion_call(self, motion: bool, data: dict, wasMeassureing: bool):
         self.logger.error("motion_call nicht überschrieben!")
 
-    def motion_data_call(self, data: dict):
+    def motion_data_call(self, data: dict, changed:bool):
         self.logger.error("motion_data_call nicht überschrieben!")
 
     def pil_magnitude_save_call(self, img: Image.Image, data: dict):
@@ -234,21 +234,18 @@ class Analyzer(cama.PiAnalysisOutput):
                                 },
                                 False
                             )
-                    elif self._framecount > 120:
+                    elif self._framecount > 1140:
                         br = self.brightness()
                         ld = self.states.get("brightness", 0) - br
                         self.states["brightness"] = br
                         self._framecount = 0
                         self.logger.debug("Neue Helligkeit: {}".format(br))
-                        self.motion_call(
-                                None,{
-                                    "motion": None,
-                                    "val": motion,
-                                    "type": "MotionDedector",
+                        self.motion_data_call({
+                                    "type": "brightness",
                                     "brightness": br,
                                     "brightness_change": ld
                                 },
-                                False
+                                True
                             )
 
                     self.processed += 1
