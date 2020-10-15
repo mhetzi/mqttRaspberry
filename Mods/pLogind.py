@@ -16,6 +16,7 @@ import Tools.Config as conf
 import Tools.Autodiscovery as autodisc
 import Tools.PluginManager as PluginMan
 from Tools.Devices.Lock import Switch, Lock, LockState
+from Tools.Devices.BinarySensor import BinarySensor
 import logging
 import schedule
 import json
@@ -36,6 +37,54 @@ class GlibThread(threading.Thread):
     
     def shutdown(self):
         self.loop.quit()
+
+class IdleMonitor:
+    _idle_watch_id = None
+
+    def __init__(self, interval:int, log:logging.Logger, pm: PluginMan.PluginManager, bus: dbus.SystemBus, netName="E_NOTSET"):
+        self._log  = log.getChild("Mutter.IdleMonitor")
+        self._timeout = interval
+
+        self._bsensor = BinarySensor(self._log, pm, "{} AFK".format(netName), autodisc.BinarySensorDeviceClasses.OCCUPANCY, "")
+
+        self.proxy     = bus.get_object('org.gnome.Mutter.IdleMonitor', '/org/gnome/Mutter/IdleMonitor/Core')
+        self.idlemon   = dbus.Interface(self.proxy, "org.gnome.Mutter.IdleMonitor")
+
+        self._idle_watch_id = self.idlemon.AddIdleWatch(interval)
+        self._active_watch_id = self.idlemon.AddUserActiveWatch()
+
+        self.idlemon.connect_to_signal("WatchFired", self.isIdle)      
+
+    def stop(self):
+        if self._idle_watch_id is not None:
+            self.idlemon.RemoveWatch(self._idle_watch_id)
+        if self._active_watch_id is not None:
+            self.idlemon.RemoveWatch(self._active_watch_id)
+        self._bsensor.turnOff()
+    
+    def register(self):
+        self._bsensor.register()
+        idleing = self.idlemon.GetIdletime()
+        if idleing > self._timeout:
+            self._bsensor.turnOff()
+        else:
+            self._bsensor.turnOn()
+
+    def isIdle(self, id):
+        self._log.debug("isIdle: ID: {}".format(id))
+        if id == self._idle_watch_id:
+            self._bsensor.turnOff()
+            if self._active_watch_id is not None:
+                self.idlemon.RemoveWatch(self._active_watch_id)
+            self._active_watch_id = self.idlemon.AddUserActiveWatch()
+        elif id == self._active_watch_id:
+            self._bsensor.turnOn()
+            if self._active_watch_id is not None:
+                self.idlemon.RemoveWatch(self._active_watch_id)
+            self._active_watch_id = None
+
+
+
 
 class Session:
     name = ""
@@ -113,12 +162,13 @@ class logindDbus:
         self.inhibit_lock = -1
         self._switches = {}
         self.sessions = {}
-        self._config = opts
+        self._config = conf.PluginConfig(opts, "logind")
 
         self._poff_notiy  = None
         self._sleep_notiy = None
         self._nsess_notiy = None
         self._rsess_notiy = None
+        self._idle_monitor = None
     
     def _setup_dbus_interfaces(self):
         from dbus.mainloop.glib import DBusGMainLoop
@@ -127,6 +177,7 @@ class logindDbus:
         gml.threads_init()
 
         self._bus    = dbus.SystemBus(mainloop=self._mainloop)
+        self._session_bus = dbus.SessionBus(mainloop=self._mainloop)
         self._proxy  = self._bus.get_object('org.freedesktop.login1', '/org/freedesktop/login1')
         self._login1 = dbus.Interface(self._proxy, 'org.freedesktop.login1.Manager')
 
@@ -139,6 +190,16 @@ class logindDbus:
         for session in self._login1.ListSessions():
             self._logger.info("Neue Benutzersession gefunden {} auf {} in Pfad {}.".format(session[2], session[3], session[4]))
             self._mod_session(add=True, path=session[4])
+        
+        if self._config.get("inactivity_ms", None) is not None: 
+            self._idle_monitor = IdleMonitor(
+                self._config["inactivity_ms"],
+                self._logger,
+                self._pluginManager,
+                self._session_bus,
+                netName=autodisc.Topics.get_std_devInf().name if self._config.get("custom_name", None) is None else self._config.get("custom_name", None)
+            )
+        
     
     def _mod_session(self, add=True, path=str):
         if path in self.sessions.keys():
@@ -153,15 +214,17 @@ class logindDbus:
         self.shutdown = shutdown
         self.sw_call(userdata="suspend", state_requested=True)
         self.sw_call(userdata="isOn", state_requested=True)
+        if self._idle_monitor is not None:
+            self._idle_monitor.stop()
 
     def set_pluginManager(self, pm:PluginMan.PluginManager):
         self._pluginManager = pm
 
     def register(self, wasConnected=False):
         self._setup_dbus_interfaces()
-        netName = autodisc.Topics.get_std_devInf().name if self._config.get("logind/custom_name", None) is None else self._config.get("logind/custom_name", None)
+        netName = autodisc.Topics.get_std_devInf().name if self._config.get("custom_name", None) is None else self._config.get("custom_name", None)
         # Kann ich ausschalten?
-        if self._login1.CanPowerOff() == "yes" and self._config.get("logind/allow_power_off", True):
+        if self._login1.CanPowerOff() == "yes" and self._config.get("allow_power_off", True):
             self._switches["isOn"] = Switch(
                 self._logger,
                 self._pluginManager,
@@ -170,7 +233,7 @@ class logindDbus:
             )
             self._bus.add_signal_receiver(handler_function=self.sendSuspend, signal_name="PrepareForShutdown")
         # Kann ich suspend?
-        if self._login1.CanSuspend() == "yes" and self._config.get("logind/allow_suspend", True):
+        if self._login1.CanSuspend() == "yes" and self._config.get("allow_suspend", True):
             self._switches["suspend"] = Switch(
                 self._logger,
                 self._pluginManager,
@@ -179,7 +242,7 @@ class logindDbus:
             )
             self._bus.add_signal_receiver(handler_function=self.sendSuspend, signal_name="PrepareForSleep")
         # Kann ich neustarten?
-        if self._login1.CanReboot() == "yes" and self._config.get("logind/allow_reboot", True):
+        if self._login1.CanReboot() == "yes" and self._config.get("allow_reboot", True):
             self._switches["reboot"] = Switch(
                 self._logger,
                 self._pluginManager,
@@ -187,7 +250,7 @@ class logindDbus:
                 name="{} Neustarten".format(netName), icon="mdi:restart"
             )
         # Kann ich inhibit
-        if self.inhibit( ) > 0 and self._config.get("logind/allow_inhibit", True):
+        if self.inhibit( ) > 0 and self._config.get("allow_inhibit", True):
             self.uninhibit( )
             self._switches["inhibit"] = Switch(
                 self._logger,
@@ -207,16 +270,20 @@ class logindDbus:
             'Publish Powerstatus to Network',
             'delay'
             ).take()
+
+        if self._idle_monitor is not None:
+            self._idle_monitor.register()
+
         if not wasConnected:
             self.thread_gml.start()
 
     def stop(self):
-        self._logger.info("[1/5] Entferne Inhibitation block")
+        self._logger.info("[1/6] Entferne Inhibitation block")
         self.uninhibit( )
-        self._logger.info("[2/5] Entferne Inhibtitation delay")
+        self._logger.info("[2/6] Entferne Inhibtitation delay")
         if self.delay_lock > 0:
             os.close(self.delay_lock)
-        self._logger.info("[3/5] Signale werden entfernt")
+        self._logger.info("[3/6] Signale werden entfernt")
         if self._poff_notiy is not None:
             self._poff_notiy.remove()
         if self._sleep_notiy is not None:
@@ -229,9 +296,13 @@ class logindDbus:
         if self._rsess_notiy is not None:
             self._rsess_notiy.remove()
 
-        self._logger.info("[4/5] Beende Glib MainLoop")
+        if self._idle_monitor is not None:
+            self._logger.info("[4/6] IdleMonitor entfernt Signale und Watches...")
+            self._idle_monitor.stop()
+
+        self._logger.info("[5/6] Beende Glib MainLoop")
         self.thread_gml.shutdown()
-        self._logger.info("[5/5] Warten auf Glib MainLoop")
+        self._logger.info("[6/6] Warten auf Glib MainLoop")
         self.thread_gml.join()
 
     
@@ -268,12 +339,14 @@ class logindDbus:
 
     def sendSuspend(self, sig):
         if int(sig) == 1:
+            self._idle_monitor.stop()
             return self._switches["suspend"].turnOn()
         self._switches["suspend"].turnOff()
 
     def sendShutdown(self, sig):
         if int(sig) == 1:
             self._switches["isOn"].turnOff()
+            self._idle_monitor.stop()
             return self._pluginManager.shutdown()
         self._switches["isOn"].turnOn()
 
@@ -321,14 +394,17 @@ class logindConfig:
     def __init__(self):
         pass
 
-    def configure(self, conf: conf.BasicConfig, logger:logging.Logger):
+    def configure(self, conff: conf.BasicConfig, logger:logging.Logger):
         from Tools import ConsoleInputTools
-        conf["logind/allow_power_off"] = ConsoleInputTools.get_bool_input("\nErlaube Ausschalten: ", True)
-        conf["logind/allow_suspend"] = ConsoleInputTools.get_bool_input("\nErlaube Bereitschaftsmodus: ", True)
-        conf["logind/allow_reboot"] = ConsoleInputTools.get_bool_input("\nErlaube Neustarten: ", True)
-        conf["logind/allow_inhibit"] = ConsoleInputTools.get_bool_input("\nErlaube Blockieren von Schlafmodus: ", True)
+        conf = conf.PluginConfig(conff, "logind")
+
+        conf["allow_power_off"] = ConsoleInputTools.get_bool_input("\nErlaube Ausschalten: ", True)
+        conf["allow_suspend"] = ConsoleInputTools.get_bool_input("\nErlaube Bereitschaftsmodus: ", True)
+        conf["allow_reboot"] = ConsoleInputTools.get_bool_input("\nErlaube Neustarten: ", True)
+        conf["allow_inhibit"] = ConsoleInputTools.get_bool_input("\nErlaube Blockieren von Schlafmodus: ", True)
         if ConsoleInputTools.get_bool_input("\nBenutze anderen Namen: ", True):
-            conf["logind/custom_name"] = ConsoleInputTools.get_input("\nDen Namen Bitte: ", True)
+            conf["custom_name"] = ConsoleInputTools.get_input("\nDen Namen Bitte: ", True)
+        conf["inactivity_ms"] = ConsoleInputTools.get_number_input("\nInaktivität nach x Millisekunden: ")
 
 
 class PluginLoader:
