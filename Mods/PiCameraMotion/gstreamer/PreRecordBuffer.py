@@ -48,6 +48,7 @@ class PreRecordBuffer(threading.Thread):
     def _thread_run(self):
         while self._do_thread_run:
             if not self._do_transmit.is_set() and self.recorder is not None:
+                self.logger.debug("Aufnahme stoppen")
                 self.recorder.stop()
                 self.recorder = None
                 self.logger.debug("Aufnahme gestoppt")

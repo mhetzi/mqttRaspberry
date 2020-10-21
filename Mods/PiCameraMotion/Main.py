@@ -241,15 +241,17 @@ class PiMotionMain(threading.Thread):
         self.__client.message_callback_add(
             self._do_record_topic.command, self.on_message)
         self.set_do_record(self._config.get("record/enabled", True))
+        
 
+        errName = "{} Kamera Fehler".format(sensorName)
         self._err_topics = self._config.get_autodiscovery_topic(
             autodisc.Component.BINARY_SENROR,
-            "Kamera Error",
+            errName,
             autodisc.BinarySensorDeviceClasses.PROBLEM
         )
         self._err_topics.register(
             self.__client,
-            "Kamera Error",
+            errName,
             "",
             value_template="{{value_json.err}}",
             json_attributes=True,
@@ -631,10 +633,10 @@ class PiMotionMain(threading.Thread):
                 "x": data["hotest"][0], "y": data["hotest"][1],
                 "val": data["hotest"][2], "c": data["noise_count"],
                 "dbg_on": self._sendDebug, "ext": data["extendet"],
-                "brightness": data["brightness"], "lightDiff": data["lightDiff"],
+                "brightness": data["brightness"], "lightDiff": data["brightness_change"],
                 "type": "hotBlock"
             }
-        elif data["tyoe"] == "brightness":
+        elif data["type"] == "brightness":
             self._lastState["brightness"] = data["brightness"]
             self._lastState["lightDiff"]  = data["brightness_change"]
             self.sendBrightness()

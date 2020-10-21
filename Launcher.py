@@ -10,6 +10,9 @@ import Tools.PluginManager as pman
 import Tools.Config as tc
 import signal
 import ctypes
+import datetime
+from pathlib import Path
+import faulthandler
 
 LIB = 'libcap.so.2'
 try:
@@ -34,6 +37,7 @@ class Launcher:
     reload = True
     reconnect_time = 0.1
     mqtt_client = None
+    faultFile = None
 
     def __init__(self):
         log = logging.getLogger("Launch")
@@ -53,6 +57,7 @@ class Launcher:
         self._ch = ch
         self._log = log
         self.config = None
+        self.abrt_file = None
         signal.signal(signal.SIGTERM, self.exit)
 
     def pm_reload(self):
@@ -181,6 +186,16 @@ class Launcher:
             if i == "y" or i == "Y":
                 return
 
+        
+        configFolder = Path(configPath).parent
+        failFile = configFolder.joinpath("fails")
+        failFile.mkdir(exist_ok=True)
+        failFile = failFile.joinpath(
+            "{}.log".format(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        )
+        self.faultFile = failFile.open('w')
+        faulthandler.enable(file=self.faultFile, all_threads=True)
+
         self.relaunch()
 
     def exit(self, signum, frame):
@@ -194,6 +209,10 @@ class Launcher:
         self.config.save()
         self.config.stop()
         self._log.info("Beende mich...")
+        if faulthandler.is_enabled():
+            faulthandler.disable()
+        if self.faultFile is not None and not self.faultFile.closed:
+            self.faultFile.close()
         exit(0)
 
 
