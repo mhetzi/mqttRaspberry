@@ -40,6 +40,9 @@ class GlibThread(threading.Thread):
 
 class IdleMonitor:
     _idle_watch_id = None
+    _register_delay_id = None
+    _IdelingPolling = None
+    _is_idle  = False
 
     def __init__(self, interval:int, log:logging.Logger, pm: PluginMan.PluginManager, bus: dbus.SystemBus, netName="E_NOTSET"):
         self._log  = log.getChild("Mutter.IdleMonitor")
@@ -47,28 +50,57 @@ class IdleMonitor:
 
         self._bsensor = BinarySensor(self._log, pm, "{} AFK".format(netName), autodisc.BinarySensorDeviceClasses.OCCUPANCY, "")
 
-        self.proxy     = bus.get_object('org.gnome.Mutter.IdleMonitor', '/org/gnome/Mutter/IdleMonitor/Core')
-        self.idlemon   = dbus.Interface(self.proxy, "org.gnome.Mutter.IdleMonitor")
+        self._bus      = bus
+        self.proxy     = None
+        self.idlemon   = None
 
-        self._idle_watch_id = self.idlemon.AddIdleWatch(interval)
-        self._active_watch_id = self.idlemon.AddUserActiveWatch()
-
-        self.idlemon.connect_to_signal("WatchFired", self.isIdle)      
+        self._idle_watch_id   = None
+        self._active_watch_id = None
 
     def stop(self):
+        if self._IdelingPolling is not None:
+            schedule.cancel_job(self._IdelingPolling)
+        if self._register_delay_id is not None:
+            schedule.cancel_job(self._register_delay_id)
         if self._idle_watch_id is not None:
             self.idlemon.RemoveWatch(self._idle_watch_id)
         if self._active_watch_id is not None:
             self.idlemon.RemoveWatch(self._active_watch_id)
         self._bsensor.turnOff()
     
+    def _delayed_register(self):
+        try:
+            self.proxy     = self._bus.get_object('org.gnome.Mutter.IdleMonitor', '/org/gnome/Mutter/IdleMonitor/Core')
+            self.idlemon   = dbus.Interface(self.proxy, "org.gnome.Mutter.IdleMonitor")
+
+            self._idle_watch_id = self.idlemon.AddIdleWatch(self._timeout)
+            self._active_watch_id = self.idlemon.AddUserActiveWatch()
+
+            self.idlemon.connect_to_signal("WatchFired", self.isIdle)   
+
+            self._bsensor.register()
+            idleing = self.idlemon.GetIdletime()
+            if idleing > self._timeout:
+                self._bsensor.turnOff()
+                self._is_idle = True
+            else:
+                self._bsensor.turnOn()
+                self._is_idle = False
+            if self._register_delay_id is not None:
+                schedule.cancel_job(self._register_delay_id)
+            
+            if self._IdelingPolling is not None:
+                schedule.cancel_job(self._IdelingPolling)
+            self._IdelingPolling = schedule.every(2).minutes.do(self.isIdleDead)
+        except dbus.exceptions.DBusException:
+            self._log.warning("DBus Signale von Mutter verbinden fehlgeschlagen! Wird in 30 Sekunden erneut probiert,,,")
+            pass
+
     def register(self):
-        self._bsensor.register()
-        idleing = self.idlemon.GetIdletime()
-        if idleing > self._timeout:
-            self._bsensor.turnOff()
-        else:
-            self._bsensor.turnOn()
+        if self._register_delay_id is not None:
+            schedule.cancel_job(self._register_delay_id)
+        self._register_delay_id = schedule.every(30).seconds.do(self._delayed_register)
+        self._register_delay_id.run()  
 
     def isIdle(self, id):
         self._log.debug("isIdle: ID: {}".format(id))
@@ -83,7 +115,18 @@ class IdleMonitor:
                 self.idlemon.RemoveWatch(self._active_watch_id)
             self._active_watch_id = None
 
-
+    def isIdleDead(self):
+        idleing = self.idlemon.GetIdletime()
+        isIdle = idleing > self._timeout
+        if isIdle != self._is_idle:
+            self._log.info("Polling Idle zeigt dass uns das Event nicht erreicht hat.")
+            from time import sleep
+            sleep(0.25)
+            isIdle = idleing > self._timeout
+            if isIdle != self._is_idle:
+                self._log.warning("Polling Idle zeigt dass uns das Event definitiv nicht erreicht hat. Signale werden neu eingerichte...")
+                self.stop()
+                self.register()
 
 
 class Session:
