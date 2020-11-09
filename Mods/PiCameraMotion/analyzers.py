@@ -60,7 +60,7 @@ class Analyzer(cama.PiAnalysisOutput):
     def pil_magnitude_save_call(self, img: Image.Image, data: dict):
         self.logger.error("pil_magnitude_save_call nicht überschrieben")
 
-    def cal_getMjpeg_Frame(self):
+    def cal_getMjpeg_Frame(self, block, timeout):
         raise NotImplementedError()
 
     def __init__(self, camera, size=None, logger=None, config=None, fps=24, postSecs=1):
@@ -291,7 +291,7 @@ class Analyzer(cama.PiAnalysisOutput):
             self.states["extendet"] = "ZeroMap aktualisieren" if update else "ZeroMap erstellen"
     
     def brightness(self):
-        frame = self.cal_getMjpeg_Frame()
+        frame = self.cal_getMjpeg_Frame(False, 0.125)
         bio = None
         if frame is not None:
             try:
@@ -301,7 +301,7 @@ class Analyzer(cama.PiAnalysisOutput):
                 return -1
         else:
             self.logger.warning("Snapshot is None")
-            return
+            return 0
         stat = ImageStat.Stat(bio)
         r,g,b = stat.mean
         return math.sqrt(0.299*(r**2) + 0.587*(g**2) + 0.114*(b**2))

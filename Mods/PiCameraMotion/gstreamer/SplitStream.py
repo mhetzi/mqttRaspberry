@@ -20,6 +20,13 @@ class CameraSplitter(cams.PiCameraCircularIO):
         self.splitter_port = splitter_port
         self._camera = camera
         self._blockEof = True
+        self.written = 0
+        #self.fps = 0
+        #import schedule
+        #def show_fps():
+        #    self.log.debug("FPS:{}".format(self.fps))
+        #    self.fps = 0
+        #schedule.every(1).second.do(show_fps)
 
     def add(self, func, customID=None):
         if not callable(func):
@@ -63,6 +70,7 @@ class CameraSplitter(cams.PiCameraCircularIO):
         self.dispatch(item, frame)
 
     def write(self, b):
+        self.written += 1
         #self.log.debug("write {} bytes".format(len(b)))
         self.adapter(b)
         self._blockEof = False

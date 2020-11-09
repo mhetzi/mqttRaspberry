@@ -419,6 +419,7 @@ class logindDbus:
             self._switches["isOn"].turnOff()
         elif userdata == "suspend" and msg == "ON":
             self._login1.Suspend(True)
+            self._idle_monitor.stop()
         elif userdata == "reboot" and msg == "ON": 
             self._login1.Reboot(True)
         elif userdata == "inhibit" and msg == "ON":

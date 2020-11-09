@@ -145,7 +145,7 @@ class AppSource(threading.Thread):
                     #self.logger.debug("SPS")
                     self._hadSPS = True
                     try:
-                        self._queue.put((data, frame), timeout=1000)
+                        self._queue.put((data, frame), timeout=0.15)
                     except queue.Full:
                         self._hadSPS = False
                     return
@@ -159,7 +159,7 @@ class AppSource(threading.Thread):
                 self._queue.put_nowait((data,frame))
             except queue.Full:
                 if self._sendData.isSet():
-                    self._queue.put((data, frame))
+                    self._queue.put((data, frame), block=True, timeout=0.25)
                     return
                 self._hadSPS = False
                 try:

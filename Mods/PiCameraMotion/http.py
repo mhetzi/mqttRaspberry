@@ -80,9 +80,15 @@ class StreamingOutput(object):
             # New frame, copy the existing buffer's content and notify all
             # clients it's available
             self.buffer.truncate()
-            with self.condition:
-                self.frame = self.buffer.getvalue()
-                self.condition.notify_all()
+            try:
+                if self.condition.acquire(True, 0.125):
+                    self.frame = self.buffer.getvalue()
+                    try:
+                        self.condition.notify_all()
+                    except: 
+                        pass
+                    self.condition.release()
+            except: pass
             self.buffer.seek(0)
         return self.buffer.write(buf)
 
@@ -199,6 +205,7 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
                 try:
                     frame = None
                     with output.condition:
+                        output.condition.wait()
                         frame = output.frame
                     self.send_response(200)
                     self.send_header('Age', 0)

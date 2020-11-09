@@ -164,30 +164,6 @@ class PiMotionMain(threading.Thread):
         self.__logger.info(
             "Config Wert aufnehmen wird auf {} gesetzt".format(recording))
         self._config["record/enabled"] = recording
-        self.__client.publish(self._do_record_topic.state,
-                              payload=b'ON' if recording else b'OFF')
-
-    def set_do_dbg(self, debug: bool):
-        self.__logger.info(
-            "Config Wert Dbg wird auf {} gesetzt".format(debug))
-        self.__client.publish(self._do_record_topic.state,
-                              payload=b'ON' if debug else b'OFF')
-
-    def on_message(self, client, userdata, message: mclient.MQTTMessage):
-        if self._do_record_topic.command == message.topic:
-            if message.payload.decode('utf-8') == "ON":
-                #self.set_do_record(True)
-                self.do_record(True)
-            elif message.payload.decode('utf-8') == "OFF":
-                #self.do_record(False)
-                self.set_do_record(False)
-
-    def on_dbg_message(self, client, userdata, message: mclient.MQTTMessage):
-        if self._do_record_topic.command == message.topic:
-            if message.payload.decode('utf-8') == "ON":
-                self.set_do_dbg(True)
-            elif message.payload.decode('utf-8') == "OFF":
-                self.set_do_dbg(False)
 
     def register(self, wasConnected=False):
         # Setup MQTT motion binary_sensor
@@ -204,45 +180,9 @@ class PiMotionMain(threading.Thread):
         if self._motion_topic.config is not None:
             self.__client.publish(self._motion_topic.config,
                                   payload=motion_payload, qos=0, retain=True)
-        # Setup MQTT debug sensor
-        uid_debug = "switch.piMotion-dbg-{}-{}".format(
-            self._device_id, sensorName)
-        self._debug_topic = self._config.get_autodiscovery_topic(
-            autodisc.Component.SWITCH,
-            sensorName,
-            autodisc.SensorDeviceClasses.GENERIC_SENSOR
-        )
-        debug_payload = self._debug_topic.get_config_payload(
-            sensorName, "", unique_id=uid_debug, value_template="{{ value_json.on_dbg_message }}", json_attributes=True)
-        if self._debug_topic.config is not None:
-            self.__client.publish(self._debug_topic.config,
-                                  payload=debug_payload, qos=0, retain=True)
-        self.__client.subscribe(self._debug_topic.command)
-        self.__client.message_callback_add(
-            self._debug_topic.command, self.on_dbg_message)
-        # Setup MQTT recording switch
-        switchName = "{} Aufnehmen".format(sensorName)
-        uid_do_record = "switch.piMotion-{}-{}".format(
-            self._device_id, switchName.replace(" ", "_"))
-        self._do_record_topic = self._config._main.get_autodiscovery_topic(
-            autodisc.Component.SWITCH,
-            switchName,
-            autodisc.SensorDeviceClasses.GENERIC_SENSOR
-        )
-        do_record_payload = self._do_record_topic.get_config_payload(
-            switchName,
-            "",
-            unique_id=uid_do_record
-        )
-        if self._do_record_topic is not None:
-            self.__client.publish(
-                self._do_record_topic.config, payload=do_record_payload, qos=0, retain=True)
-        self.__client.subscribe(self._do_record_topic.command)
-        self.__client.message_callback_add(
-            self._do_record_topic.command, self.on_message)
+
         self.set_do_record(self._config.get("record/enabled", True))
         
-
         errName = "{} Kamera Fehler".format(sensorName)
         self._err_topics = self._config.get_autodiscovery_topic(
             autodisc.Component.BINARY_SENROR,
@@ -287,8 +227,6 @@ class PiMotionMain(threading.Thread):
             self._pilThread = threading.Thread(
                 target=self.pil_magnitude_save, name="MagSave")
             self._pilThread.start()
-
-        self.set_do_dbg(self._sendDebug)
 
     def set_pluginManager(self, p: pm.PluginManager):
         self._pluginManager = p
@@ -446,12 +384,17 @@ class PiMotionMain(threading.Thread):
                 threading.Thread(target=first_run, name="Analyzer bootstrap", daemon=True).start()
                 
                 exception_raised = False
+                sleep_seconds = 2
                 while not self._doExit:
                     try:
-                        camera.wait_recording(2, splitter_port=1)
-                        pps = self._analyzer.processed / 2
+                        camera.wait_recording(sleep_seconds, splitter_port=1)
+                        if self._analyzer.disableAnalyzing:
+                            pps = self._splitStream.written / sleep_seconds
+                            self._splitStream.written = 0
+                        else:
+                            pps = self._analyzer.processed / sleep_seconds
+                            self._analyzer.processed = 0
                         fps = self._config.get("camera/fps", 23)
-                        self._analyzer.processed = 0
                         if int(fps) != int(pps):
                             self.__logger.warning("Pro Sekunde verarbeitet: %d, sollte aber %d sein", pps, fps)
 
@@ -675,12 +618,13 @@ class PiMotionMain(threading.Thread):
             except queue.Full:
                 pass
 
-    def getMjpegFrame(self):
-        frame = None
+    def getMjpegFrame(self, block=True, timeout=-1):
         try:
-            with self._http_out.condition:
-                frame = self._http_out.frame
-            return frame
+            if block:
+                with self._http_out.condition:
+                    self._http_out.condition.wait()
+                    return self._http_out.frame
+            return self._http_out.frame
         except AttributeError:
             return None
 

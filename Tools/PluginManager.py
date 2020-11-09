@@ -205,7 +205,7 @@ class PluginManager:
         client_log.setLevel(logging.INFO)
         client.enable_logger(logger=client_log)
         client.on_connect = self.connect_callback
-        client.connect(cc.host, port=cc.port)
+        client.connect_async(cc.host, port=cc.port)
         client.on_disconnect = self.disconnect_callback
         self._client = client
         self._client_name = my_name
