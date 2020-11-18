@@ -9,3 +9,4 @@ class UpdateType(enum.Enum):
     ObsAir = 4
     RainStart = 5
     RapidWind = 6
+    ObsTempest = 7

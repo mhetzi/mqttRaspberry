@@ -5,6 +5,7 @@ import logging
 import threading
 import time
 import math
+from typing import Union
 
 import paho.mqtt.client as mclient
 import schedule
@@ -15,7 +16,7 @@ import Tools.PluginManager
 import Tools.ResettableTimer as rTimer
 from Mods.Weatherflow.UpdateTypes import (DeviceStatus, HubStatus,
                                           LightningStrikeEvent, Obs_Sky,
-                                          ObsAir, RainStart, RapidWind, Tools,
+                                          ObsAir, RainStart, RapidWind, Tools, ObsTempest,
                                           updateType)
 from Tools.Config import BasicConfig
 
@@ -118,13 +119,15 @@ class WeatherflowPlugin:
         if serial not in self._config.get("Weatherflow/serial_reg", []):
             self._config["Weatherflow/serial_reg"].append(serial)
 
-    def register_new_air(self, serial_number, update: ObsAir.ObsAir):
+    def register_new_air(self, serial_number, update: Union[ObsAir.ObsAir, ObsTempest.ObsTempest], tempest_device=None):
         deviceInfo = autodisc.DeviceInfo()
         deviceInfo.IDs = [serial_number]
         deviceInfo.mfr = "Weatherflow"
         deviceInfo.model = "Air"
         deviceInfo.name = "Weatherflow AIR"
         deviceInfo.sw_version = update.firmware_revision
+        if tempest_device is not None:
+            deviceInfo = tempest_device
         std_dev = autodisc.Topics.get_std_devInf()
         
         if len(std_dev.IDs) > 0:
@@ -156,13 +159,16 @@ class WeatherflowPlugin:
             self.update_sensor(serial_number, "lightning_count_min", 0, autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR)
 
 
-    def register_new_sky(self, serial_number, upd: Obs_Sky.ObsSky):
+    def register_new_sky(self, serial_number, upd: Union[Obs_Sky.ObsSky, ObsTempest.ObsTempest], tempest_device=None):
         deviceInfo = autodisc.DeviceInfo()
         deviceInfo.IDs = [serial_number]
         deviceInfo.mfr = "Weatherflow"
         deviceInfo.model = "Sky"
         deviceInfo.name = "Weatherflow SKY"
         deviceInfo.sw_version = upd.firmware_revision
+
+        if tempest_device is not None:
+            deviceInfo = tempest_device
 
         std_dev = autodisc.Topics.get_std_devInf()
         
@@ -291,6 +297,18 @@ class WeatherflowPlugin:
             self.process_obs_air(pupd)
         elif pupd.update_type == updateType.UpdateType.ObsSky:
             self.process_obs_sky(pupd)
+        elif pupd.update_type == updateType.UpdateType.ObsTempest:
+            if not self.set_lastseen_device(pupd.serial_number, pupd.report_interval_minutes):
+                deviceInfo = autodisc.DeviceInfo()
+                deviceInfo.IDs = [pupd.serial_number]
+                deviceInfo.mfr = "Weatherflow"
+                deviceInfo.model = "Tempest"
+                deviceInfo.name = "Weatherflow Tempest"
+                deviceInfo.sw_version = pupd.firmware_revision
+                self.register_new_air(pupd.serial_number, pupd, deviceInfo)
+                self.register_new_sky(pupd.serial_number, pupd, deviceInfo)
+            self.process_obs_air(pupd)
+            self.process_obs_sky(pupd)
         elif pupd.update_type == updateType.UpdateType.LightningStrikeEvent:
             self._logger.info("Air sagt es blitzt!")
             if not self._config["Weatherflow/events"]:
@@ -343,7 +361,7 @@ class WeatherflowPlugin:
         self._online_states[serial_number]["intervall"] = interval
         return True
 
-    def process_obs_air(self, update: ObsAir.ObsAir):
+    def process_obs_air(self, update: Union[ObsAir.ObsAir, ObsTempest.ObsTempest]):
         self._logger.debug("Air update")
         if not self.set_lastseen_device(update.serial_number, update.report_intervall_minutes):
             self.register_new_air(update.serial_number, update)
@@ -384,6 +402,8 @@ class WeatherflowPlugin:
             self.update_sensor(update.serial_number, "lightning_last_nrg", "0", autodisc.SensorDeviceClasses.GENERIC_SENSOR)
 
         battery_str = math.floor(WeatherflowPlugin.percentageMinMax(update.battery, 1.6, 2.95))
+        if isinstance(update, ObsTempest.ObsTempest):
+            battery_str = 100
         sensor_ok = ""
         if self._deviceUpdates[update.serial_number]._sensor_status == DeviceStatus.SensorStatus.OK:
             sensor_ok = "OK"
@@ -422,7 +442,7 @@ class WeatherflowPlugin:
                         }
         self.update_sensor(update.serial_number, "battery", battery_json, autodisc.SensorDeviceClasses.BATTERY)
 
-    def process_obs_sky(self, update: Obs_Sky.ObsSky):
+    def process_obs_sky(self, update: Union[Obs_Sky.ObsSky, ObsTempest.ObsTempest]):
         self._logger.debug("Sky update")
         if not self.set_lastseen_device(update.serial_number, update.report_interval_minutes):
             self.register_new_sky(update.serial_number, update)
@@ -476,26 +496,50 @@ class WeatherflowPlugin:
         }
         self.update_sensor(update.serial_number, "local_day_rain_accumulation", json.dumps(daily_rain_js), autodisc.SensorDeviceClasses.GENERIC_SENSOR)
         self.update_is_windy(update.serial_number, True, update.wind_avg, update.wind_direction)
-        
-        charging_str = "on battery"
-        battery_str = math.floor(WeatherflowPlugin.percentageMinMax(update.battery, 1.6, 3.18))
+	
+        charging_str = "NULL"
+        battery_str = 0
         sensors = ""
+        
+        if isinstance(update, ObsTempest.ObsTempest):
+            last_pct = self._config.get("Weatherflow/{0}/last".format(update.serial_number), -1)
+            if update.battery != last_pct:
+                self._config["Weatherflow/{0}/last".format(update.serial_number)] = update.battery
+            if last_pct == -1:
+                last_pct = update.battery
+            self._config["Weatherflow/{0}/last".format(update.serial_number)] = update.battery
+            range_min = 1.8
+            range_max = 2.85
+            battery_str = math.floor(WeatherflowPlugin.percentageMinMax(update.battery, range_min, range_max))
+            charging_str = "Lädt" if last_pct < update.battery else "Entlädt"
+            if update.battery <= 2.355:
+                charging_str = "Sensoren auf 5 Minuten intervall gesetzt, Blitzerkennung, Regen deaktiviert| {} Ultra Energiesparmodus".format(charging_str)
+            elif update.battery <= 2.39:
+                charging_str = "Windsensor auf 1 Minuten intervall gesetzt. | {} Energiesparmodus".format(charging_str)
+            elif update.battery <= 2.415:
+                charging_str =  "Windsensor auf 6 Sekunden intervall gesetzt. | {} Leichter Energiesparmodus".format(charging_str)
+            else:
+                charging_str = "OK | {} Kein Energiesparen".format(charging_str)
+        else:
+            charging_str = "on battery"
+            battery_str = math.floor(WeatherflowPlugin.percentageMinMax(update.battery, 1.6, 3.18))
 
-        if update.battery > 3.32:
-            self._config["Weatherflow/sky_solar_module"] = True
-        if self._config.get("Weatherflow/sky_solar_module", False):
-            charging_str = "discharging"
-            battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2.5, 3.6), 1)
-            if update.battery > 3.2:
-                battery_str = 100
-                charging_str = "Komplett aufgeladen"
-            elif update.battery > 3.5:
-                battery_str = 100
-                charging_str = "Aufladen"
-            elif update.battery < 3.0:
-                charging_str = 'Unter "Working voltage"'
-        elif update.battery < 1.8:
-            charging_str = "Austauschen"
+            if update.battery > 3.32:
+                self._config["Weatherflow/sky_solar_module"] = True
+            if self._config.get("Weatherflow/sky_solar_module", False):
+                charging_str = "discharging"
+                battery_str = round(WeatherflowPlugin.percentageMinMax(update.battery, 2.5, 3.6), 1)
+                if update.battery > 3.2:
+                    battery_str = 100
+                    charging_str = "Komplett aufgeladen"
+                elif update.battery > 3.5:
+                    battery_str = 100
+                    charging_str = "Aufladen"
+                elif update.battery < 3.0:
+                    charging_str = 'Unter "Working voltage"'
+            elif update.battery < 1.8:
+                charging_str = "Austauschen"
+ 
         if self._deviceUpdates[update.serial_number]._sensor_status == DeviceStatus.SensorStatus.OK:
             sensors = "OK"
         else:
@@ -581,3 +625,4 @@ class WeatherflowPlugin:
             self._timer.cancel()
             self._timer = threading.Timer(30, self.check_online_status)
             self._timer.start()
+

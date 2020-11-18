@@ -1,7 +1,7 @@
-from Mods.Weatherflow.UpdateTypes import DeviceStatus, HubStatus, LightningStrikeEvent, Obs_Sky, ObsAir, RainStart, RapidWind, updateType
+from Mods.Weatherflow.UpdateTypes import DeviceStatus, HubStatus, LightningStrikeEvent, Obs_Sky, ObsAir, RainStart, RapidWind, updateType, ObsTempest
 
 allUpdateTypes = [DeviceStatus.DeviceStatus, HubStatus.HubStatus, LightningStrikeEvent.LightningStrikeEvent,
-                  Obs_Sky.ObsSky, ObsAir.ObsAir, RainStart.RainStartEvent, RapidWind.RapidWind]
+                  Obs_Sky.ObsSky, ObsAir.ObsAir, RainStart.RainStartEvent, RapidWind.RapidWind, ObsTempest.ObsTempest]
 
 
 def parse_json_to_update(json: dict):
@@ -12,3 +12,4 @@ def parse_json_to_update(json: dict):
         except KeyError:
             pass
     return None
+
