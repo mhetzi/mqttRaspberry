@@ -9,6 +9,7 @@ from http import server
 import urllib
 import threading
 import time
+import queue
 import cgi
 
 try:
@@ -70,10 +71,17 @@ UPLOAD = u"""
 """
 
 class StreamingOutput(object):
-    def __init__(self):
+    def __init__(self, log):
+        self._log = log.getChild("mjpeg_output")
         self.frame = None
         self.buffer = io.BytesIO()
         self.condition = Condition()
+        self.queue = queue.Queue(25)
+        self.thread = threading.Thread(target=self._run, name="MJPEG Dispatch")
+        self.thread.start()
+
+    def shutdown(self):
+        self.queue.put(None)
 
     def write(self, buf):
         if buf.startswith(b'\xff\xd8'):
@@ -81,16 +89,27 @@ class StreamingOutput(object):
             # clients it's available
             self.buffer.truncate()
             try:
-                if self.condition.acquire(True, 0.125):
-                    self.frame = self.buffer.getvalue()
-                    try:
-                        self.condition.notify_all()
-                    except: 
-                        pass
-                    self.condition.release()
+                self.frame = self.buffer.getvalue()
+                self.queue.put_nowait(self.frame)
+            except queue.Full:
+                self._log.warning("MJPEG Framequeue ist voll")
             except: pass
             self.buffer.seek(0)
         return self.buffer.write(buf)
+
+    def _run(self):
+        self._log.debug("MJPEG Dispatch läuft")
+        while True:
+            try:
+                self.frame = self.queue.get(block=True, timeout=10)
+                with self.condition:
+                    if self.frame is None:
+                        self._log.info("MJPEG frame is None, going down...")
+                    self.condition.notify_all()
+            except queue.Empty:
+                self._log.warning("Kein neues MJPEG Frame seit 10 Sekunden!")
+            except: 
+                self._log.exception("Fehler bei weitergabe des Frames")
 
 
 class StreamingJsonOutput(object):
@@ -188,11 +207,16 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
                 self.end_headers()
                 try:
                     while True:
+                        frame = None
                         with output.condition:
-                            output.condition.wait()
-                            frame = output.frame
+                            if output.condition.wait(10.0):
+                                frame = output.frame
+                                ctypte = "image/jpeg"
+                            else:
+                                frame = "ETIMEOUT"
+                                ctypte = "text/plain"
                         self.wfile.write(b'--FRAME\r\n')
-                        self.send_header('Content-Type', 'image/jpeg')
+                        self.send_header('Content-Type', ctypte)
                         self.send_header('Content-Length', len(frame))
                         self.end_headers()
                         self.wfile.write(frame)
@@ -205,13 +229,17 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
                 try:
                     frame = None
                     with output.condition:
-                        output.condition.wait()
-                        frame = output.frame
+                        if output.condition.wait(10.0):
+                            frame = output.frame
+                            ctypte = "image/jpeg"
+                        else:
+                            frame = "ETIMEOUT"
+                            ctypte = "text/plain"
                     self.send_response(200)
                     self.send_header('Age', 0)
                     self.send_header('Cache-Control', 'no-cache, private')
                     self.send_header('Pragma', 'no-cache')
-                    self.send_header('Content-Type', 'image/jpeg')
+                    self.send_header('Content-Type', ctypte)
                     self.send_header('Content-Length', len(frame))
                     self.end_headers()
                     self.wfile.write(frame)

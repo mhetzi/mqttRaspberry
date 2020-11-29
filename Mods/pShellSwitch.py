@@ -52,7 +52,7 @@ class ShellSwitch:
                     state_js["error_code"] = cp.returncode
                     self.__logger.info("{} wurde ausgeschaltet.".format(name))
                 if not switch["onOff"]:
-                    switch["onOff"] = False
+                    switch["wasOn"] = False
                 else:
                     switch["wasOn"] = on
             elif initKill and switch["init_command"] is not None:

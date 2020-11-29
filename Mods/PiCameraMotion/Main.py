@@ -256,6 +256,8 @@ class PiMotionMain(threading.Thread):
             self.__logger.info("Warte auf PIL Thread...")
             self._pilThread.join(10)
             self._pilQueue = None
+        if self._http_out is not None:
+            self._http_out.shutdown()
 
     def setupAnalyzer(self, camera: cam.PiCamera):
         anal = analyzers.Analyzer(
@@ -309,7 +311,7 @@ class PiMotionMain(threading.Thread):
 
     def setupHttpServer(self):
         self.__logger.info("Aktiviere HTTP...")
-        http_out = httpc.StreamingOutput()
+        http_out = httpc.StreamingOutput(self.__logger)
         self._http_out = http_out
 
         self._jsonOutput = httpc.StreamingJsonOutput()
@@ -447,6 +449,9 @@ class PiMotionMain(threading.Thread):
             camera.stop_recording()
         except:
             pass
+        try:
+            self._http_out.shutdown()
+        except: pass
         self._camera = None
 
     def update_anotation(self, aps=0):
