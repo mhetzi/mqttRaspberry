@@ -167,7 +167,7 @@ class ModemManagerDbus:
             signal_raw["RSSI"] = lte["rssi"]
         elif signal_api.Gsm != {}:
             gsm = signal_api.Gsm
-            signal_stat["Art"] = "GSM (2G)"
+            signal_stat["Art"] = "GSM (2G)" 
             signal_stat["RSSI"] = self._getIndexFrom("GSM", "RSSI", gsm["rssi"])
 
             signal_raw["Art"] = "GSM (2G)"
@@ -175,14 +175,22 @@ class ModemManagerDbus:
         elif signal_api.Umts != {}:
             umts = signal_api.Umts
             signal_stat["Art"]  = "UMTS (3G)"
-            signal_stat["RSSI"] = self._getIndexFrom("3G", "RSSI", gsm["rssi"])
-            signal_stat["RSCP"] = self._getIndexFrom("3G", "RCSP", gsm["rcsp"])
-            signal_stat["ECIO"] = self._getIndexFrom("3G", "ECIO", gsm["ecio"])
+            signal_stat["RSSI"] = self._getIndexFrom("3G", "RSSI", umts["rssi"])
+            try:
+                signal_stat["RSCP"] = self._getIndexFrom("3G", "RSCP", umts["rscp"])
+            except: pass
+            try:
+                signal_stat["ECIO"] = self._getIndexFrom("3G", "ECIO", umts["ecio"])
+            except: pass
 
             signal_raw["Art"]  = "UMTS (3G)"
-            signal_raw["RSSI"] = gsm["rssi"]
-            signal_raw["RSCP"] = gsm["rcsp"]
-            signal_raw["ECIO"] = gsm["ecio"]
+            signal_raw["RSSI"] = umts["rssi"]
+            try:
+                signal_raw["RSCP"] = umts["rscp"]
+            except: pass
+            try:
+                signal_raw["ECIO"] = umts["ecio"]
+            except: pass
         elif signal_api.Cdma != {}:
             signal_stat["Art"]  = "CDMA (2G)"
         elif signal_api.Evdo != {}:

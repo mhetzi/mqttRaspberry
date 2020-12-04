@@ -154,7 +154,8 @@ class BasicConfig:
             self._config["CLIENT"]["USER"] = None
             self._config["CLIENT"]["PW"] = None
             self._config["CLIENT"]["autodiscovery"] = None
-            self.save()
+            self.file_is_dirty = True
+            self.save(delayed=False)
             raise NoClientConfigured()
 
         client_config = self._config["CLIENT"]
