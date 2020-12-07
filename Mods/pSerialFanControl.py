@@ -145,7 +145,10 @@ class SerialFan:
 
     def serial_read(self):
         while not self._shutdown:
-            s = self._serial.read_until(terminator=b';')
+            try:
+                s = self._serial.read_until(expected=b';')
+            except TypeError:
+                s = self._serial.read_until(terminator=b';')
             s = s.decode("utf-8")
             if s == "":
                 continue
