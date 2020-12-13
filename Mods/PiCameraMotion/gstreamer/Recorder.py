@@ -100,6 +100,6 @@ class Recorder:
     def stop(self):
         self._appsrc.emit('end-of-stream')
         self.pipeline.set_state(Gst.State.NULL)
-        del self._appsrc
         self.pipeline.unref()
+        del self._appsrc
         del self.pipeline

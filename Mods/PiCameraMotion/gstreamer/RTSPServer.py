@@ -65,7 +65,7 @@ class AppSource(threading.Thread):
         self.fps = fps
         self.duration = 1 / self.fps * Gst.SECOND  # duration of a frame in nanoseconds
         self.logger = log
-        self._queue = queue.Queue(int(fps*1.5))
+        self._queue = queue.Queue(int(fps*0.5))
         self._doShutdown = False
         self._sendData = threading.Event()
         self._sendData.clear()
@@ -89,15 +89,15 @@ class AppSource(threading.Thread):
     def run(self):
         while True:
             if not self._sendData.is_set():
-                    if not self._sendData.wait(5.0):
-                        if self._doShutdown:
-                            self.logger.info("OK Wird beendet")
-                            break
-                        self.__sleeping += 1
-                        if self.__sleeping > 100:
-                            self.logger.warning("Schlafe seit 100 Warte zyklen. Beende...")
-                            self.stopThread()
-                        continue
+                if not self._sendData.wait(5.0):
+                    if self._doShutdown:
+                        self.logger.info("OK Wird beendet")
+                        break
+                    self.__sleeping += 1
+                    if self.__sleeping > 100:
+                        self.logger.warning("Schlafe seit 100 Warte zyklen. Beende...")
+                        self.stopThread()
+                    continue
             if self._doShutdown:
                 self.logger.info("OK Wird beendet")
                 break
@@ -153,7 +153,8 @@ class AppSource(threading.Thread):
                     #self.logger.debug("Ignoreing frame cause no sps and had no sps")
                     return
             elif frame is None and not self._hadSPS:
-                self.logger.warning("Kein frame und hatte noch kein SPS")
+                if self.__sleeping < self.fps:
+                    self.logger.warning("Kein frame und hatte noch kein SPS")
             
             try:
                 self._queue.put_nowait((data,frame))

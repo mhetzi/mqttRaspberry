@@ -31,30 +31,29 @@ class ShellSwitch:
         self._name_topic_map = {}
         self._state_name_map = {}
 
-    def exec_switch(self, name:str, on:bool, initKill=None):
+    def exec_switch(self, name:str, on:bool, initKill=None, simulate=False):
         switch = self._config["entrys/{}".format(name)]
         state_js = {
             "on": switch.get("on_command", None),
             "off": switch.get("off_command", None)
         }
         try:
-            if initKill is None:
+            if simulate:
+                self._config["entrys/{}/wasOn".format(name)] = on =  on if switch.get("onOff", True) else False
+                state_js["state"] = "OFF"
+                state_js["error_code"] = 0
+            elif initKill is None:
                 if on:
                     cp = subprocess.run(switch.get("on_command", "False"), shell=True, check=True)
-                    self._config["entrys/{}/wasOn".format(name)] = on
                     state_js["state"] = "ON" if switch.get("onOff", True) else "OFF"
                     state_js["error_code"] = cp.returncode
                     self.__logger.info("{} wurde angeschaltet.".format(name))
                 else:
                     cp = subprocess.run(switch.get("off_command", "False"), shell=True, check=True)
-                    self._config["entrys/{}/wasOn".format(name)] = on
                     state_js["state"] = "OFF"
                     state_js["error_code"] = cp.returncode
                     self.__logger.info("{} wurde ausgeschaltet.".format(name))
-                if not switch["onOff"]:
-                    switch["wasOn"] = False
-                else:
-                    switch["wasOn"] = on
+                self._config["entrys/{}/wasOn".format(name)] = on =  on if switch.get("onOff", True) else False
             elif initKill and switch["init_command"] is not None:
                 self.__logger.info("Führe init command [{}] aus.".format(switch["init_command"]))
                 cp = subprocess.run(switch["init_command"], shell=True, check=True)
@@ -122,7 +121,7 @@ class ShellSwitch:
     def sendStates(self):
         for name in self._config.get("entrys", {}).keys():
             if self._config["entrys"][name].get("setOnLoad", True):
-                self.exec_switch(name, self._config["entrys"][name]["wasOn"])
+                self.exec_switch(name, self._config["entrys"][name]["wasOn"], simulate=True)
 
 
 class ShellSwitchConf:
