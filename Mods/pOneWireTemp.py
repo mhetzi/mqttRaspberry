@@ -148,9 +148,17 @@ class OneWireTemp:
                 path_max = "w1t/stat/{}/max".format(ii)
                 path_lmin = "w1t/stat/{}/lmin".format(ii)
                 path_lmax = "w1t/stat/{}/lmax".format(ii)
+                path_sanity = "w1t/stat/{}/last".format(ii)
 
                 cmin = self._config.get(path_min, "RESET")
                 cmax = self._config.get(path_max, "RESET")
+                last = self._config.get(path_sanity, 0)
+                self._config[path_sanity] = new_temp
+
+                percentage_cahnged = 100 / last * new_temp
+                if percentage_cahnged < 70 or percentage_cahnged > 140:
+                    self.__logger.warning("Neue Temperatur hat zu hohe differenz: {}%".format(percentage_cahnged))
+                    continue
 
                 if cmin == "RESET" or cmin == "n/A" or math.isnan(cmin):
                     cmin = new_temp
