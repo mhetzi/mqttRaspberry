@@ -86,7 +86,7 @@ class AppSource(threading.Thread):
         #self.logger.debug("enough_data")
         self._hadSPS = True
 
-    def run(self):
+    def mainloop(self):
         while True:
             if not self._sendData.is_set():
                 if not self._sendData.wait(5.0):
@@ -125,6 +125,7 @@ class AppSource(threading.Thread):
                 if retval == Gst.FlowReturn.FLUSHING:
                     self.logger.debug("Gst Flushing")
                     self.on_enough_data(None)
+                    self.stopThread()
                 elif retval != Gst.FlowReturn.OK:
                     self.logger.error("push-buffer failed with \"{}\"".format(retval))
                     self.stopThread()
@@ -134,6 +135,14 @@ class AppSource(threading.Thread):
             self._appsrc.emit('end-of-stream')
         except AttributeError:
             pass
+
+    def run(self):
+        try:
+            self.mainloop()
+        except:
+            self.logger.exception("RTSP AppSource MainLoop error")
+        self.logger.debug("Queue wird geleert...")
+        self._queue.queue.clear()
 
     def writeFrame(self, data: bytes, frame: camf.PiVideoFrame, eof=False):
         with self._lock:

@@ -51,7 +51,7 @@ class SerialFan:
         self._err = None
         self._last_rpm = 0
         self._last_pct = 0
-        self._last_err = None
+        self._last_err = "BOOTED"
         self._speed_topics = None
         self._rpm_topics = None
         self._err_topics = None
@@ -121,7 +121,7 @@ class SerialFan:
         self.__client.subscribe(self._speed_topics.brightness_cmd)
         self.__client.message_callback_add(self._speed_topics.brightness_cmd, self.on_message)
         self._registered_callback_topics.append(self._speed_topics.brightness_cmd)
-
+        self.__client.publish(self._err)
         
     def new_temp(self, temp):
         pct = 0

@@ -24,6 +24,11 @@ except ImportError as ie:
         import schedule
 import Tools.Config as tc
 
+import tracemalloc
+import io
+import linecache
+import gc
+
 class PluginManager:
 
     needed_list = []
@@ -69,12 +74,84 @@ class PluginManager:
         return (cease_continuous_run, continuous_thread)
 
     def __init__(self, logger: logging.Logger, config: tc.BasicConfig):
+        tracemalloc.start(100)
+        self._start_snap = tracemalloc.take_snapshot()
         self.logger = logger.getChild("PluginManager")
         self.config = config
         self._client = None
         self._client_name = None
         self._wasConnected = False
         self.shed_thread = None
+        if config.get("tracemalloc/enabled", False):
+            schedule.every(config.get("tracemalloc/seconds", 30)).minutes.do(self.save_memory_stats)
+
+    @staticmethod
+    def display_top(snapshot, file: io.FileIO, key_type='lineno', limit=10):
+        snapshot = snapshot.filter_traces((
+            tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
+            tracemalloc.Filter(False, "<unknown>"),
+        ))
+        top_stats = snapshot.statistics(key_type)
+
+        file.write("Top {} lines:".format(limit))
+        for index, stat in enumerate(top_stats[:limit], 1):
+            frame = stat.traceback[0]
+            print("#%s: %s:%s: %.1f KiB"
+                % (index, frame.filename, frame.lineno, stat.size / 1024), file=file)
+            line = linecache.getline(frame.filename, frame.lineno).strip()
+            if line:
+                print('    %s' % line, file=file)
+
+        other = top_stats[limit:]
+        if other:
+            size = sum(stat.size for stat in other)
+            print("%s other: %.1f KiB" % (len(other), size / 1024), file=file)
+        total = sum(stat.size for stat in top_stats)
+        print("Total allocated size: %.1f KiB" % (total / 1024), file=file)
+
+    def save_memory_stats(self):
+        path = Path(self.config.get("tracemalloc/path", "~/python_memory_stats"))
+        path = path.expanduser()
+        import uuid
+        uid_str = str(uuid.uuid4())
+        path = path.joinpath(path, "{}.txt".format(uid_str))
+        memerr = False
+
+        try:
+            current_snap = tracemalloc.take_snapshot()
+            diff = current_snap.compare_to(self._start_snap, 'lineno')
+
+            top_stats = current_snap.statistics('traceback')
+        except MemoryError:
+            memerr = True
+
+        with path.open(mode="w") as f:
+            if memerr:
+                f.write("tracemalloc MemoryError")
+            gc.collect()
+            f.write("\n\nGC Stats:\n ")
+            try:
+                f.write(" gc garbage: {}\n".format(gc.garbage))
+            except RuntimeError: pass
+            try:
+                f.write(" gc stats: {}\n".format(gc.get_stats()))
+            except RuntimeError: pass
+            try:
+                f.write(" gc objects: {}\n".format(gc.get_objects()))
+            except RuntimeError: pass
+
+            f.write("Top 10 diff: \n")
+            for stat in diff[:10]:
+                f.write("  {}\n".format(stat))
+
+            f.write("\nTop 10 memory blocks:")
+            for stat in top_stats[:10]:
+                f.write("\n{} memory block: {} KiB".format(stat.count, stat.size / 1024))
+                for line in stat.traceback.format():
+                    f.write("    {}\n".format(line))
+
+            f.write("\nTop 10 pretty:")
+            PluginManager.display_top(current_snap, f)
 
     def enable_mods(self):
         self.scheduler_event, self.shed_thread = self.run_scheduler_continuously()

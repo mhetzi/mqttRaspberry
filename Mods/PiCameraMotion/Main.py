@@ -232,10 +232,9 @@ class PiMotionMain(threading.Thread):
         self._pluginManager = p
 
     def stop(self):
-        self.stop_record()
+        self._doExit = True
         if self._record_factory:
             self._record_factory.destroy()
-        self._doExit = True
         if self._pilQueue is not None and self._pilThread is not None:
             self.__logger.info("Stoppe PIL queue...")
             try:

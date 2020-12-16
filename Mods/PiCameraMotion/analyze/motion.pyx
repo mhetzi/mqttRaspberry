@@ -69,11 +69,10 @@ cdef class MotionDedector:
         # basis
 
         # accumulate and decay SAD field
-        noise = self.noise
         cdef double bitl = bit_length(self.window)-2
         cdef np.int16_t shift = int_max( <int> bitl ,0)
-        noise -= ( noise >> shift ) + 1 # decay old noise
-        noise = np.add(noise, a['sad'] >> shift).clip(0)
+        self.noise -= ( self.noise >> shift ) + 1 # decay old self.noise
+        self.noise = np.add(self.noise, a['sad'] >> shift).clip(0)
 
         # then look for motion vectors exceeding the length of the current mask
         a = np.sqrt(
@@ -83,12 +82,10 @@ cdef class MotionDedector:
         #self.field = a
 
         # look for the largest continuous area in picture that has motion
-        mask = (a > (noise >> 4)) # every motion vector exceeding current noise field
+        cdef np.ndarray mask = (a > (self.noise >> 4)) # every motion vector exceeding current noise field
         labels,count = ndimage.label(mask) # label all motion areas
         cdef np.ndarray sizes = ndimage.sum(mask, labels, range(count + 1)) # number of MV blocks per area
         cdef int largest = np.sort(sizes)[-1] # what's the size of the largest area
-
-        self.noise = noise
 
         # Do some extra work to clean up the preview overlay. Remove all but the largest
         # motion region, and even that if it's just one MV block (considered noise)
@@ -101,11 +98,11 @@ cdef class MotionDedector:
         # picture in the future for auto-adaptive motion detector
 
         # does that area size exceed the minimum motion threshold?
-        cdef bint motion = (largest >= self.area)
+        motion = (largest >= self.area)
         # then consider motion repetition
         self._last_frames.append(motion)
 
-        longest_motion_sequence = self.count_longest(True)
+        cdef int longest_motion_sequence = self.count_longest(True)
 
         #return (motion, longest_motion_sequence >= self.frames)
         return 0 if not motion else longest_motion_sequence

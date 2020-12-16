@@ -83,9 +83,12 @@ class PreRecordBuffer(threading.Thread):
             self.recorder = None
         self._splitter().remove(self._spliiter_id)
         self.join()
+        self._queue.queue.clear()
 
     def writeFrame(self, data: bytes, frame: camf.PiVideoFrame, eof=False):
         with self._lock:
+            if not self._do_thread_run:
+                return
             if frame is not None:
                 if frame.frame_type == camf.PiVideoFrameType.sps_header and not self._hadSPS:
                     self._hadSPS = True
