@@ -291,7 +291,7 @@ class Analyzer(cama.PiAnalysisOutput):
             self.states["extendet"] = "ZeroMap aktualisieren" if update else "ZeroMap erstellen"
     
     def brightness(self):
-        frame = self.cal_getMjpeg_Frame(False, 0.125)
+        frame = self.cal_getMjpeg_Frame(True, 0.25)
         bio = None
         if frame is not None:
             try:

@@ -256,7 +256,7 @@ class PiMotionMain(threading.Thread):
             self._pilThread.join(10)
             self._pilQueue = None
         if self._http_out is not None:
-            self._http_out.shutdown()
+            self._http_out.flush()
 
     def setupAnalyzer(self, camera: cam.PiCamera):
         anal = analyzers.Analyzer(
@@ -310,7 +310,7 @@ class PiMotionMain(threading.Thread):
 
     def setupHttpServer(self):
         self.__logger.info("Aktiviere HTTP...")
-        http_out = httpc.StreamingOutput(self.__logger)
+        http_out = CameraSplitter(self._camera, self.__logger, 1, True)
         self._http_out = http_out
 
         self._jsonOutput = httpc.StreamingJsonOutput()
@@ -362,7 +362,7 @@ class PiMotionMain(threading.Thread):
                     format='h264', profile='high', level='4.1',
                     splitter_port=1,
                     motion_output=self._analyzer, quality=25, sps_timing=True,
-                    intra_period=int(self._config.get("camera/fps", 23) / 1.5),
+                    intra_period=int(self._config.get("camera/fps", 23) * 0.5),
                     sei=True, inline_headers=True, bitrate=self.bitrate
                 )
 
@@ -624,11 +624,20 @@ class PiMotionMain(threading.Thread):
 
     def getMjpegFrame(self, block=True, timeout=-1):
         try:
-            if block:
-                with self._http_out.condition:
-                    self._http_out.condition.wait()
-                    return self._http_out.frame
-            return self._http_out.frame
+            q = queue.Queue(1)
+            def push_queue(frame, extendet, eof=False):
+                try:
+                    q.put_nowait(frame)
+                except queue.Full:
+                    pass
+            aid = self._http_out.add(push_queue)
+            frame = None
+            try:
+                frame = q.get(block=block, timeout=timeout)
+            except queue.Empty:
+                pass
+            self._http_out.remove(aid)
+            return frame
         except AttributeError:
             return None
 
@@ -644,7 +653,7 @@ class PiMotionMain(threading.Thread):
             if self._doExit or a is None and data is None:
                 self.__logger.warning("PIL Magnitude Save Thread wird beendet")
                 return
-            frame = self.getMjpegFrame()
+            frame = self.getMjpegFrame(block=True, timeout=2)
             background = None
             try:
                 if frame is not None:

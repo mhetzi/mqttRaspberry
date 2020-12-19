@@ -52,7 +52,7 @@ GST_h264_PIPELINE = """
 appsrc name=asrc is-live=true block=true format=GST_FORMAT_TIME !
 video/x-h264, framerate={}/1 !
 h264parse !
-rtph264pay name=pay0 pt=96
+rtph264pay name=pay0 pt=96 {}
 """
 
 class AppSource(threading.Thread):
@@ -65,7 +65,7 @@ class AppSource(threading.Thread):
         self.fps = fps
         self.duration = 1 / self.fps * Gst.SECOND  # duration of a frame in nanoseconds
         self.logger = log
-        self._queue = queue.Queue(int(fps*0.5))
+        self._queue = queue.Queue(int(fps*1.5))
         self._doShutdown = False
         self._sendData = threading.Event()
         self._sendData.clear()
@@ -203,7 +203,7 @@ class PiCameraMediaFactory(GstRtspServer.RTSPMediaFactory, threading.Thread):
         self.number_frames = 0
         self.fps = fps
         self.duration = 1 / self.fps * Gst.SECOND  # duration of a frame in nanoseconds
-        self.launch_string = GST_h264_PIPELINE.format(self.fps)
+        self.launch_string = GST_h264_PIPELINE.format(self.fps, "aggregate-mode=zero-latency")
         if wh is not None:
             self.launch_string = GST_h264_PIPELINE_CLOCK.format(self.fps, CamName, wh[0], wh[1], int(self.fps/2))
         self.logger = log
@@ -213,8 +213,13 @@ class PiCameraMediaFactory(GstRtspServer.RTSPMediaFactory, threading.Thread):
         self._threads = []
 
     def do_create_element(self, url):
-        self.logger.debug("do_create_element url: {} with {}".format(url.decode_path_components(), self.launch_string))
-        return Gst.parse_launch(self.launch_string)
+        try:
+            self.logger.debug("do_create_element url: {} with {}".format(url.decode_path_components(), self.launch_string))
+            return Gst.parse_launch(self.launch_string)
+        except:
+            self.launch_string = GST_h264_PIPELINE.format(self.fps, "")
+            self.logger.debug("do_create_element url: {} with {}".format(url.decode_path_components(), self.launch_string))
+            return Gst.parse_launch(self.launch_string)
 
     def do_configure(self, rtsp_media):
         self.number_frames = 0

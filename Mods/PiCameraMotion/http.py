@@ -11,6 +11,7 @@ import threading
 import time
 import queue
 import cgi
+import Mods.PiCameraMotion.gstreamer.SplitStream as splits
 
 try:
     import json as json
@@ -70,48 +71,6 @@ UPLOAD = u"""
 <input type="submit" value="Lernen"></form>
 """
 
-class StreamingOutput(object):
-    def __init__(self, log):
-        self._log = log.getChild("mjpeg_output")
-        self.frame = None
-        self.buffer = io.BytesIO()
-        self.condition = Condition()
-        self.queue = queue.Queue(25)
-        self.thread = threading.Thread(target=self._run, name="MJPEG Dispatch")
-        self.thread.start()
-
-    def shutdown(self):
-        self.queue.put(None)
-
-    def write(self, buf):
-        if buf.startswith(b'\xff\xd8'):
-            # New frame, copy the existing buffer's content and notify all
-            # clients it's available
-            self.buffer.truncate()
-            try:
-                self.frame = self.buffer.getvalue()
-                self.queue.put_nowait(self.frame)
-            except queue.Full:
-                self._log.warning("MJPEG Framequeue ist voll")
-            except: pass
-            self.buffer.seek(0)
-        return self.buffer.write(buf)
-
-    def _run(self):
-        self._log.debug("MJPEG Dispatch läuft")
-        while True:
-            try:
-                self.frame = self.queue.get(block=True, timeout=10)
-                with self.condition:
-                    if self.frame is None:
-                        self._log.info("MJPEG frame is None, going down...")
-                    self.condition.notify_all()
-            except queue.Empty:
-                self._log.warning("Kein neues MJPEG Frame seit 10 Sekunden!")
-            except: 
-                self._log.exception("Fehler bei weitergabe des Frames")
-
-
 class StreamingJsonOutput(object):
     def __init__(self):
         self.data = b''
@@ -156,7 +115,7 @@ class StreamingPictureOutput(object):
         self.buffer.seek(0)
 
 
-def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
+def makeStreamingHandler(output: splits.CameraSplitter, json: StreamingJsonOutput):
     class StreamingHandler(server.BaseHTTPRequestHandler):
         HTML_BACK_TO_MAIN = u"""<html><head><title>PiCamera Plugin</title></head><body><h1><OK Einstellungen gespeichert</h1><p>In Kürze wird die die Hauptseite geladen...<p><meta http-equiv="refresh" content="3;url=/index.html" /><p></body></html>""".encode('utf-8')
         logger = None
@@ -198,23 +157,31 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
                 self.end_headers()
                 self.wfile.write(content)
             elif self.path == '/stream.mjpg':
-                self.send_response(200)
-                self.send_header('Age', 0)
-                self.send_header('Cache-Control', 'no-cache, private')
-                self.send_header('Pragma', 'no-cache')
-                self.send_header(
-                    'Content-Type', 'multipart/x-mixed-replace; boundary=FRAME')
-                self.end_headers()
+                q = queue.Queue(1)
+                def push_queue(frame, extendet, eof=False):
+                    try:
+                        q.put_nowait(frame)
+                    except queue.Full:
+                        pass
+                aid = output.add(push_queue)
                 try:
+                    self.send_response(200)
+                    self.send_header('Age', 0)
+                    self.send_header('Cache-Control', 'no-cache, private')
+                    self.send_header('Pragma', 'no-cache')
+                    self.send_header(
+                        'Content-Type', 'multipart/x-mixed-replace; boundary=FRAME')
+                    self.end_headers()
                     while True:
                         frame = None
-                        with output.condition:
-                            if output.condition.wait(10.0):
-                                frame = output.frame
-                                ctypte = "image/jpeg"
-                            else:
-                                frame = "ETIMEOUT"
-                                ctypte = "text/plain"
+                        try:
+                            frame = q.get(block=True, timeout=10)
+                            if frame is None:
+                                break
+                            ctypte = "image/jpeg"
+                        except:
+                            frame = "ETIMEOUT"
+                            ctypte = "text/plain"
                         self.wfile.write(b'--FRAME\r\n')
                         self.send_header('Content-Type', ctypte)
                         self.send_header('Content-Length', len(frame))
@@ -225,16 +192,23 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
                     logging.warning(
                         'HTTP Client %s entfernt: %s',
                         self.client_address, str(e))
+                output.remove(aid)
             elif self.path == '/snap.jpg':
+                q = queue.Queue(1)
+                def push_queue(frame, extendet, eof=False):
+                    try:
+                        q.put_nowait(frame)
+                    except queue.Full:
+                        pass
+                aid = output.add(push_queue)
                 try:
                     frame = None
-                    with output.condition:
-                        if output.condition.wait(10.0):
-                            frame = output.frame
-                            ctypte = "image/jpeg"
-                        else:
-                            frame = "ETIMEOUT"
-                            ctypte = "text/plain"
+                    try:
+                        frame = q.get(block=True, timeout=10)
+                        ctypte = "image/jpeg"
+                    except:
+                        frame = "ETIMEOUT"
+                        ctypte = "text/plain"
                     self.send_response(200)
                     self.send_header('Age', 0)
                     self.send_header('Cache-Control', 'no-cache, private')
@@ -248,6 +222,7 @@ def makeStreamingHandler(output: StreamingOutput, json: StreamingJsonOutput):
                     logging.warning(
                         'HTTP Client %s entfernt: %s',
                         self.client_address, str(e))
+                output.remove(aid)
             elif self.path == "/info.json":
                 self.send_response(200)
                 self.send_header('Age', 0)

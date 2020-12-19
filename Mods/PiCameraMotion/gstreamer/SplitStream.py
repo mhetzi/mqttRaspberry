@@ -11,12 +11,13 @@ except ImportError:
     import Mods.referenz.picamera.picamera.array as cama
     import Mods.referenz.picamera.picamera.frames as camf
 import logging
+from io import BytesIO
 
 class CameraSplitter(cams.PiCameraCircularIO):
     
-    def __init__(self, camera: cam.PiCamera, log: logging.Logger, splitter_port=0):
+    def __init__(self, camera: cam.PiCamera, log: logging.Logger, splitter_port=0, mjpeg_mode=False):
         self._callbacks = {}
-        self.log = log.getChild("CameraSplitter")
+        self.log = log.getChild("CameraSplitter" if not mjpeg_mode else "CameraSplitterMJPEG")
         self.splitter_port = splitter_port
         self._camera = camera
         self._blockEof = True
@@ -27,6 +28,8 @@ class CameraSplitter(cams.PiCameraCircularIO):
         #    self.log.debug("FPS:{}".format(self.fps))
         #    self.fps = 0
         #schedule.every(1).second.do(show_fps)
+        self.adapter = self._mjpeg_adapter if mjpeg_mode else self._adapter
+        self.buffer = BytesIO() if mjpeg_mode else None
 
     def add(self, func, customID=None):
         if not callable(func):
@@ -62,19 +65,37 @@ class CameraSplitter(cams.PiCameraCircularIO):
         except RuntimeError:
             pass
 
-    def adapter(self, item:bytes):
+    def _adapter(self, item:bytes):
         encoder = self._camera._encoders[self.splitter_port]
         frame = None
         if encoder.frame.complete:
             frame = encoder.frame
         self.dispatch(item, frame)
+        return len(item)
+    
+    def _mjpeg_adapter(self, buf):
+        if buf.startswith(b'\xff\xd8'):
+            # New frame, copy the existing buffer's content and notify all
+            # clients it's available
+            self.buffer.truncate()
+            try:
+                item = self.buffer.getvalue()
+                #self.log.debug("MJPEG Dispatch")
+                self.dispatch(item, None)
+                self.written = 0
+            except: self.log.exception()
+            self.buffer.seek(0)
+        return self.buffer.write(buf)
 
     def write(self, b):
-        self.written += 1
+        if self.written < 254:
+            self.written += 1
+        else:
+            self.written = 0
         #self.log.debug("write {} bytes".format(len(b)))
-        self.adapter(b)
+        leng = self.adapter(b)
         self._blockEof = False
-        return len(b)
+        return leng
     
     def flush(self):
         if self._blockEof:
