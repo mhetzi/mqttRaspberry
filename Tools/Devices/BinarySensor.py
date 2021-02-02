@@ -30,7 +30,9 @@ class BinarySensor:
         # Setze Discovery Configuration
         self._log.debug("Publish configuration")
         plugin_name = self._log.parent.name
-        uid = "switch.MqttScripts{}.switch.{}.{}".format(self._pm._client_name, plugin_name, self._name) if self._unique_id is None else self._unique_id
+        import re
+        safename = re.sub('[\W_]+', '', self._name) 
+        uid = "switch.MqttScripts{}.switch.{}.{}".format(self._pm._client_name, plugin_name, safename) if self._unique_id is None else self._unique_id
         zeroc = self._topics.get_config_payload(
             name=self._name,
             ava_topic=None,
@@ -62,3 +64,8 @@ class BinarySensor:
         if json is None:
             return self.turn("0")
         self.turn(json)
+
+    def turnOnOff(self, state: bool):
+        if state:
+            return self.turnOn()
+        return self.turnOff

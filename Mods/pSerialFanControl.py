@@ -59,7 +59,7 @@ class SerialFan:
     def set_pluginManager(self, pm: PluginManager.PluginManager):
         self._pm = pm
 
-    def register(self, wasConnected:bool):
+    def register(self, wasConnected: bool):
 
         fan_speed = self._config.get_autodiscovery_topic(
             Autodiscovery.Component.LIGHT,
@@ -121,7 +121,12 @@ class SerialFan:
         self.__client.subscribe(self._speed_topics.brightness_cmd)
         self.__client.message_callback_add(self._speed_topics.brightness_cmd, self.on_message)
         self._registered_callback_topics.append(self._speed_topics.brightness_cmd)
-        self.__client.publish(self._err)
+        js = json.dumps({
+                    "err":  0,
+                    "Grund": "OK"
+        })
+        self.__client.publish(self._err_topics.state, js)
+        self._last_err = self._err
         
     def new_temp(self, temp):
         pct = 0

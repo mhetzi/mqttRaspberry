@@ -1,3 +1,6 @@
 [submodule "Mods/referenz/picamera"]
 	path = Mods/referenz/picamera
 	url = https://github.com/waveform80/picamera.git
+[submodule "Mods/victron/github"]
+	path = Mods/victron/github
+	url = https://github.com/karioja/vedirect.git

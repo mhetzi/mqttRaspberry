@@ -33,7 +33,9 @@ class Switch:
         # Setze Discovery Configuration
         self._log.debug("Publish configuration")
         plugin_name = self._log.parent.name
-        uid = "switch.MqttScripts{}.switch.{}.{}".format(self._pm._client_name, plugin_name, self._name) if self._unique_id is None else self._unique_id
+        import re
+        safename = re.sub('[\W_]+', '', self._name) 
+        uid = "switch.MqttScripts{}.switch.{}.{}".format(self._pm._client_name, plugin_name, safename) if self._unique_id is None else self._unique_id
         zeroc = self._topics.get_config_payload(
             name=self._name,
             measurement_unit=self._munit,

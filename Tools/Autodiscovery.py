@@ -30,14 +30,20 @@ class DeviceClass:
     pass
 
 class SensorDeviceClasses(DeviceClass, enum.Enum):
-    BATTERY = "battery"
+    BATTERY = "battery" # Percentage
     HUMIDITY = "humidity"
     ILLUMINANCE = "illuminance"
     TEMPERATURE = "temperature"
-    POWER = "power"
-    SIGNAL_STRENGTH = "signal_strength"
-    PRESSURE = "pressure"
-    TIMESTAMP = "timestamp"
+    POWER = "power" # W or kW
+    SIGNAL_STRENGTH = "signal_strength" #dB dBm
+    PRESSURE = "pressure" #hPa mbar
+    TIMESTAMP = "timestamp" #ISO 8601
+
+    CURRENT = "current" # Current in Ampere (A)
+    ENERGY = "energy" # Energy in Wh oder kWh
+    POWER_FACTOR = "power_factor" # in percentage
+    VOLTAGE = "voltage"
+
     GENERIC_SENSOR = None
 
 
@@ -317,10 +323,14 @@ def getTopics(discoveryPrefix: str, comp: Component, devicedID: str, entitiyID: 
         print("getTopics: BinarySensorDeviceClasses angegeben, Component ist aber Sensor, Sensor wird zu BinarySensor abgeändert.")
         comp = Component.BINARY_SENROR
 
+    
+    import re
+    safename = re.sub('[\W_]+', '', entitiyID) 
+
     if discoveryPrefix is not None:
-        mainPath = "{0}/{1}/{2}/{3}/".format(discoveryPrefix, str(comp.value), devicedID, entitiyID).replace(" ", "_").replace("-","_")
+        mainPath = "{0}/{1}/{2}/{3}/".format(discoveryPrefix, str(comp.value), devicedID, safename).replace(" ", "_").replace("-","_")
     else:
-        mainPath = "{0}/{1}/{2}/".format(devicedID, comp.value, entitiyID).replace(" ", "_").replace("-","_")
+        mainPath = "{0}/{1}/{2}/".format(devicedID, comp.value, safename).replace(" ", "_").replace("-","_")
     t = Topics(comp, device_class, discoveryPrefix is not None)
     t.state = mainPath + "state"
     t.command = mainPath + "set"

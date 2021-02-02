@@ -47,18 +47,18 @@ class ConsoleInputTools:
     @staticmethod
     def get_bool_input(prompt: str, standart_value=None) -> bool:
         if standart_value is not None and standart_value:
-            i = input(prompt + " [Y/n]")
+            i = input(prompt + " [Y/n] ")
             if i == "n" or i == "N":
                 return False
             return True
         elif standart_value is not None and not standart_value:
-            i = input(prompt + " [y/N]")
+            i = input(prompt + " [y/N] ")
             if i == "y" or i == "y":
                 return True
             return False
         else:
             while True:
-                i = input(prompt + " [y/n]")
+                i = input(prompt + " [y/n] ")
                 if i == "y" or i == "y":
                     return True
                 elif i == "n" or i == "N":

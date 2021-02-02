@@ -43,7 +43,7 @@ class RaspberryPiUndervoltageDetector:
         self._config = conf.PluginConfig(opts, PluginLoader.getConfigKey())
         self.__client = client
         self.__logger = logger.getChild(PluginLoader.getConfigKey())
-        self._prev_deg = None
+        self._prev_deg = True
         self.__lastTemp = 0.0
         self.__ava_topic = device_id
         self._callables = []
@@ -80,7 +80,8 @@ class RaspberryPiUndervoltageDetector:
 
         if undervoltage is None:
             self.__logger.error("Undervoltage auf diesem System nicht unterstützt!")
-        elif undervoltage.get() != self._prev_deg and not force:
+        elif undervoltage.get() == self._prev_deg and not force:
+            self.__logger.debug("Not changed {} last {} return".format(undervoltage.get(), self._prev_deg))
             return
 
         for call in self._callables:
@@ -88,14 +89,7 @@ class RaspberryPiUndervoltageDetector:
                 call(undervoltage)
             except:
                 self.__logger.exception("Undervoltage callback error")
-
-        if undervoltage is not  None and self._prev_deg is not None:
-            self.__client.publish(self._topic.ava_topic, "online", retain=True)
-            self.__client.publish(self._topic.state, self.device.turn(undervoltage.get()))
-        elif undervoltage is not None:
-            self.__client.publish(self._topic.state, self.device.turn(undervoltage.get()))
-        else:
-            self.__client.publish(self._topic.ava_topic, "offline", retain=True)
+        self.__logger.debug("Publishing undervoltage {}.".format(undervoltage.get()))
         self._prev_deg = None if undervoltage is None else undervoltage.get()
 
 
