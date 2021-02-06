@@ -4,6 +4,7 @@ from Tools.Devices.BinarySensor import BinarySensor
 from Tools.Devices.Sensor import Sensor
 from Tools.PluginManager import PluginManager
 import Tools.Autodiscovery as Autodiscovery
+from Tools.Devices.Filters.DeltaFilter import DeltaFilter
 
 from logging import Logger
 import json
@@ -25,6 +26,7 @@ class MPPT(CONST.VEDirectDevice):
             Autodiscovery.SensorDeviceClasses.VOLTAGE, measurement_unit="V", device=self._vcserial._device,
             value_template="{{value_json.v}}", json_attributes=True
         )
+        self.battery_voltage.addFilter( DeltaFilter(0.03) )
 
         self.battery_current = Sensor(
             self._log, self._pman, "Batterie (A)",
@@ -37,11 +39,14 @@ class MPPT(CONST.VEDirectDevice):
             Autodiscovery.SensorDeviceClasses.VOLTAGE, measurement_unit="V", device=self._vcserial._device,
             value_template="{{value_json.v}}", json_attributes=True
         )
+        self.panel_voltage.addFilter( DeltaFilter(0.03) )
+
         self.panel_power = Sensor(
             self._log, self._pman, "Panel (W)",
             Autodiscovery.SensorDeviceClasses.POWER, measurement_unit="W", device=self._vcserial._device,
             value_template="{{value_json.w}}", json_attributes=True
         )
+        self.panel_power.addFilter( DeltaFilter(1) )
 
         self.load = Sensor(
             self._log, self._pman, "Last",
@@ -131,17 +136,17 @@ class MPPT(CONST.VEDirectDevice):
     def update_battery_voltage(self, mV: str):
         mV = int(mV)
         js = {"v": mV / 1000}
-        self.battery_voltage(json.dumps(js))
+        self.battery_voltage(js, mainState=mV / 1000)
     
     def update_panel_voltage(self, mV: str):
         mV = int(mV)
         js = {"v": mV / 1000}
-        self.panel_voltage(json.dumps(js))
+        self.panel_voltage(js, mainState=mV / 1000)
     
     def update_panel_power(self, w: str):
         w = int(w)
         js = {"w": w}
-        self.panel_power(json.dumps(js))
+        self.panel_power(js, mainState=w)
 
     def update_battery_current(self, mA:str):
         mA = int(mA)
@@ -190,7 +195,7 @@ class MPPT(CONST.VEDirectDevice):
             "Errno": err,
             "Fehler": err_str
         }
-        self.error.turn(json.dumps(js))
+        self.error.turn(js)
     
     def update_state_operation(self, state: str):
         state = int(state)

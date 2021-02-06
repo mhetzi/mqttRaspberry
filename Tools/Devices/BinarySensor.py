@@ -47,6 +47,8 @@ class BinarySensor:
         self._pm._client.subscribe(self._topics.command)
 
     def turn(self, state=None):
+        if isinstance(state, dict):
+            state = json.dumps(state)
         self._pm._client.publish(self._topics.state, payload=state.encode('utf-8'))
 
     def turnOn(self, json=None):
