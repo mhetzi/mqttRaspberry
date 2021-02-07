@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from Mods.victron.vcSerial import Connection
 import getopt
 import sys
 import logging
