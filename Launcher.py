@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+from Mods.victron.vcSerial import Connection
 import getopt
 import sys
 import logging
@@ -85,19 +86,22 @@ class Launcher:
             except:
                 self._log.info("Remote Debugging (ptvsd) nicht verfügbar")
             self.pm.enable_mods()
-            self.mqtt_client.loop_forever(timeout=30,retry_first_connection=True)
+            while True:
+                try:
+                    self.mqtt_client.loop_forever(timeout=30, retry_first_connection=True)
+                    break
+                except ConnectionRefusedError:
+                    self.pm.start_mqtt_client()
+                except Exception as e:
+                    raise e
             return True
         except ConnectionRefusedError:
             self._log.info("Server hat die Verbindung nicht angenommen. Läuft die Server Anwendung?")
             self.reload_event.set()
-            self.pm.shutdown()
-            if self.reconnect_time < 100:
-                self._log.info("Warte {} Sekunden und werde dann versuchen neu zu verbinden.".format(self.reconnect_time))
-                time.sleep(self.reconnect_time)
-                self.reconnect_time *= 2
-                self.reload = True
-            else:
-                self._log.warning("Verbindung zu oft Fehlgeschlagen!. Gehe mich begraben...")
+            self._log.info("Warte {} Sekunden und werde dann versuchen neu zu verbinden.".format(self.reconnect_time))
+            time.sleep(self.reconnect_time)
+            self.reconnect_time = self.reconnect_time * 2 if self.reconnect_time < 100 else 150
+            self.reload = True
         except ConnectionResetError:
             self._log.warning("Server hat die Verbindung zurückgesetzt. Alles richtig konfiguriert?")
         except KeyboardInterrupt:

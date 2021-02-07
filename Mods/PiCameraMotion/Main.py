@@ -4,6 +4,7 @@ import queue
 import pathlib
 import datetime as dt
 import json
+import re
 import Tools.PluginManager as pm
 import paho.mqtt.client as mclient
 import schedule
@@ -159,6 +160,12 @@ class PiMotionMain(threading.Thread):
         self._splitStream = None  
         self._err_topics = None
         self.was_errored = True
+        self.set_do_record(self._config.get("record/enabled", True))
+
+        self.start()
+        self._pilThread = threading.Thread(
+            target=self.pil_magnitude_save, name="MagSave")
+        self._pilThread.start()
 
     def set_do_record(self, recording: bool):
         self.__logger.info(
@@ -181,7 +188,6 @@ class PiMotionMain(threading.Thread):
             self.__client.publish(self._motion_topic.config,
                                   payload=motion_payload, qos=0, retain=True)
 
-        self.set_do_record(self._config.get("record/enabled", True))
         
         errName = "{} Kamera Fehler".format(sensorName)
         self._err_topics = self._config.get_autodiscovery_topic(
@@ -220,13 +226,6 @@ class PiMotionMain(threading.Thread):
             unique_id="cam.main.bright.{}".format(self._config._main.get_client_config().id)
         )
         self.was_errored = True
-
-        # Starte thread
-        if not wasConnected:
-            self.start()
-            self._pilThread = threading.Thread(
-                target=self.pil_magnitude_save, name="MagSave")
-            self._pilThread.start()
 
     def set_pluginManager(self, p: pm.PluginManager):
         self._pluginManager = p
@@ -401,13 +400,14 @@ class PiMotionMain(threading.Thread):
 
                         if pps == 0 and not self.was_errored:
                             self.was_errored = True
-                            self.__client.publish(
-                                self._err_topics.state,
-                                json.dumps({
-                                    "err": 1,
-                                    "Grund": "FPS ist 0"
-                                })
-                            )
+                            if self.__client is not None:
+                                self.__client.publish(
+                                    self._err_topics.state,
+                                    json.dumps({
+                                        "err": 1,
+                                        "Grund": "FPS ist 0"
+                                    })
+                                )
                             import sys, traceback
                             with open("/tmp/piMotion_last_traces", "w") as f:
                                 for thread_id, frame in sys._current_frames().items():
@@ -415,14 +415,15 @@ class PiMotionMain(threading.Thread):
                                     traceback.print_stack(frame, file=f)
 
                         elif self.was_errored:
-                            self.__client.publish(
-                                self._err_topics.state,
-                                json.dumps({
-                                    "err": 0,
-                                    "Grund": "Fehler verschwunden"
-                                })
-                            )
-                            self.was_errored = False
+                            if self.__client is not None:
+                                self.__client.publish(
+                                    self._err_topics.state,
+                                    json.dumps({
+                                        "err": 0,
+                                        "Grund": "Fehler verschwunden"
+                                    })
+                                )
+                                self.was_errored = False
                         self.sendBrightness()
                     except Exception as e:
                         self.__logger.exception("Kamera Fehler")
@@ -594,8 +595,9 @@ class PiMotionMain(threading.Thread):
 
     def sendBrightness(self):
         if self.__last_brightness != self._lastState.get("brightness", nan) and not isnan(self._lastState.get("brightness", nan)):
+            if self.__client is None:
+                return
             self.__last_brightness = self._lastState.get("brightness", nan)
-
             self.__client.publish(
                 self._brightness_topic.state,
                 json.dumps({
@@ -605,6 +607,8 @@ class PiMotionMain(threading.Thread):
             )
 
     def sendStates(self, changed=None):
+        if self.__client is None:
+            return
         if changed is None:
             self.__client.publish(self._motion_topic.state, json.dumps(self._lastState))
             self.__client.publish(self._debug_topic.state, json.dumps(self._lastState))

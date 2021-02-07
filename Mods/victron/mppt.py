@@ -39,7 +39,7 @@ class MPPT(CONST.VEDirectDevice):
             Autodiscovery.SensorDeviceClasses.VOLTAGE, measurement_unit="V", device=self._vcserial._device,
             value_template="{{value_json.v}}", json_attributes=True
         )
-        self.panel_voltage.addFilter( DeltaFilter(0.03) )
+        self.panel_voltage.addFilter( DeltaFilter(1) )
 
         self.panel_power = Sensor(
             self._log, self._pman, "Panel (W)",
