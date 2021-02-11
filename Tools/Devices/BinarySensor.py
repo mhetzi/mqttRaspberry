@@ -71,3 +71,6 @@ class BinarySensor:
         if state:
             return self.turnOn()
         return self.turnOff
+
+    def reset(self):
+        pass

@@ -104,3 +104,6 @@ class VEDirectDevice:
 
     def register_entities():
         pass
+
+    def resend_entities():
+        pass

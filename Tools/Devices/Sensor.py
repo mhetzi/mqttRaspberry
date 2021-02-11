@@ -59,6 +59,8 @@ class Sensor:
 
     def reset(self):
         self._playload = None
+        for filter in self._filters:
+            ms = filter.nullOldValues()
 
     def addFilter(self, filter: BaseFilter):
         self._filters.append(filter)
@@ -66,6 +68,7 @@ class Sensor:
     def _compareMainState(self, ms):
         for filter in self._filters:
             ms = filter.filter(ms)
+        return ms
         
     def state(self, state=None, force_send=False, mainState=None) -> mclient.MQTTMessageInfo:
         if mainState is not None:

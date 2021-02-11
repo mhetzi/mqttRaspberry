@@ -316,6 +316,8 @@ class PluginManager:
                 self._client.publish(self.config.get_client_config().isOnlineTopic, "online", 0, True)
                 self._client.subscribe("broadcast/updateAll")
                 self._client.message_callback_add("broadcast/updateAll", self.reSendStates)
+                time.sleep(1.0)
+                self.reSendStates()
 
             else:
                 self.logger.warning("Nicht verbunden, Plugins werden nicht regestriert. rc: {}, flags: {}".format(rc, flags))

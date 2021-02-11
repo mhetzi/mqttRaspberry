@@ -208,3 +208,19 @@ class MPPT(CONST.VEDirectDevice):
             self.mppt("Voltage or Current limited")
         elif state == "2":
             self.mppt("MPPT Tracker active")
+
+    def resend_entities(self):
+        self.battery_current.reset()
+        self.battery_voltage.reset()
+        self.error.reset()
+        self.load.reset()
+        self.load_enabled.reset()
+        self.max_power_today.reset()
+        self.max_power_yesterday.reset()
+        self.panel_power.reset()
+        self.panel_voltage.reset()
+        self.state_of_operation.reset()
+        self.yield_today.reset()
+        self.yield_total.reset()
+        self.yield_yesterday.reset()
+        self.mppt.reset()

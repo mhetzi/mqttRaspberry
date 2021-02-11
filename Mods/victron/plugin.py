@@ -87,4 +87,5 @@ class VeDirectPlugin:
         self.send_update(True)
 
     def send_update(self, force=False):
-        pass
+        if self._veDevice is not None:
+            self._veDevice.resend_entities()

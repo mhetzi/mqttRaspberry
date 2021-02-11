@@ -177,7 +177,7 @@ class PiMotionMain(threading.Thread):
         sensorName = self._config["motion/sensorName"]
         uid_motion = "binary_sensor.piMotion-{}-{}".format(
             self._device_id, sensorName)
-        self._motion_topic = self._config._main.get_autodiscovery_topic(
+        self._motion_topic = self._config._main.get_autodiscovery_topic(  
             autodisc.Component.BINARY_SENROR,
             sensorName,
             autodisc.BinarySensorDeviceClasses.MOTION
