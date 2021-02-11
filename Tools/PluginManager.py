@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+from os import sched_setaffinity
 from pathlib import Path
 
 import threading
@@ -215,7 +216,15 @@ class PluginManager:
 
     def register_mods(self):
         self.logger.info("Regestriere Plugins in MQTT")
-        for x in self.configured_list.values():
+
+        i=0
+        sett = list(self.configured_list.items())
+
+        while i < len(sett):
+            key = sett[i][0]
+            self.logger.info("[{}/{}] Regestriere Plugin {}.".format(1+i, len(sett), key))
+            x = sett[i][1]
+            i += 1
             try:
                 x.set_pluginManager(self)
             except:
@@ -226,7 +235,7 @@ class PluginManager:
                 try:
                     x.register()
                 except:
-                    self.logger.exception("Fehler beim Regestireren des Plugins")
+                    self.logger.exception("Fehler beim Regestrieren des Plugins")
 
     def get_plguins_by_config_id(self, id:str):
         return self.configured_list[id]
@@ -289,7 +298,7 @@ class PluginManager:
         client.will_set(cc.isOnlineTopic, "offline", 0, True)
         return client, my_name
 
-    def reSendStates(self, client, userdata, message: mclient.MQTTMessage):
+    def reSendStates(self, client=None, userdata=None, message: mclient.MQTTMessage=None):
         self.logger.info("Resend Topic empfangen. alles neu senden...")
         for x in self.configured_list.keys():
             try:

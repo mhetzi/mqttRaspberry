@@ -76,14 +76,14 @@ class Launcher:
         threading.current_thread().setName("Main/MQTT")
 
         try:
-            self.pm.needed_plugins()
-            self.mqtt_client, deviceID = self.pm.start_mqtt_client()
             try:
                 if self.config.get("ptvsd/enabled", False):
                     import ptvsd
                     ptvsd.enable_attach(address=("0.0.0.0", 3000)) 
             except:
                 self._log.info("Remote Debugging (ptvsd) nicht verfügbar")
+            self.pm.needed_plugins()
+            self.mqtt_client, deviceID = self.pm.start_mqtt_client()
             self.pm.enable_mods()
             while True:
                 try:

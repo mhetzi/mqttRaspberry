@@ -4,3 +4,6 @@ class BaseFilter:
 
     def nullOldValues(self):
         pass
+
+class DontSend(Exception):
+    pass

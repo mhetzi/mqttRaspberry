@@ -60,6 +60,7 @@ class OneWireTemp:
         self._prev_deg = []
 
         if isinstance(self._config.get("w1t", None), list):
+            self.__logger.warning("w1t entry is not a list entry. Resetting...")
             devices = self._config["w1t"]
             self._config["w1t"] = {}
             self._config["w1t/dev"] = devices
@@ -80,6 +81,7 @@ class OneWireTemp:
         self.__ava_topic = device_id
 
     def register(self):
+        self.__logger.debug("Sensoren für {} werden erstellt...".format(self._paths))
         for d in self._paths:
             unique_id = "sensor.w1-{}.{}".format(d["i"], d["n"])
             topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, d["n"], conf.autodisc.SensorDeviceClasses.TEMPERATURE)

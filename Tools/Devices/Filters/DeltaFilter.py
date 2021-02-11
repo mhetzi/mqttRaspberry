@@ -1,7 +1,7 @@
 import logging
 from Tools.Devices.Filters import BaseFilter
 import math
-from logging import Logger, RootLogger
+import logging
 
 class DeltaFilter(BaseFilter):
     _delta = 0.0
@@ -31,3 +31,7 @@ class DeltaFilter(BaseFilter):
             return new_value
         self._log.debug("Received: {}".format(new_value))
         return self._last_valid_value
+
+    def nullOldValues(self):
+        self._last_valid_value = 0.0
+        return super().nullOldValues()

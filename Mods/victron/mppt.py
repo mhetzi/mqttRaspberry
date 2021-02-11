@@ -26,7 +26,7 @@ class MPPT(CONST.VEDirectDevice):
             Autodiscovery.SensorDeviceClasses.VOLTAGE, measurement_unit="V", device=self._vcserial._device,
             value_template="{{value_json.v}}", json_attributes=True
         )
-        self.battery_voltage.addFilter( DeltaFilter(0.03) )
+        self.battery_voltage.addFilter( DeltaFilter(0.05, self._log.getChild("BAT_V")) )
 
         self.battery_current = Sensor(
             self._log, self._pman, "Batterie (A)",
@@ -39,14 +39,14 @@ class MPPT(CONST.VEDirectDevice):
             Autodiscovery.SensorDeviceClasses.VOLTAGE, measurement_unit="V", device=self._vcserial._device,
             value_template="{{value_json.v}}", json_attributes=True
         )
-        self.panel_voltage.addFilter( DeltaFilter(1) )
+        self.panel_voltage.addFilter( DeltaFilter(1, self._log.getChild("VPV")) )
 
         self.panel_power = Sensor(
             self._log, self._pman, "Panel (W)",
             Autodiscovery.SensorDeviceClasses.POWER, measurement_unit="W", device=self._vcserial._device,
             value_template="{{value_json.w}}", json_attributes=True
         )
-        self.panel_power.addFilter( DeltaFilter(1) )
+        self.panel_power.addFilter( DeltaFilter(1, self._log.getChild("PPV")) )
 
         self.load = Sensor(
             self._log, self._pman, "Last",
@@ -136,17 +136,17 @@ class MPPT(CONST.VEDirectDevice):
     def update_battery_voltage(self, mV: str):
         mV = int(mV)
         js = {"v": mV / 1000}
-        self.battery_voltage(js, mainState=mV / 1000)
+        self.battery_voltage(js, keypath="v")
     
     def update_panel_voltage(self, mV: str):
         mV = int(mV)
         js = {"v": mV / 1000}
-        self.panel_voltage(js, mainState=mV / 1000)
+        self.panel_voltage(js, keypath="v")
     
     def update_panel_power(self, w: str):
         w = int(w)
         js = {"w": w}
-        self.panel_power(js, mainState=w)
+        self.panel_power(js, keypath="w")
 
     def update_battery_current(self, mA:str):
         mA = int(mA)
@@ -210,7 +210,7 @@ class MPPT(CONST.VEDirectDevice):
             self.mppt("MPPT Tracker active")
 
     def resend_entities(self):
-        self.battery_current.reset()
+        self.battery_current.resend()
         self.battery_voltage.reset()
         self.error.reset()
         self.load.reset()

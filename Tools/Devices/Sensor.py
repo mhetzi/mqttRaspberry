@@ -1,3 +1,4 @@
+from os import stat
 import paho.mqtt.client as mclient
 import Tools.Config as conf
 import Tools.Autodiscovery as autodisc
@@ -6,8 +7,10 @@ import logging
 import json
 from  Tools.PluginManager import PluginManager
 import enum
-from Tools.Devices.Filters import BaseFilter
+from Tools.Devices.Filters import BaseFilter, DontSend
 import json
+
+from Tools.Config import DictBrowser
 
 class Sensor:
     _mainState = None
@@ -32,8 +35,8 @@ class Sensor:
         self._playload = None
         self._filters = []
     
-    def __call__(self, state=None, force_send=False, mainState=None) -> mclient.MQTTMessageInfo:
-        return self.state(state=state, force_send=force_send, mainState=mainState)
+    def __call__(self, state=None, force_send=False, keypath=None) -> mclient.MQTTMessageInfo:
+        return self.state(state=state, force_send=force_send, keypath=keypath)
 
     def register(self):
         # Setze Discovery Configuration
@@ -65,26 +68,32 @@ class Sensor:
     def addFilter(self, filter: BaseFilter):
         self._filters.append(filter)
 
-    def _compareMainState(self, ms):
+    def _callFilters(self, ms):
         for filter in self._filters:
             ms = filter.filter(ms)
         return ms
         
-    def state(self, state=None, force_send=False, mainState=None) -> mclient.MQTTMessageInfo:
-        if mainState is not None:
-            mainState = self._compareMainState(mainState)
-            if self._mainState == mainState:
-                self._mainState = mainState
+    def state(self, state=None, force_send=False, keypath=None) -> mclient.MQTTMessageInfo:
+        if keypath is not None:
+            browse = DictBrowser(state)
+            try:
+                new_state = browse[keypath]
+                new_state = self._callFilters(new_state)
+                browse[keypath] = new_state 
+            except DontSend:
                 return None
         if isinstance(state, dict):
             state = json.dumps(state)
-        elif mainState is None:
-            mainState = self._compareMainState(state)
-            if self._mainState == mainState:
-                self._mainState = mainState
+        else:
+            try:
+                state = self._callFilters(state)
+            except DontSend:
                 return None
-        payload = state.encode('utf-8') if self._jsattrib else state
+        payload = state.encode('utf-8') if self._jsattrib else str(state)
         if self._playload == payload and not force_send:
             return None
         self._playload = payload
         return self._pm._client.publish(self._topics.state, payload=payload)
+
+    def resend(self):
+        return self._pm._client.publish(self._topics.state, payload=self._playload)

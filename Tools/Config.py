@@ -31,6 +31,74 @@ except ImportError:
 from typing import Dict, Tuple, Sequence
 
 
+class DictBrowser:
+    def __init__(self, backing_dict: dict, logger: logging.Logger = None) -> None:
+        self._dict = backing_dict
+        #self._log = logger if logger is not None else logging.getLogger("Launch.DictBrowser")
+    
+    def get(self, key: str, default=None):
+        t = self[key]
+        if t is None and default is not None:
+            self[key] = default
+        return self[key]
+
+    def sett(self, key: str, value):
+        self[key] = value
+
+    def __getitem__(self, item: str):
+        path = item.split("/")
+        d = self._dict
+        i = 0
+        while True:
+            if i < (len(path) - 1):
+                if d.get(path[i], None) is None:
+                    d[path[i]] = {}
+                d = d[path[i]]
+            elif i == (len(path) - 1):
+                if d.get(path[i], None) is None:
+                    return None
+                return d[path[i]]
+            elif i > len(path):
+                return d
+            i += 1
+
+    def __setitem__(self, key: str, value):
+        path = key.split("/")
+        d = self._dict
+        i = 0
+        while True:
+            if i < (len(path) - 1):
+                if d.get(path[i], None) is None:
+                    d[path[i]] = {}
+                d = d[path[i]]
+            elif i == (len(path) - 1):
+                if value is None:
+                    try:
+                        del d[path[i]]
+                    except: pass
+                else:
+                    d[path[i]] = value
+                break
+            elif i > len(path):
+                break
+            i += 1
+
+    def __delitem__(self, key:str):
+        path = key.split("/")
+        d = self._dict
+        i = 0
+        while True:
+            if i < (len(path) - 1):
+                if d.get(path[i], None) is None:
+                    d[path[i]] = {}
+                d = d[path[i]]
+            elif i == (len(path) - 1):
+                if d.get(path[i], None) is None:
+                    return
+                del d[path[i]]
+            elif i > len(path):
+                del d
+            i += 1
 
 class NoClientConfigured(Exception):
     def __init__(self):
@@ -63,6 +131,7 @@ class ClientConfig:
 
 class BasicConfig:
     _is_in_saving = False
+    _dict_browser: DictBrowser = None
 
     def __init__(self, pfad: Path, logger: logging.Logger, do_load=False, filesystem_listen=True):
         self._conf_path = pfad.expanduser()
@@ -109,6 +178,9 @@ class BasicConfig:
 
         if self._config.get("PLUGINS", None) is None:
             self._config["PLUGINS"] = {}
+        
+        self._dict_browser = DictBrowser(self._config, self._logger.getChild("DictBrowser"))
+        
 
     def am_i_saving(self) -> bool:
         return self._is_in_saving
@@ -189,83 +261,6 @@ class BasicConfig:
         if self._config.get("PLUGINS", {}).get(name, None) is None:
             self._config["PLUGINS"][name] = {}
         return self._config["PLUGINS"][name]
-
-    def get(self, key: str, default=None):
-        t = self[key]
-        if t is None and default is not None:
-            self[key] = default
-        return self[key]
-
-    def sett(self, key: str, value):
-        self[key] = value
-
-    def __getitem__(self, item: str):
-        path = item.split("/")
-        if len(path) == 1:
-            return self._config.get("PLUGINS", {}).get(path[0], None)
-        d = self.get_plugins_config(path[0])
-        i = 1
-        while True:
-            if i < (len(path) - 1):
-                if d.get(path[i], None) is None:
-                    d[path[i]] = {}
-                d = d[path[i]]
-            elif i == (len(path) - 1):
-                if d.get(path[i], None) is None:
-                    return None
-                return d[path[i]]
-            elif i > len(path):
-                return d
-            i += 1
-
-    def __setitem__(self, key: str, value):
-        path = key.split("/")
-        if len(path) == 1:
-            if value is None and path[0] in self._config["PLUGINS"].keys():
-                del self._config["PLUGINS"][path[0]]
-            elif value is not None:
-                self._config["PLUGINS"][path[0]] = value
-            return
-        d = self.get_plugins_config(path[0])
-        i = 1
-        while True:
-            if i < (len(path) - 1):
-                if d.get(path[i], None) is None:
-                    d[path[i]] = {}
-                d = d[path[i]]
-            elif i == (len(path) - 1):
-                if value is None:
-                    try:
-                        del d[path[i]]
-                    except: pass
-                else:
-                    d[path[i]] = value
-                break
-            elif i > len(path):
-                self._config["PLUGINS"] = value
-                break
-            i += 1
-        self.file_is_dirty = True
-        self.save(True)
-
-    def __delitem__(self, key:str):
-        path = key.split("/")
-        if len(path) == 1:
-            return
-        d = self.get_plugins_config(path[0])
-        i = 1
-        while True:
-            if i < (len(path) - 1):
-                if d.get(path[i], None) is None:
-                    d[path[i]] = {}
-                d = d[path[i]]
-            elif i == (len(path) - 1):
-                if d.get(path[i], None) is None:
-                    return
-                del d[path[i]]
-            elif i > len(path):
-                del d
-            i += 1
     
     def getIndependendFile(self, name:str, no_watchdog=False, do_load=True):
         if name is None:
@@ -281,6 +276,28 @@ class BasicConfig:
 
     def stop(self):
         pass
+
+    def get(self, key: str, default=None):
+        key = "PLUGINS/{}".format(key)
+        return self._dict_browser.get(key, default=default)
+
+    def sett(self, key: str, value):
+        key = "PLUGINS/{}".format(key)
+        self._dict_browser[key] = value
+
+    def __getitem__(self, key: str):
+        key = "PLUGINS/{}".format(key)
+        return self._dict_browser[key]
+
+    def __setitem__(self, key: str, value):
+        key = "PLUGINS/{}".format(key)
+        self._dict_browser[key] = value
+        self.file_is_dirty = True
+        self.save(True)
+
+    def __delitem__(self, key:str):
+        key = "PLUGINS/{}".format(key)
+        del self._dict_browser[key]
         
 
 if FILEWATCHING:
@@ -321,8 +338,7 @@ if FILEWATCHING:
                 print("Observer killed")
             except:
                 pass
-
-
+            
         def _register_watchdog(self):
             try:
                 self._observer = Observer()
@@ -331,7 +347,6 @@ if FILEWATCHING:
                 self._observer.start()
             except OSError:
                 pass
-
 
 
 class PluginConfig:

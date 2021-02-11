@@ -19,6 +19,10 @@ except ImportError as ie:
 import Tools.Config as conf
 from Tools import RangeTools
 
+from Tools.Devices.Sensor import Sensor, SensorDeviceClasses
+from Tools.Devices.Filters.TooHighFilter import TooHighFilter
+from Tools.Devices.Filters.RangedFilter import RangedFilter
+
 
 class PluginLoader:
 
@@ -39,6 +43,8 @@ class PluginLoader:
 class DHT22:
     _temp_topic = None
     _rh_topic = None
+    _sensor_celsius: Sensor = None
+    _sensor_humidity: Sensor = None
 
     def _reset_daily(self):
         for i in ["°c", "rH%"]:
@@ -71,6 +77,7 @@ class DHT22:
         self.__logger  = logger.getChild("w1Temp")
         self._prev_deg = [None,None]
         self.dht = None
+        self._plugin_manager = None
 
         if isinstance(self._config.get("DHT", None), list):
             devices = self._config["DHT"]
@@ -98,41 +105,33 @@ class DHT22:
             "{}_C".format(self._config.get("DHT/name", "DHT")),
             conf.autodisc.SensorDeviceClasses.TEMPERATURE
         )
-        if self._temp_topic.config is not None:
-            self.__logger.info("Werde AutodiscoveryTopic senden mit der Payload: {}".format(
-                self._temp_topic.get_config_payload("{}_C".format(self._config.get("DHT/name", "DHT")), "°C", unique_id=unique_id, value_template="{{ value_json.now }}", json_attributes=True))
-                )
-            self.__client.publish(
-                self._temp_topic.config,
-                self._temp_topic.get_config_payload(
-                    "{}_C".format(self._config.get("DHT/name", "DHT")),
-                    "°C",
-                    unique_id=unique_id, value_template="{{ value_json.now }}", json_attributes=True),
-                retain=True
-            )
+
+        self._sensor_celsius = Sensor(
+            self.__logger.getChild("Celsuis"),
+            self._plugin_manager,
+            "{}_C".format(self._config.get("DHT/name", "DHT")),
+            SensorDeviceClasses.TEMPERATURE, "°C", 
+            unique_id=unique_id, value_template="{{ value_json.now }}", json_attributes=True
+        )
+        self._sensor_celsius.register()
+        self._sensor_celsius.addFilter(TooHighFilter(40.0, self.__logger.getChild("Celsius")))
+        self._sensor_celsius.addFilter(RangedFilter(5.0, 5, self.__logger.getChild("Celsius")))
 
         # Registriere Luftfeuchte
         unique_id = "sensor.dht-{}.{}.rh".format(
             self._config.get("DHT/dev/type", "22"),
             self._config.get("DHT/name", "DHT"),
         )
-        self._rh_topic = self._config.get_autodiscovery_topic(
-            conf.autodisc.Component.SENSOR,
+        self._sensor_humidity = Sensor(
+            self.__logger.getChild("Humidity"),
+            self._plugin_manager,
             "{}_Rh".format(self._config.get("DHT/name", "DHT")),
-            conf.autodisc.SensorDeviceClasses.HUMIDITY
+            SensorDeviceClasses.HUMIDITY, "%", 
+            unique_id=unique_id, value_template="{{ value_json.now }}", json_attributes=True
         )
-        if self._rh_topic.config is not None:
-            self.__logger.info("Werde AutodiscoveryTopic senden mit der Payload: {}".format(
-                self._rh_topic.get_config_payload("{}_Rh".format(self._config.get("DHT/name", "DHT")), "%", unique_id=unique_id, value_template="{{ value_json.now }}", json_attributes=True))
-                )
-            self.__client.publish(
-                self._rh_topic.config,
-                self._rh_topic.get_config_payload(
-                    "{}_Rh".format(self._config.get("DHT/name", "DHT")),
-                    "%",
-                    unique_id=unique_id, value_template="{{ value_json.now }}", json_attributes=True),
-                retain=True
-            )
+        self._sensor_humidity.register()
+        self._sensor_humidity.addFilter(TooHighFilter(100.0, self.__logger.getChild("Humidity")))
+        self._sensor_humidity.addFilter(RangedFilter(5.0, 5, self.__logger.getChild("Humidity")))
 
         self._daily_job = schedule.every().day.at("00:01")
         self._daily_job.do( lambda: self._reset_daily() )
@@ -175,18 +174,17 @@ class DHT22:
             self._config[path_max] = cmax
 
             js = {
-                "now": str(new_temp),
+                "now": new_temp,
                 "Heute höchster Wert": cmax,
                 "Heute tiefster Wert": cmin,
                 "Gestern höchster Wert": self._config.get(path_lmax, "n/A"),
                 "Gestern tiefster Wert": self._config.get(path_lmin, "n/A")
             }
-            jstr = json.dumps(js)
             if new_temp != -1000 and self._prev_deg == -1000:
                 self.__client.publish(self._temp_topic.ava_topic, "online", retain=True)
-                self.__client.publish(self._temp_topic.state, jstr)
+                self._sensor_celsius(js, keypath="now")
             elif new_temp != -1000:
-                self.__client.publish(self._temp_topic.state, jstr)
+                self._sensor_celsius(js, keypath="now")
             else:
                 self.__client.publish(self._temp_topic.ava_topic, "offline", retain=True)
             self._prev_deg[0] = new_temp
@@ -218,18 +216,17 @@ class DHT22:
             self._config[path_max] = cmax
 
             js = {
-                "now": str(new_temp),
+                "now": new_temp,
                 "Heute höchster Wert": cmax,
                 "Heute tiefster Wert": cmin,
                 "Gestern höchster Wert": self._config.get(path_lmax, "n/A"),
                 "Gestern tiefster Wert": self._config.get(path_lmin, "n/A")
             }
-            jstr = json.dumps(js)
             if new_temp != -1000 and self._prev_deg == -1000:
                 self.__client.publish(self._rh_topic.ava_topic, "online", retain=True)
-                self.__client.publish(self._rh_topic.state, jstr)
+                self._sensor_humidity(js, keypath="now")
             elif new_temp != -1000:
-                self.__client.publish(self._rh_topic.state, jstr)
+                self._sensor_humidity(js, keypath="now")
             else:
                 self.__client.publish(self._rh_topic.ava_topic, "offline", retain=True)
             self._prev_deg[1] = new_temp
@@ -243,26 +240,11 @@ class DHT22:
         humidity = round(humidity, ndigits=1)
         temperature = round(temperature, ndigits=1)
 
-        if self._prev_deg[0] is None:
-            self.__logger.info("__prev_deg[0] (Temperature) is None")
-        elif not RangeTools.is_plus_minus(2.0, self._prev_deg[0], temperature):
-            self.__logger.warning("INSANE: Neue Temperatur {} ist unnatürlich! Alte war {}".format(temperature, self._prev_deg[0]))
-            if insane > 2:
-                self.__logger.info("Nach 3 Versuchen wird der Wert verwendet.")
-            else:
-                return self.send_update(force=force, insane=insane+1)
-        elif self._prev_deg[1] is None:
-            self.__logger.info("__prev_deg[1] (Humidity) is None")
-        elif not RangeTools.is_plus_minus(2, self._prev_deg[1], humidity):
-            self.__logger.warning("INSANE: Neue Luftfeuchte {} ist unnatürlich! Alte war {}".format(temperature, self._prev_deg[1]))
-            if insane > 2:
-                self.__logger.info("Nach 3 Versuchen wird der Wert verwendet.")
-            else:
-                return self.send_update(force=force, insane=insane+1)
-
         self.sendTemperature(temperature, force)
         self.sendHumidity(humidity, force)
 
+    def set_pluginManager(self, pm):
+        self._plugin_manager = pm
 
 class DhtConf:
     def __init__(self, conf: conf.BasicConfig):
