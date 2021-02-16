@@ -2,6 +2,10 @@
 import paho.mqtt.client as mclient
 import Tools.Config as conf
 import Tools.Autodiscovery as ad
+from Tools.Devices.Sensor import Sensor, SensorDeviceClasses
+from Tools.Devices.Filters import DeltaFilter, TooHighFilter
+from Tools.PluginManager import PluginManager
+
 import logging
 import os
 import re
@@ -23,16 +27,15 @@ class PluginLoader:
 
 
 class RaspberryPiCpuTemp:
-    _topic = None
     _shed_Job = None
+    _sensor: Sensor
+    _plugin_manager: PluginManager
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         self._config = conf.PluginConfig(opts, "rpiCPUtemp")
         self.__client = client
         self.__logger = logger.getChild("PiCpuTemp")
         self._prev_deg = 0
-        self.__lastTemp = 0.0
-        self.__ava_topic = device_id
         if self._config.get("diff", None) is None:
             self._config["diff"] = 1.5
         self._file = open("/sys/class/thermal/thermal_zone0/temp")
@@ -45,16 +48,25 @@ class RaspberryPiCpuTemp:
     def register(self):
         t = ad.Topics.get_std_devInf()
         n = self._config.get("name", "CPU Temp")
-        unique_id = "sensor.PiCpuTemp-{}.{}".format(t.pi_serial, n)
-        topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, n, conf.autodisc.SensorDeviceClasses.TEMPERATURE)
-        if topics.config is not None:
-            self.__logger.info("Werde AutodiscoveryTopic senden mit der Payload: {}".format(topics.get_config_payload(n, "°C", unique_id=unique_id)))
-            self.__client.publish(topics.config, topics.get_config_payload(n, "°C", unique_id=unique_id), retain=True)
-        self._topic = topics
         self._shed_Job = schedule.every(
             self._config.get("update_secs", 15)
         ).seconds
         self._shed_Job.do(self.send_update)
+
+        self._sensor = Sensor(
+            self.__logger,
+            self._plugin_manager,
+            n,
+            SensorDeviceClasses.TEMPERATURE,
+            "C"
+        )
+        self._sensor.register()
+        self._sensor.addFilter( DeltaFilter.DeltaFilter(0.5) )
+        self._sensor.addFilter( TooHighFilter.TooHighFilter(150.0) )
+
+
+    def set_pluginManager(self, pm):
+        self._plugin_manager = pm
 
     def stop(self):
         schedule.cancel_job(self._shed_Job)
@@ -83,27 +95,13 @@ class RaspberryPiCpuTemp:
     def send_update(self, force=False):
         new_temp = self.get_temperatur_file(self._file)
 
-        if self._config.get("diff", None) is not None and not force:
-            diff = self._config["diff"]
-            if not (new_temp > (self._prev_deg + diff)) and not (new_temp < (self._prev_deg - diff)):
-                #self.__logger.debug("Neue Temperatur {} hat sich nicht über {} verändert.".format(new_temp, diff))
-                return
-
         for call in self._callables:
             try:
                 call(new_temp)
             except:
                 self.__logger.exception("Temperature callback error")
 
-        if new_temp != self._prev_deg or force:
-            if new_temp != -1000 and self._prev_deg == -1000:
-                self.__client.publish(self._topic.ava_topic, "online", retain=True)
-                self.__client.publish(self._topic.state, str(new_temp))
-            elif new_temp != -1000:
-                self.__client.publish(self._topic.state, str(new_temp))
-            else:
-                self.__client.publish(self._topic.ava_topic, "offline", retain=True)
-            self._prev_deg = new_temp
+        self._sensor(new_temp)
 
 
 class RaspberryPiCpuTempConfig:

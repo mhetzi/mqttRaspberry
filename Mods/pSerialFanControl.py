@@ -186,8 +186,8 @@ class SerialFan:
         self.send_updates()
 
     def stop(self):
-        self._serial.close()
         self._shutdown = True
+        self._serial.close()
         self._serial_thr.join()
         for reg in self._registered_callback_topics:
             self.__client.message_callback_remove(reg)
