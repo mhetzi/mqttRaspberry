@@ -65,7 +65,8 @@ class ShellSwitch:
             state_js["state"] = "OFF" if on else "ON"
             state_js["error_code"] = e.returncode
             self.__logger.error("ShellSwitch Rückgabewert der Shell ist nicht 0. Ausgabe der Shell: {}".format(e.output))
-            switch["wasOn"] = not on
+            switch["wasOn"] = not on if switch.get("onOff", True) else False
+            state_js["state"] = state_js["state"] if switch.get("onOff", True) else "OFF"
         self.__client.publish(self._state_name_map[name], json.dumps(state_js))
 
     def handle_switch(self, client, userdata, message: mclient.MQTTMessage):
@@ -108,6 +109,8 @@ class ShellSwitch:
             self._name_topic_map[topics.command] = name
             self._state_name_map[name] = topics.state
             self.exec_switch(name, False, True)
+            if not self._config["entrys"][name].get("onOff", True):
+                self.exec_switch(name, False)
             if self._config["entrys"][name].get("setOnLoad", True):
                 self.exec_switch(name, self._config["entrys"][name]["wasOn"])
 
