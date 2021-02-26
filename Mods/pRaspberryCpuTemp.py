@@ -3,7 +3,7 @@ import paho.mqtt.client as mclient
 import Tools.Config as conf
 import Tools.Autodiscovery as ad
 from Tools.Devices.Sensor import Sensor, SensorDeviceClasses
-from Tools.Devices.Filters import DeltaFilter, TooHighFilter
+from Tools.Devices.Filters import DeltaFilter, TooHighFilter, MinTimeElapsed
 from Tools.PluginManager import PluginManager
 
 import logging
@@ -61,7 +61,8 @@ class RaspberryPiCpuTemp:
             "C"
         )
         self._sensor.register()
-        self._sensor.addFilter( DeltaFilter.DeltaFilter(0.5) )
+        self._sensor.addFilter( MinTimeElapsed.MinTimeElapsedFilter(5.0) )
+        self._sensor.addFilter( DeltaFilter.DeltaFilter(2.25) )
         self._sensor.addFilter( TooHighFilter.TooHighFilter(150.0) )
 
 
