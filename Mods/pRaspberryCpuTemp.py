@@ -61,9 +61,9 @@ class RaspberryPiCpuTemp:
             "C"
         )
         self._sensor.register()
-        self._sensor.addFilter( MinTimeElapsed.MinTimeElapsedFilter(5.0) )
-        self._sensor.addFilter( DeltaFilter.DeltaFilter(2.25) )
-        self._sensor.addFilter( TooHighFilter.TooHighFilter(150.0) )
+        self._sensor.addFilter( MinTimeElapsed.MinTimeElapsedFilter(5.0, self.__logger) )
+        self._sensor.addFilter( DeltaFilter.DeltaFilter(2.25, self.__logger) )
+        self._sensor.addFilter( TooHighFilter.TooHighFilter(150.0, self.__logger) )
 
 
     def set_pluginManager(self, pm):

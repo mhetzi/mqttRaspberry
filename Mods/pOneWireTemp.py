@@ -126,7 +126,12 @@ class OneWireTemp:
         tmp = re.search("t=.*", data)
         if tmp is not None:
             tmp = tmp.group(0).replace("t=", "")
-            return round(int(tmp) / 1000, 1)
+            tmp = round(int(tmp) / 1000, 1)
+            if tmp > 500.0:
+                return math.nan
+            elif tmp < 100.0:
+                return math.nan
+            return tmp
         return math.nan
 
     @staticmethod
