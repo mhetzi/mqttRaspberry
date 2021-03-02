@@ -84,7 +84,7 @@ class OneWireTemp:
         self.__logger.debug("Sensoren für {} werden erstellt...".format(self._paths))
         for d in self._paths:
             unique_id = "sensor.w1-{}.{}".format(d["i"], d["n"])
-            topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, d["n"], conf.autodisc.SensorDeviceClasses.TEMPERATURE)
+            topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, d["n"], conf.autodisc.SensorDeviceClasses.TEMPERATURE, ownOfflineTopic=True)
             if topics.config is not None:
                 self.__logger.info("Werde AutodiscoveryTopic senden mit der Payload: {}".format(topics.get_config_payload(d["n"], "°C", unique_id=unique_id, value_template="{{ value_json.now }}", json_attributes=True)))
                 self.__client.publish(
@@ -129,7 +129,7 @@ class OneWireTemp:
             tmp = round(int(tmp) / 1000, 1)
             if tmp > 500.0:
                 return math.nan
-            elif tmp < 100.0:
+            elif tmp < -100.0:
                 return math.nan
             return tmp
         return math.nan
@@ -145,7 +145,7 @@ class OneWireTemp:
         for i in range(0, len(self._paths)):
             d = self._paths[i]
             new_temp = self.get_temperatur_file(d["f"])
-            topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, d["n"], conf.autodisc.SensorDeviceClasses.TEMPERATURE)
+            topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, d["n"], conf.autodisc.SensorDeviceClasses.TEMPERATURE, ownOfflineTopic=True)
 
             if new_temp != self._prev_deg[i] or force:
 
@@ -166,18 +166,19 @@ class OneWireTemp:
                 if percentage_cahnged < 70 or percentage_cahnged > 140:
                     self.__logger.warning("Neue Temperatur hat zu hohe differenz: {}%".format(percentage_cahnged))
                     continue
+                
+                if not math.isnan(new_temp):
+                    if cmin == "RESET" or cmin == "n/A" or math.isnan(cmin):
+                        cmin = new_temp
+                    elif cmin > new_temp and not math.isnan(new_temp):
+                        cmin = new_temp
+                    if cmax == "RESET" or cmax == "n/A" or math.isnan(cmax):
+                        cmax = new_temp
+                    elif cmax < new_temp and not math.isnan(new_temp):
+                        cmax = new_temp
 
-                if cmin == "RESET" or cmin == "n/A" or math.isnan(cmin):
-                    cmin = new_temp
-                elif cmin > new_temp and not math.isnan(new_temp):
-                    cmin = new_temp
-                if cmax == "RESET" or cmax == "n/A" or math.isnan(cmax):
-                    cmax = new_temp
-                elif cmax < new_temp and not math.isnan(new_temp):
-                    cmax = new_temp
-
-                self._config[path_min] = cmin
-                self._config[path_max] = cmax
+                    self._config[path_min] = cmin
+                    self._config[path_max] = cmax
 
                 if self._config.get("w1t/diff/{}".format(ii), None) is not None and not force:
                     diff = self._config["w1t/diff/{}".format(ii)]
@@ -185,21 +186,22 @@ class OneWireTemp:
                         self.__logger.debug("Neue Temperatur {} hat sich nicht über {} verändert.".format(new_temp, diff))
                         return
 
-                js = {
-                    "now": str(new_temp),
-                    "Heute höchster Wert": cmax,
-                    "Heute tiefster Wert": cmin,
-                    "Gestern höchster Wert": self._config.get(path_lmax, "n/A"),
-                    "Gestern tiefster Wert": self._config.get(path_lmin, "n/A")
-                }
-                jstr = json.dumps(js)
-                self.__client.publish(topics.state, jstr)
+                if not math.isnan(new_temp) and not math.isnan(self._prev_deg[i]):
+                    self.__client.publish(topics.ava_topic, "online", retain=True)
+                    self.__client.publish(topics.state, jstr)
+                elif math.isnan(new_temp):
+                    self.__client.publish(topics.ava_topic, "offline", retain=True)
+                else:
+                    js = {
+                        "now": str(new_temp),
+                        "Heute höchster Wert": cmax,
+                        "Heute tiefster Wert": cmin,
+                        "Gestern höchster Wert": self._config.get(path_lmax, "n/A"),
+                        "Gestern tiefster Wert": self._config.get(path_lmin, "n/A")
+                    }
+                    jstr = json.dumps(js)
+                    self.__client.publish(topics.state, jstr)
 
-                # if not math.isnan(new_temp) and not math.isnan(self._prev_deg[i]):
-                #     self.__client.publish(topics.ava_topic, "online", retain=True)
-                #     self.__client.publish(topics.state, jstr)
-                # elif math.isnan(new_temp):
-                #     self.__client.publish(topics.ava_topic, "offline", retain=True)
                 self._prev_deg[i] = new_temp
 
 

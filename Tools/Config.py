@@ -246,7 +246,7 @@ class BasicConfig:
     def get_discovery_prefix(self):
         return self.get_client_config().discorvery_prefix
 
-    def get_autodiscovery_topic(self, component: autodisc.Component, entitiy_id: str, dev_class: autodisc.DeviceClass, node_id=None) -> autodisc.Topics:
+    def get_autodiscovery_topic(self, component: autodisc.Component, entitiy_id: str, dev_class: autodisc.DeviceClass, node_id=None, ownOfflineTopic=False) -> autodisc.Topics:
         cc = self.get_client_config()
         topics = None
         if node_id is None:
@@ -254,7 +254,8 @@ class BasicConfig:
                                   cc.client_id if cc.client_id is not None else cc.username, entitiy_id, dev_class)
         else:
             topics = autodisc.getTopics(cc.discorvery_prefix, component, node_id, entitiy_id, dev_class)
-        topics.ava_topic = cc.isOnlineTopic
+        if not ownOfflineTopic:
+            topics.ava_topic = cc.isOnlineTopic
         return topics
 
     def get_plugins_config(self, name) -> dict:

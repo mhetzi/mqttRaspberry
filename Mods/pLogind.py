@@ -440,7 +440,7 @@ class logindConfig:
 
     def configure(self, conff: conf.BasicConfig, logger:logging.Logger):
         from Tools import ConsoleInputTools
-        conf = conf.PluginConfig(conff, "logind")
+        conf = conff.PluginConfig(conff, "logind")
 
         conf["allow_power_off"] = ConsoleInputTools.get_bool_input("\nErlaube Ausschalten: ", True)
         conf["allow_suspend"] = ConsoleInputTools.get_bool_input("\nErlaube Bereitschaftsmodus: ", True)

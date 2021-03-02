@@ -5,7 +5,7 @@ import logging
 
 class DeltaFilter(BaseFilter):
     _delta = 0.0
-    _last_valid_value = 0.0
+    _last_valid_value = math.nan
 
     def __init__(self, delta=None, logger=None) -> None:
         super().__init__()

@@ -1,3 +1,4 @@
+import math
 from os import stat
 import paho.mqtt.client as mclient
 import Tools.Config as conf
@@ -71,6 +72,8 @@ class Sensor:
     def _callFilters(self, ms):
         for filter in self._filters:
             ms = filter.filter(ms)
+        if math.isnan(ms):
+            raise DontSend
         return ms
         
     def state(self, state=None, force_send=False, keypath=None) -> mclient.MQTTMessageInfo:
