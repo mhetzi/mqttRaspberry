@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from Tools.PluginManager import PluginManager
 import paho.mqtt.client as mclient
 import Tools.Config as conf
 import logging
@@ -8,6 +9,10 @@ import schedule
 import io
 import json
 import math
+
+from Tools.Devices.Sensor import Sensor, SensorDeviceClasses
+from Tools.Devices.Filters.DeltaFilter import DeltaFilter
+from Tools.Devices.Filters.TooHighFilter import TooHighFilter
 
 class PluginLoader:
 
@@ -25,6 +30,7 @@ class PluginLoader:
 
 
 class OneWireTemp:
+    _plugin_manager: PluginManager = None
 
     def _reset_daily(self):
         for d in self._paths:
@@ -58,6 +64,7 @@ class OneWireTemp:
         self.__logger = logger.getChild("w1Temp")
         self._paths = []
         self._prev_deg = []
+        
 
         if isinstance(self._config.get("w1t", None), list):
             self.__logger.warning("w1t entry is not a list entry. Resetting...")
@@ -76,22 +83,20 @@ class OneWireTemp:
             self._paths.append(d)
             self.__logger.info("Temperaturfühler {} mit der ID {} wird veröffentlicht.".format(d["n"], d["i"]))
             self.__logger.info("Der Pfad ist \"{}\"".format(d["p"]))
-            self._prev_deg.append(-1)
-        self.__lastTemp = 0.0
-        self.__ava_topic = device_id
+            self._prev_deg.append(math.nan)
+
+    def set_pluginManager(self, pm):
+        self._plugin_manager = pm
 
     def register(self):
         self.__logger.debug("Sensoren für {} werden erstellt...".format(self._paths))
         for d in self._paths:
             unique_id = "sensor.w1-{}.{}".format(d["i"], d["n"])
-            topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, d["n"], conf.autodisc.SensorDeviceClasses.TEMPERATURE, ownOfflineTopic=True)
-            if topics.config is not None:
-                self.__logger.info("Werde AutodiscoveryTopic senden mit der Payload: {}".format(topics.get_config_payload(d["n"], "°C", unique_id=unique_id, value_template="{{ value_json.now }}", json_attributes=True)))
-                self.__client.publish(
-                    topics.config,
-                    topics.get_config_payload(d["n"], "°C", unique_id=unique_id, value_template="{{ value_json.now }}", json_attributes=True),
-                    retain=True
-                )
+            sensor = Sensor(self.__logger, self._plugin_manager, d["n"], SensorDeviceClasses.TEMPERATURE, "C", unique_id=unique_id, value_template="{{ value_json.now }}", json_attributes=True, ownOfflineTopic=True)
+            sensor.addFilter( TooHighFilter(500.0, self.__logger) )
+            sensor.addFilter( DeltaFilter(self._config["w1t/diff/{}".format(d["i"])], self.__logger) )
+            sensor.register()
+            d["d"] = sensor
 
         self._daily_job = schedule.every().day.at("00:00")
         self._daily_job.do( lambda: self._reset_daily() )
@@ -142,67 +147,64 @@ class OneWireTemp:
         return math.nan
 
     def send_update(self, force=False):
-        for i in range(0, len(self._paths)):
-            d = self._paths[i]
-            new_temp = self.get_temperatur_file(d["f"])
-            topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, d["n"], conf.autodisc.SensorDeviceClasses.TEMPERATURE, ownOfflineTopic=True)
+        try:
+            self.__logger.debug("send_update for:")
+            for i in range(0, len(self._paths)):
+                d = self._paths[i]
+                self.__logger.debug("Read Temperature for {}...".format(d))
+                new_temp = self.get_temperatur_file(d["f"])
+                sensor: Sensor = d["d"]
 
-            if new_temp != self._prev_deg[i] or force:
+                if new_temp != self._prev_deg[i] or force:
 
-                ii = d["i"]
+                    ii = d["i"]
 
-                path_min = "w1t/stat/{}/min".format(ii)
-                path_max = "w1t/stat/{}/max".format(ii)
-                path_lmin = "w1t/stat/{}/lmin".format(ii)
-                path_lmax = "w1t/stat/{}/lmax".format(ii)
-                path_sanity = "w1t/stat/{}/last".format(ii)
+                    path_min = "w1t/stat/{}/min".format(ii)
+                    path_max = "w1t/stat/{}/max".format(ii)
+                    path_lmin = "w1t/stat/{}/lmin".format(ii)
+                    path_lmax = "w1t/stat/{}/lmax".format(ii)
+                    path_sanity = "w1t/stat/{}/last".format(ii)
 
-                cmin = self._config.get(path_min, "RESET")
-                cmax = self._config.get(path_max, "RESET")
-                last = self._config.get(path_sanity, 0)
-                self._config[path_sanity] = new_temp
+                    cmin = self._config.get(path_min, "RESET")
+                    cmax = self._config.get(path_max, "RESET")
+                    last = self._config.get(path_sanity, 0)
+                    self._config[path_sanity] = new_temp
 
-                percentage_cahnged = 100 / last * new_temp
-                if percentage_cahnged < 70 or percentage_cahnged > 140:
-                    self.__logger.warning("Neue Temperatur hat zu hohe differenz: {}%".format(percentage_cahnged))
-                    continue
-                
-                if not math.isnan(new_temp):
-                    if cmin == "RESET" or cmin == "n/A" or math.isnan(cmin):
-                        cmin = new_temp
-                    elif cmin > new_temp and not math.isnan(new_temp):
-                        cmin = new_temp
-                    if cmax == "RESET" or cmax == "n/A" or math.isnan(cmax):
-                        cmax = new_temp
-                    elif cmax < new_temp and not math.isnan(new_temp):
-                        cmax = new_temp
+                    percentage_cahnged = 100 / last * new_temp
+                    if percentage_cahnged < 70 or percentage_cahnged > 140:
+                        self.__logger.warning("Neue Temperatur hat zu hohe differenz: {}%".format(percentage_cahnged))
+                        continue
+                    
+                    if not math.isnan(new_temp):
+                        if cmin == "RESET" or cmin == "n/A" or math.isnan(cmin):
+                            cmin = new_temp
+                        elif cmin > new_temp and not math.isnan(new_temp):
+                            cmin = new_temp
+                        if cmax == "RESET" or cmax == "n/A" or math.isnan(cmax):
+                            cmax = new_temp
+                        elif cmax < new_temp and not math.isnan(new_temp):
+                            cmax = new_temp
 
-                    self._config[path_min] = cmin
-                    self._config[path_max] = cmax
+                        self._config[path_min] = cmin
+                        self._config[path_max] = cmax
 
-                if self._config.get("w1t/diff/{}".format(ii), None) is not None and not force:
-                    diff = self._config["w1t/diff/{}".format(ii)]
-                    if not (new_temp > (self._prev_deg[i] + diff)) and not (new_temp < (self._prev_deg[i] - diff)):
-                        self.__logger.debug("Neue Temperatur {} hat sich nicht über {} verändert.".format(new_temp, diff))
-                        return
-
-                if not math.isnan(new_temp) and not math.isnan(self._prev_deg[i]):
-                    self.__client.publish(topics.ava_topic, "online", retain=True)
-                    self.__client.publish(topics.state, jstr)
-                elif math.isnan(new_temp):
-                    self.__client.publish(topics.ava_topic, "offline", retain=True)
-                else:
                     js = {
-                        "now": str(new_temp),
-                        "Heute höchster Wert": cmax,
-                        "Heute tiefster Wert": cmin,
-                        "Gestern höchster Wert": self._config.get(path_lmax, "n/A"),
-                        "Gestern tiefster Wert": self._config.get(path_lmin, "n/A")
-                    }
-                    jstr = json.dumps(js)
-                    self.__client.publish(topics.state, jstr)
+                            "now": new_temp,
+                            "Heute höchster Wert": cmax,
+                            "Heute tiefster Wert": cmin,
+                            "Gestern höchster Wert": self._config.get(path_lmax, "n/A"),
+                            "Gestern tiefster Wert": self._config.get(path_lmin, "n/A")
+                        }
 
-                self._prev_deg[i] = new_temp
+                    if math.isnan(new_temp):
+                        sensor.offline()
+                    else:
+                        sensor(js, keypath="now")
+
+                    self._prev_deg[i] = new_temp
+        except:
+            self.__logger.exception("send_update() failed.")
+        self.__logger.debug(" endfor")
 
 
 class OneWireConf:

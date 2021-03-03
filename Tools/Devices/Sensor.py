@@ -15,8 +15,10 @@ from Tools.Config import DictBrowser
 
 class Sensor:
     _mainState = None
+    _is_offline = True
+    _has_offline = False
 
-    def __init__(self, logger:logging.Logger, pman: PluginManager, name: str, sensor_type: SensorDeviceClasses, measurement_unit: str='', ava_topic=None, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None):
+    def __init__(self, logger:logging.Logger, pman: PluginManager, name: str, sensor_type: SensorDeviceClasses, measurement_unit: str='', ava_topic=None, ownOfflineTopic=False, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None):
         self._log = logger.getChild("Sensor")
         self._log.debug("Sensor Object für {} mit custom uid {} erstellt.".format(name, unique_id))
         self._pm = pman
@@ -31,10 +33,13 @@ class Sensor:
         self._topics = pman.config.get_autodiscovery_topic(
             autodisc.Component.SENSOR,
             name,
-            sensor_type
-            )
+            sensor_type,
+            ownOfflineTopic=ownOfflineTopic
+        )
         self._playload = None
         self._filters = []
+        if ownOfflineTopic or ava_topic is not None:
+            self._has_offline = True
     
     def __call__(self, state=None, force_send=False, keypath=None) -> mclient.MQTTMessageInfo:
         return self.state(state=state, force_send=force_send, keypath=keypath)
@@ -96,7 +101,15 @@ class Sensor:
         if self._playload == payload and not force_send:
             return None
         self._playload = payload
+        if self._is_offline:
+            self.online()
         return self._pm._client.publish(self._topics.state, payload=payload)
 
     def resend(self):
         return self._pm._client.publish(self._topics.state, payload=self._playload)
+    
+    def offline(self):
+        return self._pm._client.publish(self._topics.ava_topic, payload="offline", retain=True)
+    def online(self):
+        return self._pm._client.publish(self._topics.ava_topic, payload="online", retain=True)
+        
