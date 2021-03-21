@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import logging
-from os import sched_setaffinity
 from pathlib import Path
 
 import threading
@@ -85,6 +84,8 @@ class PluginManager:
         self.shed_thread = None
         if config.get("tracemalloc/enabled", False):
             schedule.every(config.get("tracemalloc/seconds", 30)).minutes.do(self.save_memory_stats)
+        self._discovery_topics = self.config.getIndependendFile("discovery_topics", no_watchdog=True, do_load=True)[0]
+        self.discovery_topics = tc.PluginConfig(self._discovery_topics, "Registry")
 
     @staticmethod
     def display_top(snapshot, file: io.FileIO, key_type='lineno', limit=10):
@@ -271,7 +272,7 @@ class PluginManager:
         if cc.is_secure():
             self.logger.info("SSL Optionen werden gesetzt...")
             import ssl
-
+        
             client.tls_set(ca_certs=cc.ca, certfile=cc.cert, keyfile=cc.key, tls_version=ssl.PROTOCOL_TLS)
             self.logger.debug("SSL Kontext gesetzt")
         elif cc.broken_security():

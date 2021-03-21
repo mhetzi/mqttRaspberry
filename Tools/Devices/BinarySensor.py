@@ -7,7 +7,7 @@ from  Tools.PluginManager import PluginManager
 import enum
 
 class BinarySensor:
-    def __init__(self, logger:logging.Logger, pman: PluginManager, name: str, binary_sensor_type: autodisc.BinarySensorDeviceClasses, measurement_unit: str='', ava_topic=None, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None):
+    def __init__(self, logger:logging.Logger, pman: PluginManager, name: str, binary_sensor_type: autodisc.BinarySensorDeviceClasses, measurement_unit: str='', ava_topic=None, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None, nodeID=None, subnode_id=None):
 
         self._log = logger.getChild("BinarySensor")
         self._log.debug("BinarySensor Object für {} mit custom uid {} erstellt.".format(name, unique_id))
@@ -19,10 +19,16 @@ class BinarySensor:
         self._dev = device
         self._unique_id = unique_id
         self._icon = icon
+        import re
+        if nodeID is not None:
+            nodeID = re.sub('[\W_#]+', '', nodeID)
+            self._log.debug("NodeID {} wird verwendet.")
         self._topics = pman.config.get_autodiscovery_topic(
             autodisc.Component.BINARY_SENROR,
             name,
-            binary_sensor_type
+            binary_sensor_type,
+            node_id=nodeID,
+            subnode_id=subnode_id
             )
     
     def register(self):
@@ -31,7 +37,7 @@ class BinarySensor:
         self._log.debug("Publish configuration")
         plugin_name = self._log.parent.name
         import re
-        safename = re.sub('[\W_]+', '', self._name) 
+        safename = re.sub('[\W_#]+', '', self._name) 
         uid = "switch.MqttScripts{}.switch.{}.{}".format(self._pm._client_name, plugin_name, safename) if self._unique_id is None else self._unique_id
         zeroc = self._topics.get_config_payload(
             name=self._name,
@@ -69,8 +75,10 @@ class BinarySensor:
 
     def turnOnOff(self, state: bool):
         if state:
+            self._log.debug("{}: einschalten.".format(self._name))
             return self.turnOn()
-        return self.turnOff
+        self._log.debug("{}: ausschalten.".format(self._name))
+        return self.turnOff()
 
     def reset(self):
         pass

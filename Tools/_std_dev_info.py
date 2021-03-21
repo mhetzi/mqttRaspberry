@@ -66,6 +66,10 @@ class DevInfoFactory:
                         log.info("Füge MAC {} hinzu".format(MAC))
             except:
                 log.exception("IDs")
+        elif sys.platform == "win32":
+            import uuid
+            MACs = [hex(uuid.getnode())]
+
         devInf.IDs = MACs
         log.debug(devInf)
         return devInf

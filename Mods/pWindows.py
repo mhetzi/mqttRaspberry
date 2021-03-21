@@ -1,0 +1,96 @@
+# -*- coding: utf-8 -*-
+import paho.mqtt.client as mclient
+import Tools.Config as conf
+import Tools.Autodiscovery as ad
+import logging
+import os
+import re
+import schedule
+import weakref
+
+try:
+    import wmi
+except ImportError as ie:
+    try:
+        import Tools.error as err
+        err.try_install_package('wmi', throw=ie, ask=True)
+    except err.RestartError:
+        import wmi
+
+from Tools.Devices import BinarySensor
+
+from Mods.win32submods.wmi_PnP import WMI_PnP
+from Mods.win32submods.powerevents import Powerevents
+
+class PluginLoader:
+
+    @staticmethod
+    def getConfigKey():
+        return "MS_Windows_Sensors"
+
+    @staticmethod
+    def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        return MsWindowsMain(client, opts, logger, device_id)
+
+    @staticmethod
+    def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
+        MsWindowsMainConfig(conf).run()
+
+
+class MsWindowsMain:
+    _topic = None
+    _shed_Job = None
+    _plugin_manager = None
+
+    _wmi_devices: WMI_PnP = None
+
+    def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        self._config = conf.PluginConfig(opts, PluginLoader.getConfigKey())
+        self.__client = client
+        self.__logger = logger.getChild(PluginLoader.getConfigKey())
+        self._prev_deg = True
+        self.__lastTemp = 0.0
+        self.__ava_topic = device_id
+        self._callables = []
+        self.device = None
+
+        if self._config.get("enabled/wmi_pnp", True):
+            self._wmi_devices = WMI_PnP(self._config, self.__logger)
+        if self._config.get("enabled/powerevents", True):
+            self._pwr_ev = Powerevents(self._config, self.__logger)
+
+    def set_pluginManager(self, pm):
+        self._plugin_manager = pm
+
+    def register(self, wasConnected=False):
+        if self._wmi_devices is not None:
+            self._wmi_devices.register(wasConnected, self._plugin_manager)
+        if self._pwr_ev is not None:
+            self._pwr_ev.register(wasConnected, self._plugin_manager)
+
+    def stop(self):
+        #schedule.cancel_job(self._shed_Job)
+        if self._wmi_devices is not None:
+            self._wmi_devices.shutdown_watchers()
+        if self._pwr_ev is not None:
+            self._pwr_ev.shutdown()
+
+    def sendStates(self):
+        self.send_update(True)
+
+    def send_update(self, force=False):
+        if self._wmi_devices is not None:
+            self._wmi_devices.sendUpdate(force)
+        if self._pwr_ev is not None:
+            self._wmi_devices.sendUpdate(force)
+
+
+class MsWindowsMainConfig:
+    def __init__(self, conff: conf.BasicConfig):
+        self.c = conf.PluginConfig(conff, PluginLoader.getConfigKey())
+
+    def run(self):
+        from Tools import ConsoleInputTools as cit
+        self.c["name"] = cit.get_input("Unter welchem Namen soll der PC angegeben werden. \n-> ", require_val=True, std_val="WindowsPC")
+        self.c["enabled/wmi_pnp"] = cit.get_bool_input("PnP Geräte aktivieren? \n->", True)
+        self.c["enabled/powerevents"] = cit.get_bool_input("PowerEvents aktivieren? \n->", True)

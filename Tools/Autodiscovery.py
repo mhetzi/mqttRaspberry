@@ -126,20 +126,21 @@ class Topics:
         else:
             self._dev_class = SensorDeviceClasses.GENERIC_SENSOR
         
-        self.brightness_cmd = None
-        self.brightness_state = None
-        self.color_temp_cmd = None
-        self.color_temp_state = None
-        self.effect_cmd = None
-        self.effect_state = None
-        self.hs_cmd = None
-        self.hs_state = None
-        self.white_cmd = None
-        self.white_state = None
-        self.rgb_cmd = None
-        self.rgb_state = None
-        self.xy_cmd = None
-        self.xy_state = None
+        if comp == Component.LIGHT:
+            self.brightness_cmd = None
+            self.brightness_state = None
+            self.color_temp_cmd = None
+            self.color_temp_state = None
+            self.effect_cmd = None
+            self.effect_state = None
+            self.hs_cmd = None
+            self.hs_state = None
+            self.white_cmd = None
+            self.white_state = None
+            self.rgb_cmd = None
+            self.rgb_state = None
+            self.xy_cmd = None
+            self.xy_state = None
 
     def register(self, mqtt_client:mclient.Client, name: str, measurement_unit: str, ava_topic=None, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None, asDict=False):
         config = self.get_config_payload(

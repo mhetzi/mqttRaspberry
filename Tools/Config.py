@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from abc import abstractmethod
 import pathlib
 import os.path as osp
 from pathlib import Path
@@ -28,7 +29,7 @@ except ImportError:
         FILEWATCHING = True
     except:
         FILEWATCHING = False
-from typing import Dict, Tuple, Sequence
+from typing import Dict, Tuple, Sequence, Union
 
 
 class DictBrowser:
@@ -99,6 +100,20 @@ class DictBrowser:
             elif i > len(path):
                 del d
             i += 1
+    
+    def listDeep(self, d=None, prepand="/") -> list:
+        d = d if d is not None else self._dict
+        ls = []
+        for key, value in d.items():
+            if isinstance(value, dict):
+                ls.append(self.listDeep(value, "{}/{}/".format(prepand, key)))
+            elif isinstance(value, list):
+                for item in value:
+                    if isinstance(item, dict):
+                        ls.append(self.listDeep(value, "{}/{}/".format(prepand, key)))
+            else:
+                ls.append("{}/{}".format(prepand, key), value)
+        return ls
 
 class NoClientConfigured(Exception):
     def __init__(self):
@@ -121,7 +136,8 @@ class ClientConfig:
 
 
     def is_secure(self) -> bool:
-        return self.ca is not None and self.cert is not None and self.key is not None
+        print("is_secure(): ca: {}, cert: {}, key: {}, port: {}".format(self.ca, self.cert, self.key, self.port))
+        return self.ca is not None and self.cert is not None and self.key is not None and self.port != 1883
 
     def broken_security(self) -> bool:
         return self.ca is not None or self.cert is not None or self.key is not None
@@ -129,7 +145,40 @@ class ClientConfig:
     def has_user(self) -> bool:
         return self.username is not None and self.password is not None
 
-class BasicConfig:
+class AbstractConfig:
+    @abstractmethod
+    def load(self, fileNotFoundOK=True):
+        pass
+
+    @abstractmethod
+    def am_i_saving(self) -> bool:
+        pass
+
+    @abstractmethod
+    def save(self, delayed=False) -> None:
+        pass
+
+    @abstractmethod
+    def get_autodiscovery_topic(self, component: autodisc.Component, entitiy_id: str, dev_class: autodisc.DeviceClass, node_id=None, ownOfflineTopic=False) -> autodisc.Topics:
+        pass
+
+    @abstractmethod
+    def getIndependendFile(self, name:str, no_watchdog=False, do_load=True):
+        pass
+
+    @abstractmethod
+    def __getitem__(self, item: str):
+        pass
+
+    @abstractmethod
+    def __setitem__(self, key: str, value):
+        pass
+
+    @abstractmethod
+    def __delitem__(self, key:str):
+        pass
+
+class BasicConfig(AbstractConfig):
     _is_in_saving = False
     _dict_browser: DictBrowser = None
 
@@ -194,6 +243,7 @@ class BasicConfig:
         self._is_in_saving = True
         self._logger.debug("[1/3] Erstelle Backup der alten Konfig...")
         if self._conf_path.exists():
+            self._conf_path.with_suffix(".cbackup").unlink()
             self._conf_path.rename(self._conf_path.with_suffix(".cbackup"))
         self._logger.debug("[2/3] Öffne Konfigurationsdatei zum speichern" + str(self._conf_path.absolute()))
         with self._conf_path.open("w") as json_file:
@@ -246,12 +296,15 @@ class BasicConfig:
     def get_discovery_prefix(self):
         return self.get_client_config().discorvery_prefix
 
-    def get_autodiscovery_topic(self, component: autodisc.Component, entitiy_id: str, dev_class: autodisc.DeviceClass, node_id=None, ownOfflineTopic=False) -> autodisc.Topics:
+    def get_autodiscovery_topic(self, component: autodisc.Component, entitiy_id: str, dev_class: autodisc.DeviceClass, node_id=None, ownOfflineTopic=False, subnode_id=None) -> autodisc.Topics:
         cc = self.get_client_config()
         topics = None
         if node_id is None:
-            topics = autodisc.getTopics(cc.discorvery_prefix, component,
-                                  cc.client_id if cc.client_id is not None else cc.username, entitiy_id, dev_class)
+            nid = entitiy_id
+            if subnode_id is not None:
+                nid = "{}_{}".format(subnode_id, entitiy_id)
+            topics = autodisc.getTopics(cc.discorvery_prefix, component, cc.client_id if cc.client_id is not None else cc.username, 
+                nid, dev_class)
         else:
             topics = autodisc.getTopics(cc.discorvery_prefix, component, node_id, entitiy_id, dev_class)
         if not ownOfflineTopic:
@@ -349,10 +402,9 @@ if FILEWATCHING:
             except OSError:
                 pass
 
+class PluginConfig(AbstractConfig):
 
-class PluginConfig:
-
-    def __init__(self, config: BasicConfig, plugin_name:str):
+    def __init__(self, config: AbstractConfig, plugin_name:str):
         self._main  = config
         self._pname = plugin_name
         self.get_autodiscovery_topic = self._main.get_autodiscovery_topic
