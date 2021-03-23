@@ -21,6 +21,7 @@ from Tools.Devices import BinarySensor
 
 from Mods.win32submods.wmi_PnP import WMI_PnP
 from Mods.win32submods.powerevents import Powerevents
+from Mods.win32submods.systray import win32Systray
 
 class PluginLoader:
 
@@ -58,6 +59,8 @@ class MsWindowsMain:
             self._wmi_devices = WMI_PnP(self._config, self.__logger)
         if self._config.get("enabled/powerevents", True):
             self._pwr_ev = Powerevents(self._config, self.__logger)
+        if self._config.get("enabled/systray", True):
+            self._pwr_ev = win32Systray(self._config, self.__logger)
 
     def set_pluginManager(self, pm):
         self._plugin_manager = pm

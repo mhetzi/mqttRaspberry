@@ -6,6 +6,7 @@ import threading
 import time
 import pkgutil
 import sys
+from typing import NoReturn
 import Tools.error as err
 
 try:
@@ -337,7 +338,7 @@ class PluginManager:
     def _shutdown(self):
         pass
 
-    def shutdown(self):
+    def shutdown(self) -> NoReturn:
         self.logger.info("Plugins werden deaktiviert")
         self.disable_mods()
         self.logger.info("MQTT wird getrennt")
@@ -347,4 +348,5 @@ class PluginManager:
         schedule.clear()
         self.scheduler_event.set()
         self.shed_thread.join()
+        exit(0)
 
