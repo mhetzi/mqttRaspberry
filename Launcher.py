@@ -38,6 +38,8 @@ class Launcher:
     reconnect_time = 0.1
     mqtt_client = None
     faultFile = None
+    _logFile = None
+    
 
     def __init__(self):
         log = logging.getLogger("Launch")
@@ -123,14 +125,16 @@ class Launcher:
         configPath = "~/.config/mqttra.config"
         auto_reload_config = True
 
+        logPath = None
+
         door_hall_calib_mode = False
         conf_all_mods = False
         systemd = False
 
         while True:
             try:
-                opts, args = getopt.gnu_getopt(t_args, "h?sc:",
-                                               ["help", "config=", "systemd", "no-reload", "door-hall-calibnoise", "configure-all-plugins"])
+                opts, args = getopt.gnu_getopt(t_args, "h?sc:l:",
+                                               ["help", "config=", "systemd", "no-reload", "door-hall-calibnoise", "configure-all-plugins", "log="])
                 break
             except getopt.error as e:
                 opt = e.msg.replace("option ", "").replace(" not recognized", "")
@@ -155,12 +159,24 @@ class Launcher:
                     --door-hall-calibnoise  Noise Level von dem Halleffekt Sensor von Raspberry Tor ermitteln
                     --configure-all-plugins Alle Plugins Konfigureieren, wird eines Konfiguriert wird es
                                             beim nächsten Start automatisch geladen.
+                    --log                   Log in Datei speichern und nicht in der Konsole ausgeben
                 """)
                 return
             elif opt == "--door-hall-calibnoise":
                 door_hall_calib_mode = True
             elif opt == "--configure-all-plugins":
                 conf_all_mods = True
+            elif opt == "--log":
+                try:
+                    if arg is not None:
+                        p = Path(arg)
+                        p.parent.mkdir(parents=True, exist_ok=True)
+                        self._logFile = p.open(mode="wt", buffering=4096, encoding="utf-8")
+                        self._log.info("Logger wird jetzt auf Logfile umgestellt...")
+                        if self._ch.setStream(self._logFile) is None:
+                            self._log.warning("Umstellen Fehlgeschlagen!")
+                except Exception as e:
+                    print("Kann logfile nicht erstellen! {}".format(e))
 
         self.config = tc.config_factory(configPath, logger=self._log, do_load=True, filesystem_listen=auto_reload_config)
         from Tools import _std_dev_info
@@ -190,6 +206,7 @@ class Launcher:
                 return
 
         
+
         configFolder = Path(configPath).parent
         failFile = configFolder.joinpath("fails")
         failFile.mkdir(exist_ok=True)

@@ -338,6 +338,7 @@ class BasicConfig(AbstractConfig):
     def sett(self, key: str, value):
         key = "PLUGINS/{}".format(key)
         self._dict_browser[key] = value
+        self.save(delayed=True)
 
     def __getitem__(self, key: str):
         key = "PLUGINS/{}".format(key)

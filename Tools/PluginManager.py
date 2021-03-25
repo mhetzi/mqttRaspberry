@@ -6,7 +6,7 @@ import threading
 import time
 import pkgutil
 import sys
-from typing import NoReturn
+from typing import Callable, NoReturn
 import Tools.error as err
 
 try:
@@ -35,7 +35,7 @@ class PluginManager:
     needed_list = []
     configured_list = {}
     is_connected = False
-    scheduler_event = None 
+    scheduler_event = None
 
     def run_scheduler_continuously(self, interval=1):
         """Continuously run, while executing pending jobs at each elapsed
@@ -238,6 +238,22 @@ class PluginManager:
                     x.register()
                 except:
                     self.logger.exception("Fehler beim Regestrieren des Plugins")
+
+    def send_disconnected_to_mods(self):
+        self.logger.info("Verbindung getrennt!")
+
+        i=0
+        sett = list(self.configured_list.items())
+
+        while i < len(sett):
+            key = sett[i][0]
+            self.logger.info("[{}/{}] Informiere Plugin {}.".format(1+i, len(sett), key))
+            x = sett[i][1]
+            i += 1
+            try:
+                x.disconnected()
+            except:
+                self.logger.debug("Fehler beim Informieren des Plugins")
 
     def get_plguins_by_config_id(self, id:str):
         return self.configured_list[id]

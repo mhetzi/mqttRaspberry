@@ -55,12 +55,12 @@ class MsWindowsMain:
         self._callables = []
         self.device = None
 
-        if self._config.get("enabled/wmi_pnp", True):
-            self._wmi_devices = WMI_PnP(self._config, self.__logger)
+        if self._config.get("enabled/systray", True):
+            self._systray = win32Systray(self._config, self.__logger)
         if self._config.get("enabled/powerevents", True):
             self._pwr_ev = Powerevents(self._config, self.__logger)
-        if self._config.get("enabled/systray", True):
-            self._pwr_ev = win32Systray(self._config, self.__logger)
+        if self._config.get("enabled/wmi_pnp", True):
+            self._wmi_devices = WMI_PnP(self._config, self.__logger)
 
     def set_pluginManager(self, pm):
         self._plugin_manager = pm
@@ -70,13 +70,27 @@ class MsWindowsMain:
             self._wmi_devices.register(wasConnected, self._plugin_manager)
         if self._pwr_ev is not None:
             self._pwr_ev.register(wasConnected, self._plugin_manager)
+        if self._systray is not None:
+            self._systray.register(wasConnected, self._plugin_manager)
+
 
     def stop(self):
         #schedule.cancel_job(self._shed_Job)
-        if self._wmi_devices is not None:
-            self._wmi_devices.shutdown_watchers()
-        if self._pwr_ev is not None:
-            self._pwr_ev.shutdown()
+        try:
+            if self._wmi_devices is not None:
+                self._wmi_devices.shutdown_watchers()
+        except:
+            self.__logger.exception("Stoppen von wmi")
+        try:
+            if self._pwr_ev is not None:
+                self._pwr_ev.shutdown()
+        except:
+            self.__logger.exception("Stoppen von PWR events")
+        try:
+            if self._systray is not None:
+                self._systray.shutdown()
+        except:
+            self.__logger.exception("Stoppen von Systray")
 
     def sendStates(self):
         self.send_update(True)
@@ -86,6 +100,12 @@ class MsWindowsMain:
             self._wmi_devices.sendUpdate(force)
         if self._pwr_ev is not None:
             self._wmi_devices.sendUpdate(force)
+        if self._systray is not None:
+            self._systray.sendUpdate(force)
+
+    def disconnected(self):
+        if self._systray is not None:
+            self._systray.disconnected()
 
 
 class MsWindowsMainConfig:
@@ -97,3 +117,13 @@ class MsWindowsMainConfig:
         self.c["name"] = cit.get_input("Unter welchem Namen soll der PC angegeben werden. \n-> ", require_val=True, std_val="WindowsPC")
         self.c["enabled/wmi_pnp"] = cit.get_bool_input("PnP Geräte aktivieren? \n->", True)
         self.c["enabled/powerevents"] = cit.get_bool_input("PowerEvents aktivieren? \n->", True)
+        self.c["enabled/systray"] = cit.get_bool_input("Systemtray aktivieren? \n->", True)
+
+        if self.c["enabled/systray"]:
+            print("CTRL-C drücken sobald kein neuer Aktionseintrag erstellt werden soll.")
+            while True:
+                try:
+                    name, entry = win32Systray.getNewDeviceEntry()
+                    self.c["systray/itemList/{}".format(name)] = entry
+                except KeyboardInterrupt:
+                    break
