@@ -192,10 +192,10 @@ class Powerevents:
             if data == 0: self._log.debug('  AC power')
             elif data == 1: self._log.debug('  Battery power')
             elif data == 2: self._log.debug('  Short term power')
-            self._states[GUID_ACDC_POWER_SOURCE] = data != 0
+            self._states[GUID_ACDC_POWER_SOURCE] = data == 0
             if GUID_ACDC_POWER_SOURCE in self._sensors.keys():
                 dev = self._sensors[GUID_ACDC_POWER_SOURCE]
-                dev.turnOnOff(data != 0)
+                dev.turnOnOff(data == 0)
         elif power_setting == GUID_BATTERY_PERCENTAGE_REMAINING:
             self._log.debug('  battery remaining: %s' % data)
             self._states[GUID_BATTERY_PERCENTAGE_REMAINING] = int(data)

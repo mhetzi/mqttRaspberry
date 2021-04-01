@@ -99,7 +99,7 @@ class MsWindowsMain:
         if self._wmi_devices is not None:
             self._wmi_devices.sendUpdate(force)
         if self._pwr_ev is not None:
-            self._wmi_devices.sendUpdate(force)
+            self._pwr_ev.sendUpdate(force)
         if self._systray is not None:
             self._systray.sendUpdate(force)
 
