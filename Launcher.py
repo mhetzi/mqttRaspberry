@@ -30,6 +30,21 @@ else:
     threading.Thread._bootstrap_original = threading.Thread._bootstrap
     threading.Thread._bootstrap = _name_hack
 
+
+try:
+    import setproctitle
+except ImportError as ie:
+    from Tools import error as err
+    try:
+        err.try_install_package('setproctitle', throw=ie, ask=False)
+    except err.RestartError:
+        try:
+            import setproctitle
+        except:
+            pass
+    except:
+        pass
+
 class Launcher:
 
     pm = None
@@ -61,6 +76,12 @@ class Launcher:
         self.config = None
         self.abrt_file = None
         signal.signal(signal.SIGTERM, self.exit)
+
+        try:
+            import setproctitle
+            setproctitle.setproctitle("mqttScripts")
+        except:
+            log.exception("Process Name change failed!")
 
     def pm_reload(self):
         self.reload = True

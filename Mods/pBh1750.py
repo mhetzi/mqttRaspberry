@@ -101,6 +101,8 @@ class bh1750:
                 self._threasholds[0] = 30
             elif self._dev_last > 7:
                 self._threasholds[0] = 2
+            elif self._dev_last > 3.5:
+                self._threasholds[0] = 1
             else:
                 self._threasholds[0] = 0.5
         if self._conf["device_alt"]:
@@ -112,6 +114,8 @@ class bh1750:
                 self._threasholds[1] = 30
             elif self._dev_alt_last > 7:
                 self._threasholds[1] = 2
+            elif self._dev_last > 3.5:
+                self._threasholds[1] = 1
             else:
                 self._threasholds[1] = 0.5
         self._logger.info("Threshold sind jetzt auf ({}, {})".format(self._threasholds[0], self._threasholds[1]))

@@ -23,6 +23,7 @@ from Tools.Devices.Sensor import Sensor, SensorDeviceClasses
 from Tools.Devices.Filters.TooHighFilter import TooHighFilter
 from Tools.Devices.Filters.RangedFilter import RangedFilter
 
+from Tools.PluginManager import PluginInterface
 
 class PluginLoader:
 
@@ -40,7 +41,7 @@ class PluginLoader:
         c.run()
 
 
-class DHT22:
+class DHT22(PluginInterface):
     _temp_topic = None
     _rh_topic = None
     _sensor_celsius: Sensor = None

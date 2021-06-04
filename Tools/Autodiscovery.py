@@ -189,6 +189,10 @@ class Topics:
 
         if self._component == Component.SENSOR and not isinstance(self._dev_class, BinarySensorDeviceClasses):
             p["unit_of_measurement"] = measurement_unit
+        
+        if self._component == Component.COVER and value_template is not None:
+            p["position_template"] = value_template
+            value_template = None
 
         if isinstance(self._dev_class, BinarySensorDeviceClasses):
             p["payload_on"]  = 1

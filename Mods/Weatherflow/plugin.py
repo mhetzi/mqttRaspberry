@@ -283,11 +283,11 @@ class WeatherflowPlugin:
 
     def process_update(self, update: dict):
 
-        pupd = Tools.parse_json_to_update(update)
+        pupd = Tools.parse_json_to_update(update, self._logger)
         if pupd is None:
             self._logger.info("Nachricht {} von Station ist kein update.".format(update))
             return
-        #self._logger.debug("Habe von Station {} update bekommen. Nachricht war: {}".format(pupd.update_type.name, update))
+        self._logger.debug("Habe von Station {} update bekommen. Nachricht war: {}".format(pupd.update_type.name, update))
 
         if pupd.update_type == updateType.UpdateType.DeviceStatus:
             self._deviceUpdates[pupd.serial_number] = pupd
