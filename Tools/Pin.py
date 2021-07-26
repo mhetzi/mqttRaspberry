@@ -35,7 +35,7 @@ class Pin:
             init = None
 
         if direction == PinDirection.IN:
-            self._underlying = Button(pin=pin, pull_up=None, active_state=True)
+            self._underlying = Button(pin=pin, pull_up=None, active_state=True, hold_time=0.25)
         elif direction == PinDirection.OUT:
             self._underlying = LED(pin=pin, active_high=True, initial_value=init)
         elif direction == PinDirection.IN_PULL_LOW:

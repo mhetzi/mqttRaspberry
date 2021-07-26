@@ -167,7 +167,7 @@ class AbstractConfig:
         pass
 
     @abstractmethod
-    def __getitem__(self, item: str):
+    def __getitem__(self, item: str) -> Union[dict, int, str, list]:
         pass
 
     @abstractmethod

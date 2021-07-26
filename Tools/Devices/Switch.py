@@ -7,6 +7,8 @@ from  Tools.PluginManager import PluginManager
 import enum
 
 class Switch:
+    _pm: PluginManager
+
     def __init__(self, logger:logging.Logger, pman: PluginManager, callback, name: str, measurement_unit: str='', ava_topic=None, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None):
         if not callable(callback):
             raise AttributeError("callback not callable")
@@ -28,11 +30,15 @@ class Switch:
             autodisc.DeviceClass()
             )
     
+    def __del__(self):
+        if self._pm is not None and self._pm._client is not None:
+            self._pm._client.message_callback_remove(self._topics.command)
+
     def register(self):
 
         # Setze Discovery Configuration
         self._log.debug("Publish configuration")
-        plugin_name = self._log.parent.name
+        plugin_name = self._log.parent.name if self._log.parent is not None else self._log.name
         import re
         safename = re.sub('[\W_]+', '', self._name) 
         uid = "switch.MqttScripts{}.switch.{}.{}".format(self._pm._client_name, plugin_name, safename) if self._unique_id is None else self._unique_id

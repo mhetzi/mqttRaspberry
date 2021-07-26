@@ -6,7 +6,7 @@ import threading
 import time
 import pkgutil
 import sys
-from typing import Callable, NoReturn
+from typing import Callable, NoReturn, Union
 import Tools.error as err
 
 try:
@@ -52,6 +52,7 @@ class PluginManager:
     configured_list = {}
     is_connected = False
     scheduler_event = None
+    _client: Union[mclient.Client, None]
 
     def run_scheduler_continuously(self, interval=1):
         """Continuously run, while executing pending jobs at each elapsed

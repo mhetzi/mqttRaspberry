@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 
+from typing import Union
+
+
 class RangeTools:
     @staticmethod
     def is_in_range(min: float, max: float, value: float) -> bool:
@@ -31,17 +34,24 @@ class ConsoleInputTools:
                 print("Bitte antwort eingeben!")
 
     @staticmethod
-    def get_number_input(prompt: str, map_no_input_to=None) -> int:
+    def get_number_input(prompt: str, map_no_input_to:Union[str, int, float]=None) -> Union[int, float]:
         while True:
+            i=""
             try:
                 prompt = prompt if map_no_input_to is None else prompt + " [{}] ".format(map_no_input_to)
                 i = input(prompt)
-                if i == "" and map_no_input_to is not None:
-                    return int(map_no_input_to)
-                number = int(i)
+                if i == "" and isinstance(map_no_input_to, (int, float)):
+                    return map_no_input_to
+                if i == "" and isinstance(map_no_input_to, str):
+                    return int(map_no_input_to, 0)
+                number = int(i, 0)
                 return number
             except ValueError:
-                print("Antwort ist keine Zahl!")
+                try:
+                    number = float(i)
+                    return number
+                except ValueError:
+                    print("Antwort ist keine Zahl!")
 
 
     @staticmethod

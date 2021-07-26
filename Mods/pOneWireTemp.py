@@ -74,11 +74,15 @@ class OneWireTemp:
 
         for temp in self._config.get("w1t/dev", []):
             path = os.path.join("/sys/bus/w1/devices", temp.get("id", ""), "w1_slave")
+            try:
+                f = open(path)
+            except FileNotFoundError:
+                f = None
             d = {
                 "i": temp.get("id", ""),
                 "n": temp.get("name", ""),
                 "p": path,
-                "f": open(path)
+                "f": f
             }
             self._paths.append(d)
             self.__logger.info("Temperaturfühler {} mit der ID {} wird veröffentlicht.".format(d["n"], d["i"]))
@@ -152,7 +156,7 @@ class OneWireTemp:
             for i in range(0, len(self._paths)):
                 d = self._paths[i]
                 self.__logger.debug("Read Temperature for {}...".format(d))
-                new_temp = self.get_temperatur_file(d["f"])
+                new_temp = self.get_temperatur_file(d["f"]) if d["f"] is not None else math.nan
                 sensor: Sensor = d["d"]
 
                 if new_temp != self._prev_deg[i] or force:
@@ -167,7 +171,9 @@ class OneWireTemp:
 
                     cmin = self._config.get(path_min, "RESET")
                     cmax = self._config.get(path_max, "RESET")
-                    last = self._config.get(path_sanity, 0)
+                    last = self._config.get(path_sanity, 0.1)
+                    if last == 0.000:
+                        last= 0.0001
                     self._config[path_sanity] = new_temp
 
                     percentage_cahnged = 100 / last * new_temp
@@ -197,9 +203,11 @@ class OneWireTemp:
                         }
 
                     if math.isnan(new_temp):
+                        self.__logger.info("OneWire device offline.")
                         sensor.offline()
                     else:
-                        sensor(js, keypath="now")
+                        self.__logger.debug(f"Send State: {js}")
+                        sensor.state(js, keypath="now")
 
                     self._prev_deg[i] = new_temp
         except:

@@ -398,7 +398,7 @@ class PiMotionMain(threading.Thread):
                         if int(fps) != int(pps):
                             self.__logger.warning("Pro Sekunde verarbeitet: %d, sollte aber %d sein", pps, fps)
 
-                        if pps == 0 and not self.was_errored:
+                        if pps == 0:
                             self.was_errored = True
                             if self.__client is not None:
                                 self.__client.publish(

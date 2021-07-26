@@ -44,12 +44,12 @@ class Plugin:
         self.__logger = logger.getChild("pi_garage")
         self._config = opts
         self._pins = {
-            "zu"   : Pin.Pin(opts["PiGarageSwitches/pins/zu"]      , Pin.PinDirection.IN),
-            "mitte": Pin.Pin(opts["PiGarageSwitches/pins/mitte"]   , Pin.PinDirection.IN),
-            "offen": Pin.Pin(opts["PiGarageSwitches/pins/offen"]   , Pin.PinDirection.IN),
-            "stop" : Pin.Pin(opts["PiGarageSwitches/pins/stop"]    , Pin.PinDirection.IN),
+            "zu"   : Pin.Pin(opts["PiGarageSwitches/pins/zu"]      , Pin.PinDirection.IN_PULL_UP),
+            "mitte": Pin.Pin(opts["PiGarageSwitches/pins/mitte"]   , Pin.PinDirection.IN_PULL_UP),
+            "offen": Pin.Pin(opts["PiGarageSwitches/pins/offen"]   , Pin.PinDirection.IN_PULL_UP),
+            "stop" : Pin.Pin(opts["PiGarageSwitches/pins/stop"]    , Pin.PinDirection.IN_PULL_UP),
             "relais": Pin.Pin(opts["PiGarageSwitches/relayPin"]    , Pin.PinDirection.OUT),
-            "res": Pin.Pin(opts["PiGarageSwitches/pins/sperren"]   , Pin.PinDirection.IN)
+            "res": Pin.Pin(opts["PiGarageSwitches/pins/sperren"]   , Pin.PinDirection.IN_PULL_UP)
         }
         self._device_id = device_id
         

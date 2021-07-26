@@ -13,6 +13,8 @@ import json
 
 from Tools.Config import DictBrowser
 
+from time import sleep
+
 class Sensor:
     _mainState = None
     _is_offline = True
@@ -86,9 +88,11 @@ class Sensor:
             browse = DictBrowser(state)
             try:
                 new_state = browse[keypath]
+                self._log.debug(f"Filtering extracted state {new_state}")
                 new_state = self._callFilters(new_state)
                 browse[keypath] = new_state 
             except DontSend:
+                self._log.exception("Filtering failed!")
                 return None
         if isinstance(state, dict):
             state = json.dumps(state)
@@ -96,13 +100,18 @@ class Sensor:
             try:
                 state = self._callFilters(state)
             except DontSend:
+                self._log.exception("Filtering failed!")
                 return None
         payload = state.encode('utf-8') if self._jsattrib else str(state)
         if self._playload == payload and not force_send:
+            self._log.info("new payload == old payload ignoring...")
             return None
         self._playload = payload
         if self._is_offline:
+            self._log.info("Was offline, become online")
             self.online()
+            sleep(1)
+        self._log.debug(f"Sending on {self._topics.state} payload {payload}")
         return self._pm._client.publish(self._topics.state, payload=payload)
 
     def resend(self):
