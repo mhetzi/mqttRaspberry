@@ -50,7 +50,7 @@ class VeDirectPlugin:
 
         self.__logger.debug("Erstelle verbindung...")
         self._veDirCon = Connection(self._config, self.__logger)
-        self._veDirCon._device_ready_call = self._device_ready
+        self._veDirCon._device_ready_call = lambda: self._device_ready()
         self._veDirCon.start()
         
 

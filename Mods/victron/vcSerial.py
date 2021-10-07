@@ -61,7 +61,7 @@ class Connection(threading.Thread):
                 f = self._calls.get(key, None)
                 if callable(f): f(value)
                 elif len(self._calls) < 1:
-                    self._log.warning("Not callable")
+                    self._log.warning("No callable list")
                     self._device_ready = False
             elif key == "PID":
                 self._device.model = CONST.PIDs.get(value, None)
@@ -76,13 +76,19 @@ class Connection(threading.Thread):
             elif key == "SER#":
                 self._device.IDs.append(value)
                 self._device_ready = True
-                self._device_ready_call()
+                if callable(self._device_ready_call):
+                    self._device_ready_call()
+                else:
+                    self._log.error("self._device_ready_call is not callable!")
             else:
                 if self._device.model is not None and self._device.sw_version != "" and len(self._device.IDs) > 0:
                     self._log.info("Geräteinformationen gesammelt! Gerät bereit.")
                     self._device_ready = True
                     self._device.mfr = "Victron"
-                    self._device_ready_call()
+                    if callable(self._device_ready_call):
+                        self._device_ready_call()
+                    else:
+                        self._log.error("self._device_ready_call is not callable!")
                 else:
                     self._log.debug("{}: {}".format(key, value))
     
