@@ -1,0 +1,42 @@
+# -*- coding: utf-8 -*-
+from typing import Union
+from Tools import ConsoleInputTools
+from Tools.PluginManager import PluginManager, PluginInterface
+from Tools.Config import PluginConfig
+
+import paho.mqtt.client as mclient
+import Tools.Config as conf
+import logging
+import os
+import re
+import schedule
+import io
+import json
+import math
+
+from Tools.Devices.Sensor import Sensor
+
+class PluginLoader:
+
+    @staticmethod
+    def getConfigKey():
+        return "udev_dbus"
+
+    @staticmethod
+    def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        from Mods.udev.Main import UdevPlugin as pl
+        return pl(client, PluginConfig(opts, PluginLoader.getConfigKey()), logger, device_id)
+
+    @staticmethod
+    def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
+        UdevPluginConfig(conf).run()
+
+
+class UdevPluginConfig:
+    def __init__(self, conf: conf.BasicConfig):
+        self.__ids = []
+        self.c = PluginConfig(conf, PluginLoader.getConfigKey())
+
+    def run(self):
+        self.c["displays/enabled"] = ConsoleInputTools.get_bool_input("Process Monitor States", False)
+

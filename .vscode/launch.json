@@ -33,11 +33,47 @@
             ]
         },
         {
+            "name": "Python: Launcher Windows",
+            "type": "python",
+            "request": "launch",
+            "module": "Launcher",
+            "console": "integratedTerminal",
+            "args": [
+                "--config", "D:\\wurzel\\opt\\mqttScripts\\config\\mqttra.config",
+                "--systemd"
+            ],
+            "justMyCode": false
+        },
+        {
+            "name": "Python: Launcher Fedora",
+            "type": "python",
+            "request": "launch",
+            "module": "Launcher",
+            "console": "integratedTerminal",
+            "args": [
+                "--config", "/opt/mqttScripts/config/mqttra.config",
+                "--systemd"
+            ],
+            "justMyCode": false
+        },
+        {
             "name": "Python: Module",
             "type": "python3",
             "request": "launch",
             "module": "enter-your-module-name-here",
             "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: mqttScript Launcher Module",
+            "type": "python",
+            "request": "launch",
+            "module": "Launcher",
+            "console": "integratedTerminal",
+            "args": [
+                "--config", "D:\\wurzel\\opt\\mqttScripts\\config\\mqttra.config",
+                "--systemd"
+            ],
+            "justMyCode": false
         },
         {
             "name": "Python: Current File (External Terminal)",
@@ -100,6 +136,20 @@
             "justMyCode": false
         },
         {
+            "name": "Python Attach (Remote Debug rb-marcel.lan)",
+            "type": "python",
+            "request": "attach",
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}",  // You may also manually specify the directory containing your source code.
+                    "remoteRoot": "/opt/mqttScript/data/" // Linux example; adjust as necessary for your OS and situation.
+                }
+            ],
+            "port": 3000,                   // Set to the remote port.
+            "host": "rb-marcel.lan",               // Set to your remote host's public IP address.
+            "justMyCode": false
+        },
+        {
             "name": "Python Attach (Remote Debug TestPi4.lan)",
             "type": "python",
             "request": "attach",
@@ -111,6 +161,19 @@
             ],
             "port": 3000,                   // Set to the remote port.
             "host": "192.168.55.157"               // Set to your remote host's public IP address.
+        },
+        {
+            "name": "Python Attach (Remote Debug KameraGmuend)",
+            "type": "python",
+            "request": "attach",
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}",  // You may also manually specify the directory containing your source code.
+                    "remoteRoot": "/opt/mqttScript/data/" // Linux example; adjust as necessary for your OS and situation.
+                }
+            ],
+            "port": 3000,                   // Set to the remote port.
+            "host": "192.168.2.1"               // Set to your remote host's public IP address.
         }
     ]
 }

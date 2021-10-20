@@ -5,9 +5,10 @@ import logging
 import json
 from  Tools.PluginManager import PluginManager
 import enum
+from Tools.Autodiscovery import BinarySensorDeviceClasses
 
 class BinarySensor:
-    def __init__(self, logger:logging.Logger, pman: PluginManager, name: str, binary_sensor_type: autodisc.BinarySensorDeviceClasses, measurement_unit: str='', ava_topic=None, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None, nodeID=None, subnode_id=None):
+    def __init__(self, logger:logging.Logger, pman: PluginManager, name: str, binary_sensor_type: BinarySensorDeviceClasses, measurement_unit: str='', ava_topic=None, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None, nodeID=None, subnode_id=None):
 
         self._log = logger.getChild("BinarySensor")
         self._log.debug("BinarySensor Object für {} mit custom uid {} erstellt.".format(name, unique_id))

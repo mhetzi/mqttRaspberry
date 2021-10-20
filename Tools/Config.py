@@ -167,6 +167,10 @@ class AbstractConfig:
         pass
 
     @abstractmethod
+    def getIndependendPath(self, name:str) -> Path:
+        pass
+
+    @abstractmethod
     def __getitem__(self, item: str) -> Union[dict, int, str, list]:
         pass
 
@@ -317,6 +321,11 @@ class BasicConfig(AbstractConfig):
         return self._config["PLUGINS"][name]
     
     def getIndependendFile(self, name:str, no_watchdog=False, do_load=True):
+        new_path = self.getIndependendPath(name=name)
+        c = config_factory(pfad=new_path, logger=self._logger, do_load=do_load, filesystem_listen=not no_watchdog)
+        return (c, name)
+
+    def getIndependendPath(self, name:str) -> Path:
         if name is None:
             self._logger.info("Kein Name angegeben.")
             import uuid
@@ -324,9 +333,7 @@ class BasicConfig(AbstractConfig):
             name = str(uid)
             self._logger.info("Name {} wurde generiert.".format(name))
         self._logger.debug("Generiere Configpath von {} + {}".format(self._conf_path.parent, "{}.config".format(name)))
-        new_path = self._conf_path.parent.joinpath("{}.config".format(name))
-        c = config_factory(pfad=new_path, logger=self._logger, do_load=do_load, filesystem_listen=not no_watchdog)
-        return (c, name)
+        return self._conf_path.parent.joinpath("{}.config".format(name))
 
     def stop(self):
         pass
@@ -410,6 +417,7 @@ class PluginConfig(AbstractConfig):
         self._pname = plugin_name
         self.get_autodiscovery_topic = self._main.get_autodiscovery_topic
         self.getIndependendFile      = self._main.getIndependendFile
+        self.getIndependendPath      = self._main.getIndependendPath
 
     def save(self):
         self._main.save()

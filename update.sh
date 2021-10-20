@@ -117,6 +117,14 @@ then
     exit $?
 fi
 
+if [ "$1" == "run" ]
+then
+    #git reset --hard testing;
+    source /opt/mqttScripts/venv/bin/activate
+    ./Launcher.py --config /opt/mqttScripts/config/mqttra.config
+    exit $?
+fi
+
 if [ "$1" == "stop-service" ]
 then
     #git reset --hard testing;
