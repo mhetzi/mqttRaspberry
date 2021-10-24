@@ -164,18 +164,23 @@ class Displays(UdevDeviceProcessor):
             if self._config is not None:
                 r_csv = pyedid.Registry.from_csv(str(self._config.getIndependendPath("EDID_Registry.csv").absolute()))
                 pyedid.DEFAULT_REGISTRY = r_csv
-        
+    
+    def event(self, action, device):
+        self._log.debug(f"{action = }")
+        self._log.debug(f"{device = }")
+        self.rescanDevices()
+        self.updateDevices()
+
+    def rescanDevices(self):
         current_connected_displays = self.searchMonitors()
+        for rdd in self._display_list.values():
+            rdd.connected = False
+            
         for ccd in current_connected_displays:
             if hash(ccd) not in self._display_list.keys():
                 self._log.debug("Erstelle Sensor...")
                 self.makeNewDevice(ccd)
             self._display_list[hash(ccd)] = ccd
-    
-    def event(self, action, device):
-        self._log.debug(f"{action = }")
-        self._log.debug(f"{device = }")
-        self.updateDevices()
 
     def stop(self):
         super().stop()
@@ -225,5 +230,6 @@ class Displays(UdevDeviceProcessor):
         self.updateDevices()
     
     def sendUpdate(self):
+        self.rescanDevices()
         self.updateDevices()
         return super().sendUpdate()
