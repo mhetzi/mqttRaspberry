@@ -40,7 +40,7 @@
             "console": "integratedTerminal",
             "args": [
                 "--config", "D:\\wurzel\\opt\\mqttScripts\\config\\mqttra.config",
-                "--systemd"
+                "--debug", "systemd"
             ],
             "justMyCode": false
         },
@@ -52,7 +52,7 @@
             "console": "integratedTerminal",
             "args": [
                 "--config", "/opt/mqttScripts/config/mqttra.config",
-                "--systemd"
+                "--debug", "systemd"
             ],
             "justMyCode": false
         },
