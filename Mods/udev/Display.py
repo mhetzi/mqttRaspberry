@@ -141,11 +141,12 @@ class Displays(UdevDeviceProcessor):
 
     def start(self, context: pyudev.Context):
         super().start(context)
-        self._monitor = pyudev.Monitor.from_netlink(context=context)
-        self._monitor.filter_by("drm")
-        self._observer = pyudev.MonitorObserver(self._monitor, self.event)
-        self._observer.setName("UdevDRM")
-        self._observer.start()
+        if self._observer is not None and not self._observer.is_alive():
+            self._monitor = pyudev.Monitor.from_netlink(context=context)
+            self._monitor.filter_by("drm")
+            self._observer = pyudev.MonitorObserver(self._monitor, self.event)
+            self._observer.setName("UdevDRM")
+            self._observer.start()
 
         updated = False
         try:

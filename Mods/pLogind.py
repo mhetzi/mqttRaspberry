@@ -11,6 +11,7 @@ except ImportError as ie:
     except err.RestartError:
         import dbus
 
+from typing import IO, Union
 import paho.mqtt.client as mclient
 import Tools.Config as conf
 import Tools.Autodiscovery as autodisc
@@ -25,6 +26,11 @@ import threading
 import gi
 gi.require_version('GLib', '2.0')
 from gi.repository import GLib
+
+from time import sleep
+
+POWER_SWITCHE_ONLINE_TOPIC = "online/{}/logindPower"
+SLEEP_SWITCHE_ONLINE_TOPIC = "online/{}/logindSleep"
 
 class GlibThread(threading.Thread):
 
@@ -191,6 +197,8 @@ class Session:
             self._log.warning("LockState Requested, but it´s invalid.")
 
 class logindDbus:
+    _sleep_delay_lock: Union[IO, None] = None
+
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         self._bus    = None
         self._proxy  = None
@@ -203,7 +211,7 @@ class logindDbus:
         self.shutdown = False
 
         self.inhibit_lock = -1
-        self._switches = {}
+        self._switches: dict[str, Switch] = {}
         self.sessions = {}
         self._config = conf.PluginConfig(opts, "logind")
 
@@ -223,9 +231,6 @@ class logindDbus:
         self._session_bus = dbus.SessionBus(mainloop=self._mainloop)
         self._proxy  = self._bus.get_object('org.freedesktop.login1', '/org/freedesktop/login1')
         self._login1 = dbus.Interface(self._proxy, 'org.freedesktop.login1.Manager')
-
-        self._sleep_notiy = self._login1.connect_to_signal("PrepareForSleep", lambda x: self._notify_sleep(sleep=x))
-        self._poff_notiy  = self._login1.connect_to_signal("PrepareForShutdown", lambda x: self._notify_sleep(shutdown=x))
 
         self._nsess_notiy = self._login1.connect_to_signal("SessionNew",     lambda sID, path: self._mod_session(add=True,  path=path) )
         self._rsess_notiy = self._login1.connect_to_signal("SessionRemoved", lambda sID, path: self._mod_session(add=False, path=path) )
@@ -252,14 +257,6 @@ class logindDbus:
             self.sessions[path] = Session(self._logger, self._pluginManager, path, self._bus)
             self.sessions[path].register()
 
-    def _notify_sleep(self, sleep=False, shutdown=False):
-        self.sleeping = sleep
-        self.shutdown = shutdown
-        self.sw_call(userdata="suspend", state_requested=True)
-        self.sw_call(userdata="isOn", state_requested=True)
-        if self._idle_monitor is not None:
-            self._idle_monitor.stop()
-
     def set_pluginManager(self, pm:PluginMan.PluginManager):
         self._pluginManager = pm
 
@@ -272,16 +269,18 @@ class logindDbus:
                 self._logger,
                 self._pluginManager,
                 lambda state_requested, message: self.sw_call(userdata="isOn",state_requested=state_requested, message=message),
-                name="{} Eingeschaltet".format(netName)
+                name="{} Eingeschaltet".format(netName),
+                ava_topic=POWER_SWITCHE_ONLINE_TOPIC.format(self._pluginManager._client_name)
             )
-            self._bus.add_signal_receiver(handler_function=self.sendSuspend, signal_name="PrepareForShutdown")
+            self._bus.add_signal_receiver(handler_function=self.sendShutdown, signal_name="PrepareForShutdown")
         # Kann ich suspend?
         if self._login1.CanSuspend() == "yes" and self._config.get("allow_suspend", True):
             self._switches["suspend"] = Switch(
                 self._logger,
                 self._pluginManager,
                 lambda state_requested, message: self.sw_call(userdata="suspend",state_requested=state_requested, message=message),
-                name="{} Schlafen".format(netName), icon="mdi:sleep"
+                name="{} Schlafen".format(netName), icon="mdi:sleep",
+                ava_topic=SLEEP_SWITCHE_ONLINE_TOPIC.format(self._pluginManager._client_name)
             )
             self._bus.add_signal_receiver(handler_function=self.sendSuspend, signal_name="PrepareForSleep")
         # Kann ich neustarten?
@@ -307,12 +306,9 @@ class logindDbus:
         self._switches["reboot"].register()
         self._switches["inhibit"].register()
 
-        self.delay_lock = self._login1.Inhibit(
-            'sleep:shutdown',
-            'mqttScript',
-            'Publish Powerstatus to Network',
-            'delay'
-            ).take()
+        sleep(5.0)
+
+        self.inhibit_delay(True)
 
         if self._idle_monitor is not None:
             self._idle_monitor.register()
@@ -320,12 +316,35 @@ class logindDbus:
         if not wasConnected:
             self.thread_gml.start()
 
+    def inhibit_delay(self, sleep=False):
+        if sleep:
+            delay_lock = self._login1.Inhibit(
+                'sleep:shutdown',
+                'mqttScript',
+                'Publish Powerstatus (Standby) to Network',
+                'delay'
+                )
+            self._sleep_delay_lock = os.fdopen(delay_lock.take(), "r", -1)
+            self._logger.debug("Sleep delayed")
+        elif not sleep and self._sleep_delay_lock is not None:
+            self._sleep_delay_lock.close()
+            self._sleep_delay_lock = None
+            self._logger.debug("Sleep lock destroyed")
+
     def stop(self):
+        self._logger.info("[0/6] Setze Stromschalter")
+        try:
+            self._switches["isOn"].turnOff()
+        except: pass
+        try:
+            self._switches["suspend"].turnOff()
+            self._switches["suspend"].offline()
+        except: pass
+
         self._logger.info("[1/6] Entferne Inhibitation block")
         self.uninhibit( )
         self._logger.info("[2/6] Entferne Inhibtitation delay")
-        if self.delay_lock > 0:
-            os.close(self.delay_lock)
+        self.inhibit_delay(False)
         self._logger.info("[3/6] Signale werden entfernt")
         if self._poff_notiy is not None:
             self._poff_notiy.remove()
@@ -338,7 +357,6 @@ class logindDbus:
             self._nsess_notiy.remove()
         if self._rsess_notiy is not None:
             self._rsess_notiy.remove()
-
         if self._idle_monitor is not None:
             self._logger.info("[4/6] IdleMonitor entfernt Signale und Watches...")
             self._idle_monitor.stop()
@@ -348,14 +366,13 @@ class logindDbus:
         self._logger.info("[6/6] Warten auf Glib MainLoop")
         self.thread_gml.join()
 
-    
     def inhibit(self):
         if self.inhibit_lock > 1:
             return self.inhibit_lock
         self.inhibit_lock = self._login1.Inhibit(
             'sleep:shutdown',
             'mqttScript',
-            'Inhibation requested from Network',
+            'Inhibation requested from HomeAssistant',
             'block'
             ).take()
         return self.inhibit_lock
@@ -381,17 +398,29 @@ class logindDbus:
         self._login1.UnlockSession(session_id)
 
     def sendSuspend(self, sig):
-        if int(sig) == 1:
-            self._idle_monitor.stop()
-            return self._switches["suspend"].turnOn()
-        self._switches["suspend"].turnOff()
+        self._logger.debug(f"Suspend: {sig = }")
+        if sig == True:
+            if self._idle_monitor is not None:
+                self._idle_monitor.stop()
+            self.sleeping = True
+            self._switches["suspend"].turnOn(qos=2).wait_for_publish()
+        else:
+            self.sleeping = False
+            self._switches["suspend"].turnOff().wait_for_publish()
+        sleep(0.25)
+        self._logger.debug("Send done!")
+        self.inhibit_delay(sleep=not sig)
 
     def sendShutdown(self, sig):
-        if int(sig) == 1:
-            self._switches["isOn"].turnOff()
+        self._logger.debug(f"Shutdown: {sig = }")
+        if sig == True:
+            self.shutdown = True
+            self._switches["isOn"].turnOff(qos=1).wait_for_publish()
             self._idle_monitor.stop()
-            return self._pluginManager.shutdown()
-        self._switches["isOn"].turnOn()
+        else:
+            self.shutdown = False
+            self._switches["isOn"].turnOn().wait_for_publish()
+        self.inhibit_delay(sleep=not sig)
 
     def sw_call(self, userdata=None, state_requested=False, message=None):
         if state_requested:
@@ -418,7 +447,9 @@ class logindDbus:
             self._login1.PowerOff(True)
             self._switches["isOn"].turnOff()
         elif userdata == "suspend" and msg == "ON":
+            self.sleeping = True
             self._login1.Suspend(True)
+            self._switches["suspend"].turnOn()
             self._idle_monitor.stop()
         elif userdata == "reboot" and msg == "ON": 
             self._login1.Reboot(True)

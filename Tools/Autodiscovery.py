@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import enum
+from typing import Union
 try:
     import json
 except ImportError:
@@ -106,7 +107,7 @@ class Topics:
     state = ""
     command = ""
     config = ""
-    ava_topic = ""
+    ava_topic: Union[str, None] = ""
     base = ""
 
     @staticmethod

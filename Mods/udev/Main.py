@@ -42,7 +42,8 @@ class UdevPlugin(PluginInterface):
         for sp in self._sub_plugins:
             if self._plugin_manager is not None:
                 sp.regDevices(self._plugin_manager)
-                sp.start(self._context)
+                if not wasConnected:
+                    sp.start(self._context)
 
     def stop(self):
         self.__logger.debug("Weitergabe von stop()...")

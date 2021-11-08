@@ -151,11 +151,12 @@ class Launcher:
         door_hall_calib_mode = False
         conf_all_mods = False
         systemd = False
+        debug = False
 
         while True:
             try:
-                opts, args = getopt.gnu_getopt(t_args, "h?sc:l:",
-                                               ["help", "config=", "systemd", "no-reload", "door-hall-calibnoise", "configure-all-plugins", "log="])
+                opts, args = getopt.gnu_getopt(t_args, "h?sdc:l:",
+                                               ["help", "config=", "systemd", "no-reload", "door-hall-calibnoise", "configure-all-plugins", "log=", "debug"])
                 break
             except getopt.error as e:
                 opt = e.msg.replace("option ", "").replace(" not recognized", "")
@@ -165,7 +166,6 @@ class Launcher:
             if opt == "-c" or opt == "--config":
                 configPath = arg
             elif opt == "-s" or opt == "--systemd":
-                self._ch.setFormatter(logging.Formatter('%(name)s - %(levelname)s - %(message)s'))
                 systemd = True
                 self._log.info("OK Systemflag gefunden. Bin ein Service.")
             elif opt == "--no-reload":
@@ -174,13 +174,14 @@ class Launcher:
                 self._log.info("""
                                         ============ HILFE ============
                     -c --config             Konfigurations Datei angeben (Standartpfad ~/.config/mqttra.config)
-                    -s --systemd            Verändert die logger Formatierung damit sie zu systemd passt
+                    -s --systemd            Verändert die logger Formatierung damit sie zu systemd passt, verhindert Fragen über installieren von pip Packeten
                     --no-reload             Neuladen des Server bei externen änderungen der Konfigurationsdatei ausschalten
                     -? -h --help            Diese Nachricht anzeigen
                     --door-hall-calibnoise  Noise Level von dem Halleffekt Sensor von Raspberry Tor ermitteln
                     --configure-all-plugins Alle Plugins Konfigureieren, wird eines Konfiguriert wird es
                                             beim nächsten Start automatisch geladen.
                     --log                   Log in Datei speichern und nicht in der Konsole ausgeben
+                    --debug                 Zeit im log anzeigen, überschreibt systemd logger format
                 """)
                 return
             elif opt == "--door-hall-calibnoise":
@@ -198,6 +199,9 @@ class Launcher:
                             self._log.warning("Umstellen Fehlgeschlagen!")
                 except Exception as e:
                     print("Kann logfile nicht erstellen! {}".format(e))
+            elif opt == "-d" or opt == "--debug":
+                debug = True
+                pass
 
         self.config = tc.config_factory(configPath, logger=self._log, do_load=True, filesystem_listen=auto_reload_config)
         from Tools import _std_dev_info
@@ -210,7 +214,7 @@ class Launcher:
             err.set_system_mode(systemd)
         except:
             pass
-
+        
         if door_hall_calib_mode:
             self._log.info("Ermittle noise für Halleffekt Sensor (Raspberry Tor)...")
             import Mods.DoorOpener.calibrate as calib
@@ -236,6 +240,12 @@ class Launcher:
         )
         self.faultFile = failFile.open('w')
         faulthandler.enable(file=self.faultFile, all_threads=True)
+
+        formatter = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
+        if debug or not systemd:
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)8s - %(message)s')
+
+        self._ch.setFormatter(formatter)
 
         self.relaunch()
 

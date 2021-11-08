@@ -145,9 +145,9 @@ class WMI_PnP:
                 sensor.register()
                 self.sendDeviceState(id)
 
-    def sendDeviceState(self, PnPDeviceID: str):
+    def sendDeviceState(self, PnPDeviceID: str, forceOff=False):
         dev = self._registered_devices[PnPDeviceID]
-        dev_pluggedin = 1 if PnPDeviceID in self._pnp_cache.keys() else 0
+        dev_pluggedin = 1 if PnPDeviceID in self._pnp_cache.keys() and not forceOff else 0
         self._log.debug("Gerät {} is da? {}. [{}] Update wird gesendet!".format(PnPDeviceID, dev_pluggedin, self._pnp_cache.keys()))
         js = { }
         js.update(self._config.get("devices", {}).get(PnPDeviceID,{}))
@@ -179,6 +179,8 @@ class WMI_PnP:
         self._log.debug("Warte auf removed Thread...")
         self._pnp_removed_thread.join()
         self._log.debug("WMI PnP Überwachung beendet")
+        for PnPDeviceID in self._registered_devices:
+            self.sendDeviceState(PnPDeviceID, True)
 
 
         

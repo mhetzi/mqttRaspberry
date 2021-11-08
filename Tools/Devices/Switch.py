@@ -18,7 +18,6 @@ class Switch:
         self._callback = callback
         self._name = name
         self._munit = measurement_unit
-        self._ava_topic = ava_topic
         self._vt = value_template
         self._jsattrib = json_attributes
         self._dev = device
@@ -29,6 +28,9 @@ class Switch:
             name,
             autodisc.DeviceClass()
             )
+        if ava_topic is not None:
+            self._topics.ava_topic = ava_topic
+        self.is_online = ava_topic is None
     
     def __del__(self):
         if self._pm is not None and self._pm._client is not None:
@@ -59,21 +61,32 @@ class Switch:
         #Frage Callback nach aktuellen status
         self._callback(state_requested=True, message=None)
 
-    def turn(self, state=None):
-        self._pm._client.publish(self._topics.state, payload=state.encode('utf-8'))
+    def turn(self, state=None, qos=0):
+        if not self.is_online:
+            self.online()
+        payload = state.encode('utf-8')
+        self._log.debug(f"Switch \n{self._topics.state =} \n{payload =}")
+        return self._pm._client.publish(self._topics.state, payload=payload,qos=qos)
 
-    def turnOn(self, json=None):
+    def turnOn(self, json=None, qos=0):
         if json is not None and self._jsattrib:
             self._log.error("Sending json without declaring json_attributes true. Homeassistant does not like that!")
             raise AttributeError("Sending json without declaring json_attributes true. Homeassistant does not like that!")
         if json is None:
             return self.turn("ON")
-        self.turn(json)
+        return self.turn(json, qos=qos)
 
-    def turnOff(self, json=None):
+    def turnOff(self, json=None, qos=0):
         if json is not None and self._jsattrib:
             self._log.error("Sending json without declaring json_attributes true. Homeassistant does not like that!")
             raise AttributeError("Sending json without declaring json_attributes true. Homeassistant does not like that!")
         if json is None:
             return self.turn("OFF")
-        self.turn(json)
+        return self.turn(json, qos=qos)
+
+    def offline(self):
+        self.is_online = False
+        return self._pm._client.publish(self._topics.ava_topic, payload="offline", retain=True)
+    def online(self):
+        self.is_online = True
+        return self._pm._client.publish(self._topics.ava_topic, payload="online", retain=True)
