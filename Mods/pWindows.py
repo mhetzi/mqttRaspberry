@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+from types import NoneType
+from typing import Union
+from Tools.PluginManager import PluginManager
 import paho.mqtt.client as mclient
 import Tools.Config as conf
 import Tools.Autodiscovery as ad
@@ -43,7 +46,7 @@ class MsWindowsMain:
     _shed_Job = None
     _plugin_manager = None
 
-    _wmi_devices: WMI_PnP = None
+    _wmi_devices: Union[WMI_PnP, None] = None
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         self._config = conf.PluginConfig(opts, PluginLoader.getConfigKey())
@@ -54,6 +57,7 @@ class MsWindowsMain:
         self.__ava_topic = device_id
         self._callables = []
         self.device = None
+        self._running_sensor = None
 
         if self._config.get("enabled/systray", True):
             self._systray = win32Systray(self._config, self.__logger)
@@ -62,20 +66,27 @@ class MsWindowsMain:
         if self._config.get("enabled/wmi_pnp", True):
             self._wmi_devices = WMI_PnP(self._config, self.__logger)
 
-    def set_pluginManager(self, pm):
+    def set_pluginManager(self, pm: PluginManager):
         self._plugin_manager = pm
 
     def register(self, wasConnected=False):
+        if self._plugin_manager is None:
+            raise Exception("PluginManager is None!")
         if self._wmi_devices is not None:
             self._wmi_devices.register(wasConnected, self._plugin_manager)
         if self._pwr_ev is not None:
             self._pwr_ev.register(wasConnected, self._plugin_manager)
         if self._systray is not None:
             self._systray.register(wasConnected, self._plugin_manager)
+        self._running_sensor = BinarySensor.BinarySensor(self.__logger, self._plugin_manager, "Windows läuft", BinarySensor.BinarySensorDeviceClasses.POWER)
+        self._running_sensor.register()
+        self._running_sensor.turnOn()
 
 
     def stop(self):
         #schedule.cancel_job(self._shed_Job)
+        if self._running_sensor is not None:
+            self._running_sensor.turnOff()
         try:
             if self._wmi_devices is not None:
                 self._wmi_devices.shutdown_watchers()
