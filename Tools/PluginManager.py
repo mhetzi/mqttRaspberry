@@ -11,7 +11,7 @@ import Tools.error as err
 
 try:
     import paho.mqtt.client as mclient
-except ImportError as ie:
+except (ImportError, ModuleNotFoundError) as ie:
     try:
         err.try_install_package('paho.mqtt', throw=ie, ask=False)
     except err.RestartError:
