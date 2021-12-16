@@ -49,6 +49,7 @@ class IdleMonitor:
     _register_delay_id = None
     _IdelingPolling = None
     _is_idle  = False
+    __sheduler_fails = 0
 
     def __init__(self, interval:int, log:logging.Logger, pm: PluginMan.PluginManager, bus: dbus.SystemBus, netName="E_NOTSET"):
         self._log  = log.getChild("Mutter.IdleMonitor")
@@ -122,15 +123,25 @@ class IdleMonitor:
             self._active_watch_id = None
 
     def isIdleDead(self):
-        idleing = self.idlemon.GetIdletime()
-        isIdle = idleing > self._timeout
-        if isIdle != self._is_idle:
-            self._log.info("Polling Idle zeigt dass uns das Event nicht erreicht hat.")
-            from time import sleep
-            sleep(0.25)
+        try:
+            idleing = self.idlemon.GetIdletime()
             isIdle = idleing > self._timeout
             if isIdle != self._is_idle:
-                self._log.warning("Polling Idle zeigt dass uns das Event definitiv nicht erreicht hat. Signale werden neu eingerichte...")
+                self._log.info("Polling Idle zeigt dass uns das Event nicht erreicht hat.")
+                from time import sleep
+                sleep(0.25)
+                isIdle = idleing > self._timeout
+                if isIdle != self._is_idle:
+                    self._log.warning("Polling Idle zeigt dass uns das Event definitiv nicht erreicht hat. Signale werden neu eingerichte...")
+                    self.stop()
+                    self.register()
+        except dbus.exceptions.DBusException:
+            self._log.exception("isIdleDead():")
+            from time import sleep
+            sleep(2.5)
+            self.__sheduler_fails += 1
+            if self.__sheduler_fails > 5:
+                self.__sheduler_fails = 0
                 self.stop()
                 self.register()
 

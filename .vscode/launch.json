@@ -21,7 +21,7 @@
         },
         {
             "name": "Python: Remote Attach",
-            "type": "python3",
+            "type": "python",
             "request": "attach",
             "port": 5678,
             "host": "localhost",
@@ -53,6 +53,18 @@
             "args": [
                 "--config", "/opt/mqttScripts/config/mqttra.config",
                 "--debug", "systemd"
+            ],
+            "justMyCode": false
+        },
+        {
+            "name": "Python: Launcher Fedora (nonsystemd)",
+            "type": "python",
+            "request": "launch",
+            "module": "Launcher",
+            "console": "integratedTerminal",
+            "args": [
+                "--config", "/opt/mqttScripts/config/mqttra.config",
+                "--debug"
             ],
             "justMyCode": false
         },
