@@ -122,11 +122,14 @@ class PluginManager:
             plugin = None
             for x in self.needed_list:
                 if x.getConfigKey() == key:
-                    self.logger.info("Konfiguriere Plugin...")
-                    plugin = x.getPlugin(client=self._client, opts=self.config, logger=self.logger.parent,
-                                       device_id=self._client_name)
-                    self.logger.info("Plugin konfiguriert")
-                    break
+                    try:
+                        self.logger.info("Konfiguriere Plugin...")
+                        plugin = x.getPlugin(client=self._client, opts=self.config, logger=self.logger.parent,
+                                        device_id=self._client_name)
+                        self.logger.info("Plugin konfiguriert")
+                        break
+                    except:
+                        self.logger.exception("Konfigurieren Fehlgeschlagen!")
 
             if plugin is None:
                 self.logger.warning("Plugin {} nicht vorhanden.".format(key))

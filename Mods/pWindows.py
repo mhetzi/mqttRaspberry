@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from types import NoneType
 from typing import Union
 from Tools.PluginManager import PluginManager
 import paho.mqtt.client as mclient

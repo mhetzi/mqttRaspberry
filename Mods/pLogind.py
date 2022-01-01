@@ -33,14 +33,11 @@ POWER_SWITCHE_ONLINE_TOPIC = "online/{}/logindPower"
 SLEEP_SWITCHE_ONLINE_TOPIC = "online/{}/logindSleep"
 
 class GlibThread(threading.Thread):
-
     def __init__(self):
         super().__init__(name="logind_ml", daemon=False)
         self.loop = GLib.MainLoop()
-
     def run(self):
         self.loop.run()
-    
     def shutdown(self):
         self.loop.quit()
 
