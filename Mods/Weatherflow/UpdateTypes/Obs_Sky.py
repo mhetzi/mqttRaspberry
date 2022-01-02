@@ -64,6 +64,11 @@ class ObsSky:
         return self.__report_interval_minutes
 
     @property
+    def report_intervall_minutes(self): # Kompatibilität mir ObsTempest
+        """ Der interval in Minuten, in dem neue Werte übertragen werden """
+        return self.__report_interval_minutes
+
+    @property
     def lux(self):
         """ Illuminance	Lux """
         return self.__lux

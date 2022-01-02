@@ -362,6 +362,10 @@ class WeatherflowPlugin:
         return True
 
     def process_obs_air(self, update: Union[ObsAir.ObsAir, ObsTempest.ObsTempest]):
+        max_delta = datetime.timedelta(seconds=update.report_intervall_minutes)
+        if (update.timestamp + max_delta) < datetime.datetime.now():
+            self._logger.warning("Air Update wird abgewiesen. Zu alt!")
+            return
         self._logger.debug("Air update")
         if not self.set_lastseen_device(update.serial_number, update.report_intervall_minutes):
             self.register_new_air(update.serial_number, update)
@@ -401,25 +405,26 @@ class WeatherflowPlugin:
             self.update_sensor(update.serial_number, "lightning_last_dist", "0", autodisc.SensorDeviceClasses.GENERIC_SENSOR)
             self.update_sensor(update.serial_number, "lightning_last_nrg", "0", autodisc.SensorDeviceClasses.GENERIC_SENSOR)
 
-        battery_str = math.floor(WeatherflowPlugin.percentageMinMax(update.battery, 1.6, 2.95))
-        if isinstance(update, ObsTempest.ObsTempest):
-            battery_str = 100
-        sensor_ok = ""
-        if self._deviceUpdates[update.serial_number]._sensor_status == DeviceStatus.SensorStatus.OK:
-            sensor_ok = "OK"
-        elif self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.AIR_LIGHTNING_DISTURBER:
-            sensor_ok = "OK_LD"
-        else:
-            if self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.AIR_LIGHTNING_FAILED:
-                sensor_ok = str(sensor_ok) + "Blitzsensor ist ausgefallen. "
-            if self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.AIR_LIGHTNING_NOISE:
-                sensor_ok = str(sensor_ok) + "Zu viel Rauschen für Blitzsensor. "
-            if self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.AIR_PRESSURE_FAILED:
-                sensor_ok = str(sensor_ok) + "Luftdrucksensor ausgefallen. "
-            if self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.AIR_TEMPERATURE_FAILED:
-                sensor_ok = str(sensor_ok) + "Temperatursensor ausgefallen. "
-            if self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.AIR_RH_FAILED:
-                sensor_ok = str(sensor_ok) + "Luftfeuchtesensor ausgefallen. "
+        if update.serial_number in self._deviceUpdates.keys():
+            battery_str = math.floor(WeatherflowPlugin.percentageMinMax(update.battery, 1.6, 2.95))
+            if isinstance(update, ObsTempest.ObsTempest):
+                battery_str = 100
+            sensor_ok = ""
+            if self._deviceUpdates[update.serial_number]._sensor_status == DeviceStatus.SensorStatus.OK:
+                sensor_ok = "OK"
+            elif self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.AIR_LIGHTNING_DISTURBER:
+                sensor_ok = "OK_LD"
+            else:
+                if self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.AIR_LIGHTNING_FAILED:
+                    sensor_ok = str(sensor_ok) + "Blitzsensor ist ausgefallen. "
+                if self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.AIR_LIGHTNING_NOISE:
+                    sensor_ok = str(sensor_ok) + "Zu viel Rauschen für Blitzsensor. "
+                if self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.AIR_PRESSURE_FAILED:
+                    sensor_ok = str(sensor_ok) + "Luftdrucksensor ausgefallen. "
+                if self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.AIR_TEMPERATURE_FAILED:
+                    sensor_ok = str(sensor_ok) + "Temperatursensor ausgefallen. "
+                if self._deviceUpdates[update.serial_number]._sensor_status & DeviceStatus.SensorStatus.AIR_RH_FAILED:
+                    sensor_ok = str(sensor_ok) + "Luftfeuchtesensor ausgefallen. "
 
         if self._config.get("Weatherflow/{0}/minBat".format(update.serial_number), 10) > update.battery:
             self._config["Weatherflow/{0}/minBat".format(update.serial_number)] = update.battery
@@ -443,6 +448,10 @@ class WeatherflowPlugin:
         self.update_sensor(update.serial_number, "battery", battery_json, autodisc.SensorDeviceClasses.BATTERY)
 
     def process_obs_sky(self, update: Union[Obs_Sky.ObsSky, ObsTempest.ObsTempest]):
+        max_delta = datetime.timedelta(seconds=update.report_intervall_minutes)
+        if (update.timestamp + max_delta) < datetime.datetime.now():
+            self._logger.warning("Sky Update wird abgewiesen. Zu alt!")
+            return
         self._logger.debug("Sky update")
         if not self.set_lastseen_device(update.serial_number, update.report_interval_minutes):
             self.register_new_sky(update.serial_number, update)
@@ -610,7 +619,7 @@ class WeatherflowPlugin:
         for serial in self._online_states.keys():
             last_update = self._online_states[serial]["lastUpdate"]
             timespan = datetime.datetime.now() - last_update
-            if timespan.seconds > (self._online_states[serial]["intervall"] * 2) and self._online_states[serial]["wasOnline"]:
+            if timespan.seconds > (self._online_states[serial]["intervall"] * 4) and self._online_states[serial]["wasOnline"]:
                 self._logger.info("Weatherflow Device {} ist jetzt offline".format(serial))
                 online_topic = WeatherflowPlugin.get_device_online_topic(serial)
                 self._client.publish(online_topic, "offline", retain=True)
