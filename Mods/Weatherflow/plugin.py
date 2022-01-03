@@ -362,9 +362,9 @@ class WeatherflowPlugin:
         return True
 
     def process_obs_air(self, update: Union[ObsAir.ObsAir, ObsTempest.ObsTempest]):
-        max_delta = datetime.timedelta(seconds=update.report_intervall_minutes)
+        max_delta = datetime.timedelta( minutes=(update.report_intervall_minutes * 2) )
         if (update.timestamp + max_delta) < datetime.datetime.now():
-            self._logger.warning("Air Update wird abgewiesen. Zu alt!")
+            self._logger.warning("Air Update wird abgewiesen. Zu alt! {}".format(update.timestamp.isoformat()))
             return
         self._logger.debug("Air update")
         if not self.set_lastseen_device(update.serial_number, update.report_intervall_minutes):
@@ -448,7 +448,7 @@ class WeatherflowPlugin:
         self.update_sensor(update.serial_number, "battery", battery_json, autodisc.SensorDeviceClasses.BATTERY)
 
     def process_obs_sky(self, update: Union[Obs_Sky.ObsSky, ObsTempest.ObsTempest]):
-        max_delta = datetime.timedelta(seconds=update.report_intervall_minutes)
+        max_delta = datetime.timedelta(minutes=(update.report_intervall_minutes * 2) )
         if (update.timestamp + max_delta) < datetime.datetime.now():
             self._logger.warning("Sky Update wird abgewiesen. Zu alt!")
             return
