@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+from os import name
 import threading
 from Tools.Autodiscovery import BinarySensorDeviceClasses, SensorDeviceClasses
 from time import sleep
@@ -41,13 +42,19 @@ class POWERBROADCAST_SETTING(Structure):
 
 class Powerevents:
     _shutdown = False
-    _pman: Union[PluginConfig,None] = None
+    _pman: Union[PluginManager,None] = None
     _handles: dict[str, int] = {}
     # Map from GUID to Sensor
     _sensors: dict[str, BinarySensor.BinarySensor] = {}
     _states: dict[str, Union[bool,int]] = {}
     _guids_info: dict[str, str] = {}
     __hwnd: Union[int,None] = 0
+
+
+    def killPluginManager(self):
+        import threading
+        t = threading.Thread(target=self._pman.shutdown, name="WindowsAsyncDestroy", daemon=True)
+        t.start()
 
     def __init__(self, config: PluginConfig, log: Logger) -> None:
         self._config = PluginConfig(config, "pwr")
@@ -72,7 +79,9 @@ class Powerevents:
                         data = settings.Data
                         self.powerSettingsChanged(power_setting=power_setting, data=data)
                     return True
-
+                if msg == win32con.WM_QUERYENDSESSION:
+                    self.killPluginManager()
+                    return True
                 return False
             except:
                 self._log.exception("wndproc")
@@ -174,10 +183,18 @@ class Powerevents:
             self.powerSettingsChanged(uid, data)
     
     def shutdown(self):
-        self._shutdown = True
-        self._window_pump_thread.join()
+        self._log.debug("PowerEvents UnregisterPowerSettingNotification...")
         for hndl in self._handles.values():
             windll.user32.UnregisterPowerSettingNotification(hndl)
+
+        self._log.debug("PowerEvents wait4shutdown...")
+        self._shutdown = True
+        self._window_pump_thread.join()
+        self._log.debug("PowerEvents settings MqttDevices...")
+        self.powerSettingsChanged(GUID_CONSOLE_DISPLAY_STATE, 0)
+        self.powerSettingsChanged(GUID_MONITOR_POWER_ON, 0)
+        self.powerSettingsChanged(GUID_SESSION_USER_PRESENCE, 2)
+        self._log.debug("PowerEvents isDead")
         
     def powerSettingsChanged(self, power_setting, data):
         if power_setting == GUID_CONSOLE_DISPLAY_STATE:

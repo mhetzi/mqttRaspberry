@@ -371,8 +371,11 @@ class logindDbus:
 
         self._logger.info("[5/6] Beende Glib MainLoop")
         self.thread_gml.shutdown()
-        self._logger.info("[6/6] Warten auf Glib MainLoop")
-        self.thread_gml.join()
+        try:
+            self._logger.info("[6/6] Warten auf Glib MainLoop")
+            self.thread_gml.join()
+        except:
+            self._logger.debug("Glib MainLoop join failed!")
 
     def inhibit(self):
         if self.inhibit_lock > 1:
@@ -409,7 +412,10 @@ class logindDbus:
         self._logger.debug(f"Suspend: {sig = }")
         if sig == True:
             if self._idle_monitor is not None:
-                self._idle_monitor.stop()
+                try:
+                    self._idle_monitor.stop()
+                except:
+                    self._idle_monitor = None
             self.sleeping = True
             self._switches["suspend"].turnOn(qos=2).wait_for_publish()
         else:
@@ -424,7 +430,10 @@ class logindDbus:
         if sig == True:
             self.shutdown = True
             self._switches["isOn"].turnOff(qos=1).wait_for_publish()
-            self._idle_monitor.stop()
+            try:
+                self._idle_monitor.stop()
+            except:
+                self._idle_monitor = None
         else:
             self.shutdown = False
             self._switches["isOn"].turnOn().wait_for_publish()

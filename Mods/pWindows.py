@@ -77,25 +77,24 @@ class MsWindowsMain:
             self._pwr_ev.register(wasConnected, self._plugin_manager)
         if self._systray is not None:
             self._systray.register(wasConnected, self._plugin_manager)
-        self._running_sensor = BinarySensor.BinarySensor(self.__logger, self._plugin_manager, "Windows läuft", BinarySensor.BinarySensorDeviceClasses.POWER)
+        self._running_sensor = BinarySensor.BinarySensor(self.__logger, self._plugin_manager, "Windows gestartet", BinarySensor.BinarySensorDeviceClasses.POWER)
         self._running_sensor.register()
         self._running_sensor.turnOn()
-
 
     def stop(self):
         #schedule.cancel_job(self._shed_Job)
         if self._running_sensor is not None:
             self._running_sensor.turnOff()
         try:
-            if self._wmi_devices is not None:
-                self._wmi_devices.shutdown_watchers()
-        except:
-            self.__logger.exception("Stoppen von wmi")
-        try:
             if self._pwr_ev is not None:
                 self._pwr_ev.shutdown()
         except:
             self.__logger.exception("Stoppen von PWR events")
+        try:
+            if self._wmi_devices is not None:
+                self._wmi_devices.shutdown_watchers()
+        except:
+            self.__logger.exception("Stoppen von wmi")
         try:
             if self._systray is not None:
                 self._systray.shutdown()

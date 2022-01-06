@@ -310,7 +310,7 @@ class PluginManager:
 
     def _shutdown(self):
         pass
-
+    
     def shutdown(self) -> NoReturn:
         self.logger.info("Plugins werden deaktiviert")
         self.disable_mods()
