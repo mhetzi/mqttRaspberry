@@ -24,15 +24,6 @@ except ImportError as ie:
     except err.RestartError:
         import schedule
 
-try:
-    import dataclasses_json
-except ImportError as ie:
-    import Tools.error as err
-    try:
-        err.try_install_package('dataclasses-json', throw=ie, ask=False) # Dont ask, plugin is wanted! So try to get it up and running
-    except err.RestartError:
-        import dataclasses_json
-
 import Tools.Config as tc
 
 from abc import ABC, abstractmethod

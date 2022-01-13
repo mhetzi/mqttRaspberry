@@ -285,8 +285,12 @@ class BasicConfig(AbstractConfig):
             raise NoClientConfigured()
 
         client_config = self._config["CLIENT"]
+
+        import platform
+        plat = platform.system()
+
         return ClientConfig(client_config["host"], client_config["port"],
-                            client_config["client_id"], client_config["clean_session"], client_config["CA"],
+                            client_config["client_id"].format(os=plat), client_config["clean_session"], client_config["CA"],
                             client_config["CERT"], client_config["KEY"],
                             client_config["USER"], client_config["PW"], client_config["autodiscovery"])
 

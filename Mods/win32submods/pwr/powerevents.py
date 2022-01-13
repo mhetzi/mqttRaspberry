@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 
+from abc import abstractmethod
 from os import name
 import threading
 from Tools.Autodiscovery import BinarySensorDeviceClasses, SensorDeviceClasses
 from time import sleep
 from typing import Tuple, Union
 from Tools.Config import PluginConfig
-from Tools.PluginManager import PluginManager
+from Tools.PluginManager import PluginInterface, PluginManager
 from Tools.Devices import BinarySensor, Sensor
 from Tools.Devices.Filters import DeltaFilter
 
@@ -24,7 +25,6 @@ import ctypes
 from ctypes import POINTER, windll, Structure, cast, CFUNCTYPE, c_int, c_uint, c_void_p, c_bool, wintypes
 from comtypes import GUID
 from ctypes.wintypes import HANDLE, DWORD, BOOL
-import wmi
 
 ### CONSTANTS
 PBT_POWERSETTINGCHANGE = 0x8013
@@ -40,113 +40,60 @@ class POWERBROADCAST_SETTING(Structure):
                 ("DataLength", DWORD),
                 ("Data", DWORD)]
 
-class Powerevents:
-    _shutdown = False
-    _pman: Union[PluginManager,None] = None
+from Mods.win32submods.pwr.WindowEventReceiverInterface import WindowEventReciever
+
+class Powerevents(WindowEventReciever):
     _handles: dict[str, int] = {}
     # Map from GUID to Sensor
     _sensors: dict[str, BinarySensor.BinarySensor] = {}
     _states: dict[str, Union[bool,int]] = {}
     _guids_info: dict[str, str] = {}
-    __hwnd: Union[int,None] = 0
+
+    def on_window_event(self, hwnd, msg, wparam, lparam) -> Union[None, bool]:
+        try:
+            if msg == win32con.WM_POWERBROADCAST:
+                if wparam == win32con.PBT_APMPOWERSTATUSCHANGE:
+                    self._log.debug('Power status has changed')
+                if wparam == win32con.PBT_APMRESUMEAUTOMATIC:
+                    self._log.debug('System resume')
+                if wparam == win32con.PBT_APMRESUMESUSPEND:
+                    self._log.debug('System resume by user input')
+                if wparam == win32con.PBT_APMSUSPEND:
+                    self._log.debug('System suspend')
+                if wparam == PBT_POWERSETTINGCHANGE:
+                    self._log.debug('Power setting changed...')
+                    settings = cast(lparam, POINTER(POWERBROADCAST_SETTING)).contents
+                    power_setting = str(settings.PowerSetting)
+                    data_length = settings.DataLength
+                    data = settings.Data
+                    self.powerSettingsChanged(power_setting=power_setting, data=data)
+                return True
+            if msg == win32con.WM_QUERYENDSESSION:
+                self._wep.killPluginManager()
+                return True
+            return None
+        except:
+            self._log.exception("my_window_receiver")
+            return None
+
+    def __init__(self, window_event_processor) -> None:
+        self._wep = window_event_processor
+        self._log = window_event_processor._log.getChild("PWR")
+        self._guids_info = window_event_processor._config.get("enabled_guids", {
+            'Monitor' : GUID_MONITOR_POWER_ON,
+            'System Away' : GUID_SYSTEM_AWAYMODE,
+            'Konsolenfenster Status' : GUID_CONSOLE_DISPLAY_STATE,
+            'ACDC Stromversorgung' : GUID_ACDC_POWER_SOURCE,
+            'Batterie %' : GUID_BATTERY_PERCENTAGE_REMAINING,
+            'Benutzeranwesenheit': GUID_SESSION_USER_PRESENCE
+        })
+        for name, guid_info in self._guids_info.items():
+            result = windll.user32.RegisterPowerSettingNotification(HANDLE(self._wep._hwnd), GUID(guid_info), DWORD(0))
+            self._handles[name] = result
+            self._log.info("PowerNotification {} Regestriert: GUID {}, Handle: {}, Fehler: {}".format(name, guid_info, hex(result), win32api.GetLastError()))
 
 
-    def killPluginManager(self):
-        import threading
-        t = threading.Thread(target=self._pman.shutdown, name="WindowsAsyncDestroy", daemon=True)
-        t.start()
-
-    def __init__(self, config: PluginConfig, log: Logger) -> None:
-        self._config = PluginConfig(config, "pwr")
-        self._log = log.getChild("PWR")
-
-        def wndproc(hwnd, msg, wparam, lparam):
-            try:
-                if msg == win32con.WM_POWERBROADCAST:
-                    if wparam == win32con.PBT_APMPOWERSTATUSCHANGE:
-                        self._log.debug('Power status has changed')
-                    if wparam == win32con.PBT_APMRESUMEAUTOMATIC:
-                        self._log.debug('System resume')
-                    if wparam == win32con.PBT_APMRESUMESUSPEND:
-                        self._log.debug('System resume by user input')
-                    if wparam == win32con.PBT_APMSUSPEND:
-                        self._log.debug('System suspend')
-                    if wparam == PBT_POWERSETTINGCHANGE:
-                        self._log.debug('Power setting changed...')
-                        settings = cast(lparam, POINTER(POWERBROADCAST_SETTING)).contents
-                        power_setting = str(settings.PowerSetting)
-                        data_length = settings.DataLength
-                        data = settings.Data
-                        self.powerSettingsChanged(power_setting=power_setting, data=data)
-                    return True
-                if msg == win32con.WM_QUERYENDSESSION:
-                    self.killPluginManager()
-                    return True
-                return False
-            except:
-                self._log.exception("wndproc")
-
-        def window_pump():
-            self._log.debug("Win32 API Window erstellen...")
-            hinst = win32api.GetModuleHandle(None)
-            wndclass = win32gui.WNDCLASS()
-            wndclass.hInstance = hinst
-            wndclass.lpszClassName = "mqttScriptPowereventWindowClass"
-            CMPFUNC = CFUNCTYPE(c_bool, c_int, c_uint, c_uint, c_void_p)
-            wndproc_pointer = CMPFUNC(wndproc)
-            wndclass.lpfnWndProc = {win32con.WM_POWERBROADCAST : wndproc_pointer}
-            hwnd = None
-            try:
-                myWindowClass = win32gui.RegisterClass(wndclass)
-                hwnd = win32gui.CreateWindowEx(win32con.WS_EX_LEFT,
-                                            myWindowClass, 
-                                            "mqttScriptPowereventWindow", 
-                                            0, 
-                                            0, 
-                                            0, 
-                                            win32con.CW_USEDEFAULT, 
-                                            win32con.CW_USEDEFAULT, 
-                                            win32con.HWND_MESSAGE, 
-                                            0, 
-                                            hinst, 
-                                            None)
-            except Exception as e:
-                self._log.exception("Window konnte nicht erstellt werden!")
-
-            self.__hwnd = hwnd
-            if hwnd is None:
-                self._log.error("hwnd is none!")
-                return
-            else:
-                self._log.debug("Windows Handle ({}) erstellt".format(hwnd))
-
-            self._guids_info = self._config.get("enabled_guids", {
-                'Monitor' : GUID_MONITOR_POWER_ON,
-                'System Away' : GUID_SYSTEM_AWAYMODE,
-                'Konsolenfenster Status' : GUID_CONSOLE_DISPLAY_STATE,
-                'ACDC Stromversorgung' : GUID_ACDC_POWER_SOURCE,
-                'Batterie %' : GUID_BATTERY_PERCENTAGE_REMAINING,
-                'Benutzeranwesenheit': GUID_SESSION_USER_PRESENCE
-            })
-            for name, guid_info in self._guids_info.items():
-                result = windll.user32.RegisterPowerSettingNotification(HANDLE(hwnd), GUID(guid_info), DWORD(0))
-                self._handles[name] = result
-                self._log.info("PowerNotification {} Regestriert: GUID {}, Handle: {}, Fehler: {}".format(name, guid_info, hex(result), win32api.GetLastError()))
-
-            self._log.debug("Begin pumping...")
-            try:
-                while not self._shutdown:
-                    win32gui.PumpWaitingMessages()
-                    time.sleep(1)
-            except:
-                self._log.exception("Pumping of messages failed")
-
-        self._window_pump_thread = threading.Thread(name="window_pump", target=window_pump)
-        self._window_pump_thread.start()
-
-    def register(self, wasConnected: bool, pman: PluginManager):
-        self._pman = pman
-
+    def register(self, wasConnected):
         if not wasConnected:
             for name, guid in self._guids_info.items():
                 devc = BinarySensorDeviceClasses.GENERIC_SENSOR
@@ -160,7 +107,7 @@ class Powerevents:
                 if guid == GUID_BATTERY_PERCENTAGE_REMAINING:
                     devc = Sensor.SensorDeviceClasses.BATTERY
                     dev = Sensor.Sensor(
-                        self._log, self._pman,
+                        self._log, self._wep._pman,
                         name, devc, "%"
                     )
                     dev.addFilter( DeltaFilter.DeltaFilter(1, self._log) )
@@ -169,7 +116,7 @@ class Powerevents:
                         dev.state(self._states[guid])
                 else:
                     dev = BinarySensor.BinarySensor(
-                        self._log, self._pman,
+                        self._log, self._wep._pman,
                         name, devc
                     )
                     dev.register()
@@ -186,10 +133,6 @@ class Powerevents:
         self._log.debug("PowerEvents UnregisterPowerSettingNotification...")
         for hndl in self._handles.values():
             windll.user32.UnregisterPowerSettingNotification(hndl)
-
-        self._log.debug("PowerEvents wait4shutdown...")
-        self._shutdown = True
-        self._window_pump_thread.join()
         self._log.debug("PowerEvents settings MqttDevices...")
         self.powerSettingsChanged(GUID_CONSOLE_DISPLAY_STATE, 0)
         self.powerSettingsChanged(GUID_MONITOR_POWER_ON, 0)

@@ -22,7 +22,7 @@ except ImportError as ie:
 from Tools.Devices import BinarySensor
 
 from Mods.win32submods.wmi_PnP import WMI_PnP
-from Mods.win32submods.powerevents import Powerevents
+from Mods.win32submods.pwr.WindowEvents import WindowEventProcessor
 from Mods.win32submods.systray import win32Systray
 
 class PluginLoader:
@@ -61,7 +61,7 @@ class MsWindowsMain:
         if self._config.get("enabled/systray", True):
             self._systray = win32Systray(self._config, self.__logger)
         if self._config.get("enabled/powerevents", True):
-            self._pwr_ev = Powerevents(self._config, self.__logger)
+            self._pwr_ev = WindowEventProcessor(self._config, self.__logger)
         if self._config.get("enabled/wmi_pnp", True):
             self._wmi_devices = WMI_PnP(self._config, self.__logger)
 
