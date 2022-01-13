@@ -272,6 +272,7 @@ class logindDbus:
         self._setup_dbus_interfaces()
         netName = autodisc.Topics.get_std_devInf().name if self._config.get("custom_name", None) is None else self._config.get("custom_name", None)
         # Kann ich ausschalten?
+
         if self._login1.CanPowerOff() == "yes" and self._config.get("allow_power_off", True):
             self._switches["isOn"] = Switch(
                 self._logger,
@@ -281,7 +282,9 @@ class logindDbus:
                 ava_topic=POWER_SWITCHE_ONLINE_TOPIC.format(self._pluginManager._client_name)
             )
             self._bus.add_signal_receiver(handler_function=self.sendShutdown, signal_name="PrepareForShutdown")
+            self._switches["isOn"].register()
         # Kann ich suspend?
+
         if self._login1.CanSuspend() == "yes" and self._config.get("allow_suspend", True):
             self._switches["suspend"] = Switch(
                 self._logger,
@@ -291,7 +294,9 @@ class logindDbus:
                 ava_topic=SLEEP_SWITCHE_ONLINE_TOPIC.format(self._pluginManager._client_name)
             )
             self._bus.add_signal_receiver(handler_function=self.sendSuspend, signal_name="PrepareForSleep")
+            self._switches["suspend"].register()
         # Kann ich neustarten?
+
         if self._login1.CanReboot() == "yes" and self._config.get("allow_reboot", True):
             self._switches["reboot"] = Switch(
                 self._logger,
@@ -299,6 +304,7 @@ class logindDbus:
                 lambda state_requested, message: self.sw_call(userdata="reboot",state_requested=state_requested, message=message),
                 name="{} Neustarten".format(netName), icon="mdi:restart"
             )
+            self._switches["reboot"].register()
         # Kann ich inhibit
         if self.inhibit( ) > 0 and self._config.get("allow_inhibit", True):
             self.uninhibit( )
@@ -308,12 +314,8 @@ class logindDbus:
                 lambda state_requested, message: self.sw_call(userdata="inhibit",state_requested=state_requested, message=message),
                 name="{} Nicht schlafen".format(netName), icon="mdi:sleep-off"
             )
+            self._switches["inhibit"].register()
         
-        self._switches["isOn"].register()
-        self._switches["suspend"].register()
-        self._switches["reboot"].register()
-        self._switches["inhibit"].register()
-
         sleep(5.0)
 
         self.inhibit_delay(True)
