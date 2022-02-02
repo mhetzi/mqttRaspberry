@@ -32,14 +32,31 @@ from time import sleep
 POWER_SWITCHE_ONLINE_TOPIC = "online/{}/logindPower"
 SLEEP_SWITCHE_ONLINE_TOPIC = "online/{}/logindSleep"
 
+global_glibthread = None
+
 class GlibThread(threading.Thread):
     def __init__(self):
         super().__init__(name="logind_ml", daemon=False)
         self.loop = GLib.MainLoop()
+    
+    #Only starts Thread if not alive
+    def safe_start(self):
+        if not self.is_alive():
+            self.start()
+
     def run(self):
         self.loop.run()
     def shutdown(self):
         self.loop.quit()
+    
+    @staticmethod
+    def getThread():
+        global global_glibthread
+
+        if isinstance(global_glibthread, GlibThread):
+            return global_glibthread
+        glibthread = GlibThread()
+        return glibthread
 
 class IdleMonitor:
     _idle_watch_id = None
@@ -158,12 +175,20 @@ class Session:
         self.isRemote   = self.properties.Get("org.freedesktop.login1.Session", "Remote")
         self.uname      = self.properties.Get("org.freedesktop.login1.Session", "Name")
         self.uID        = self.properties.Get("org.freedesktop.login1.Session", "User")
+        self.lockedHint = self.properties.Get("org.freedesktop.login1.Session", "LockedHint")
 
         self._log = log.getChild("Session")
         self._pman = pm
 
         self._lock_notify   = None
         self._unlock_notify = None
+
+    def _process_prop_changed(self, src, dic, arr):
+        self.lockedHint: dbus.Boolean = self.properties.Get("org.freedesktop.login1.Session", "LockedHint")
+        if self.lockedHint:
+            self._lock.lock()
+        else:
+            self._lock.unlock()
 
     def register(self):
         if self.isGUI and self.uID[0] == os.getuid():
@@ -176,8 +201,10 @@ class Session:
             )
             self._lock.register()
 
-            self._lock_notify = self.session.connect_to_signal("Lock",   self._lock.lock)
+            self._lock_notify    = self.session.connect_to_signal("Lock",   self._lock.lock  )
             self._unlock_notify  = self.session.connect_to_signal("Unlock", self._lock.unlock)
+            self.properties.connect_to_signal("PropertiesChanged", self._process_prop_changed)
+            self._process_prop_changed(None, None, None)
     
     def stop(self):
         if self._lock_notify is not None:
@@ -213,7 +240,7 @@ class logindDbus:
         self._login1 = None
         self._logger = logger
         self._mainloop = None
-        self.thread_gml = GlibThread()
+        self.thread_gml = GlibThread.getThread()
         
         self.sleeping = False
         self.shutdown = False
@@ -324,7 +351,7 @@ class logindDbus:
             self._idle_monitor.register()
 
         if not wasConnected:
-            self.thread_gml.start()
+            self.thread_gml.safe_start()
 
     def inhibit_delay(self, sleep=False):
         if sleep:
