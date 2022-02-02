@@ -10,7 +10,7 @@ class MqttMessageThread(thr.Thread):
         super().__init__()
         if not callable(callback):
             raise AttributeError("callback muss aufrufbar sein.")
-        self.setName("MsgThr")
+        self.name = "MsgThr"
         self.setDaemon(False)
         self._cancel_new_when_running = False
         self._sleeping = True

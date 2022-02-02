@@ -145,7 +145,7 @@ class Displays(UdevDeviceProcessor):
             self._monitor = pyudev.Monitor.from_netlink(context=context)
             self._monitor.filter_by("drm")
             self._observer = pyudev.MonitorObserver(self._monitor, self.event)
-            self._observer.setName("UdevDRM")
+            self._observer.name = "UdevDRM"
             self._observer.start()
             self._log.info("UDEV Observer started!")
 

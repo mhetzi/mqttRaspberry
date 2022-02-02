@@ -71,7 +71,7 @@ class AppSource(threading.Thread):
         self._sendData.clear()
         self._lock = threading.Lock()
         self._hadSPS = False
-        self.setName("Camera_RTSP_AppSrc")
+        self.name = "Camera_RTSP_AppSrc"
         self._camera_splitter = ref(splitter)
         self.parent = ref(parent)
         self._split_id = self._camera_splitter().add(self.writeFrame)
@@ -266,7 +266,7 @@ class GstServer( GstRtspServer.RTSPServer, threading.Thread ):
         self.set_address("0.0.0.0")
         self._gst_id = self.attach(None)
         self.connect("client-connected",  self.client_connected_call)
-        self.setName("GstRtspServerThread")
+        self.name = "GstRtspServerThread"
 
     def run(self):
         self._mainLoop.run()

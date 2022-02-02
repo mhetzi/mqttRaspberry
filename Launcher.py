@@ -96,7 +96,7 @@ class Launcher:
         self.config.post_reload = self.pm_reload
         self.mqtt_client = None
 
-        threading.current_thread().setName("Main/MQTT")
+        threading.current_thread().name = "Main/MQTT"
 
         try:
             try:

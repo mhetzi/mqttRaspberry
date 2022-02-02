@@ -86,7 +86,7 @@ class PluginManager:
                 schedule.clear()
 
         continuous_thread = ScheduleThread()
-        continuous_thread.setName("scheduler")
+        continuous_thread.name = "scheduler"
         continuous_thread.start()
         self.logger.debug("ScheduleThread gestartet...")
         return (cease_continuous_run, continuous_thread)

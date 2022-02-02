@@ -26,7 +26,7 @@ class PreRecordBuffer(threading.Thread):
     
     def __init__(self, secs_pre:float, wh:tuple, fps: int, camName: str, path:pathlib.Path, splitter:CameraSplitter, logger:logging.Logger):
         threading.Thread.__init__(self, target=self._thread_run)
-        self.setName("PreRecordBuffer")
+        self.name = "PreRecordBuffer"
 
         self._fps = fps
         self._camName = camName

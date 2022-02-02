@@ -133,7 +133,7 @@ class PiMotionMain(threading.Thread):
 
         self.__logger.debug("PiMotion.__init__()")
 
-        self.setName("PiCamera")
+        self.name = "PiCamera"
         self.__logger.debug("PiMotion.register()")
         self._doExit = False
         self._camera = None
@@ -514,7 +514,7 @@ class PiMotionMain(threading.Thread):
                             interval=self._config.get("motion/takeSnapshotSeconds", 2),
                             function=self.takeSnapshot
                         )
-                        self._snapper.setName("PiMotionSnapshot")
+                        self._snapper.name = "PiMotionSnapshot"
                         self._snapper.start()
                 elif self._postRecordTimer is not None:
                     self._postRecordTimer.cancel()

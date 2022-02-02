@@ -133,7 +133,7 @@ class CameraSplitIO(threading.Thread):
         )
         self._myParent = parent
         self._redirectPackages(cameraStream, file)
-        self.setName("cam_RTSP_queue" if file is None else "cam_file_queue")
+        self.name = "cam_RTSP_queue" if file is None else "cam_file_queue"
         self.setDaemon(False)
         self.start()
         if parent is not None:

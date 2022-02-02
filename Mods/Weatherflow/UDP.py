@@ -17,7 +17,7 @@ class UdpServer(threading.Thread):
         self.__logger = logger
         self._sock = sock
         self._shutdown = False
-        self.setName("Weatherflow UDP Receiver")
+        self.name = "Weatherflow UDP Receiver"
         self.on_message = self.__on_message
 
     def run(self):

@@ -30,7 +30,7 @@ class Connection(threading.Thread):
         self._ved = None
         self._calls = {}
 
-        self.setName("VE.Direct Serial")
+        self.name = "VE.Direct Serial"
 
     def set_callbacks(self, callbacks: dict):
         self._log.debug("Callbacks set!")

@@ -408,7 +408,7 @@ if FILEWATCHING:
         def _register_watchdog(self):
             try:
                 self._observer = Observer()
-                self._observer.setName("ConfigWatchdog")
+                self._observer.name = "ConfigWatchdog"
                 self._observer.schedule(self, str(self._conf_path.parent), recursive=False)
                 self._observer.start()
             except OSError:

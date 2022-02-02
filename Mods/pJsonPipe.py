@@ -35,7 +35,7 @@ class JsonPipe(threading.Thread):
         self._config = opts
         self._pins = []
         self._device_id = device_id
-        self.setName("JsonPipeReader")
+        self.name = "JsonPipeReader"
         self._doExit = False
         self._lastData = None
 
