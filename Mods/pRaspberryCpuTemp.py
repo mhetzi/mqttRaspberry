@@ -38,8 +38,11 @@ class RaspberryPiCpuTemp:
         self._prev_deg = 0
         if self._config.get("diff", None) is None:
             self._config["diff"] = 1.5
-        self._file = open("/sys/class/thermal/thermal_zone0/temp")
         self._callables = []
+        self._open_file()
+
+    def _open_file(self):
+        self._file = open("/sys/class/thermal/thermal_zone0/temp")
 
     def add_temperature_call(self, call):
         if callable(call):
@@ -94,7 +97,11 @@ class RaspberryPiCpuTemp:
         return -1000
 
     def send_update(self, force=False):
-        new_temp = self.get_temperatur_file(self._file)
+        try:
+            new_temp = self.get_temperatur_file(self._file)
+        except ValueError:
+            self._open_file()
+            return
 
         for call in self._callables:
             try:

@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import pathlib
 from Tools.PluginManager import PluginManager
 import paho.mqtt.client as mclient
 import Tools.Config as conf
@@ -71,11 +72,15 @@ class OneWireTemp:
             devices = self._config["w1t"]
             self._config["w1t"] = {}
             self._config["w1t/dev"] = devices
+            self._build_paths()
 
+    def _build_paths(self):
+        self._prev_deg = []
+        self._paths = []
         for temp in self._config.get("w1t/dev", []):
-            path = os.path.join("/sys/bus/w1/devices", temp.get("id", ""), "w1_slave")
+            path = pathlib.Path("/sys/bus/w1/devices").joinpath(temp.get("id", "")).joinpath("w1_slave")
             try:
-                f = open(path)
+                f = path.open("r")
             except FileNotFoundError:
                 f = None
             d = {
@@ -156,7 +161,19 @@ class OneWireTemp:
             for i in range(0, len(self._paths)):
                 d = self._paths[i]
                 self.__logger.debug("Read Temperature for {}...".format(d))
-                new_temp = self.get_temperatur_file(d["f"]) if d["f"] is not None else math.nan
+
+                path: pathlib.Path = d["p"]
+
+                try:
+                    if d["f"] is None and path.exists():
+                        self._build_paths()
+                        self.register()
+                        return
+                    new_temp = self.get_temperatur_file(d["f"]) if d["f"] is not None else math.nan
+                except ValueError:
+                    d["f"] = None
+                    return
+
                 sensor: Sensor = d["d"]
 
                 if new_temp != self._prev_deg[i] or force:
