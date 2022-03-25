@@ -20,7 +20,7 @@ class Sensor:
     _is_offline = True
     _has_offline = False
 
-    def __init__(self, logger:logging.Logger, pman: PluginManager, name: str, sensor_type: SensorDeviceClasses, measurement_unit: str='', ava_topic=None, ownOfflineTopic=False, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None):
+    def __init__(self, logger:logging.Logger, pman: PluginManager, name: str, sensor_type: SensorDeviceClasses, measurement_unit: str='', ava_topic=None, ownOfflineTopic=False, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None, nodeID=None):
         self._log = logger.getChild("Sensor")
         self._log.debug("Sensor Object für {} mit custom uid {} erstellt.".format(name, unique_id))
         self._pm = pman
@@ -32,11 +32,13 @@ class Sensor:
         self._unique_id = unique_id
         self._icon = icon
         self._meassunit = measurement_unit
+        self.nodeID = nodeID
         self._topics = pman.config.get_autodiscovery_topic(
             autodisc.Component.SENSOR,
             name,
             sensor_type,
-            ownOfflineTopic=ownOfflineTopic
+            ownOfflineTopic=ownOfflineTopic,
+            node_id=nodeID
         )
         self._playload = None
         self._filters = []

@@ -29,6 +29,7 @@ import Tools.Config as tc
 from abc import ABC, abstractmethod
 
 class PluginInterface(ABC):
+    __slots__ = ()
     
     # Do necessary registrations, this gets called on (re)connect with the mqtt broker 
     @abstractmethod

@@ -87,7 +87,7 @@ class Launcher:
         self.reload = True
         self.reload_event.set()
 
-    def relaunch(self):
+    def relaunch(self, one_shot=False):
         if self.pm is not None:
             self.pm.shutdown()
 
@@ -135,8 +135,13 @@ class Launcher:
             self.pm.shutdown()
         except Exception:
             self._log.exception("MQTT Hauptthread gestorben")
-            self.reload_event.set()
-            self.pm.shutdown()
+            try:
+                self.reload_event.set()
+                self.pm.shutdown()
+            except:
+                pass
+            if one_shot:
+                exit(-1)
         return False
 
     def launch(self):
@@ -247,7 +252,7 @@ class Launcher:
 
         self._ch.setFormatter(formatter)
 
-        self.relaunch()
+        self.relaunch(systemd)
 
     def exit(self, signum, frame):
         self.reload_event.set()

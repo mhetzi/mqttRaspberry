@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from abc import abstractmethod
+from numbers import Number
 import pathlib
 import os.path as osp
 from pathlib import Path
@@ -46,16 +47,26 @@ class DictBrowser:
     def sett(self, key: str, value):
         self[key] = value
 
-    def __getitem__(self, item: str):
+    def __getitem__(self, item: str) -> Union[dict, list, int, float, bool, str, None]:
         path = item.split("/")
-        d = self._dict
+        d: Union[dict, list] = self._dict
         i = 0
         while True:
             if i < (len(path) - 1):
+                if isinstance(d, list):
+                    int_path = int(path[i])
+                    d = d[int_path]
+                    i += 1
+                    continue
                 if d.get(path[i], None) is None:
                     d[path[i]] = {}
                 d = d[path[i]]
             elif i == (len(path) - 1):
+                if isinstance(d, list):
+                    int_path = int(path[i])
+                    if int_path > len(d) - 1:
+                        return None
+                    return d[int_path]
                 if d.get(path[i], None) is None:
                     return None
                 return d[path[i]]
@@ -65,14 +76,27 @@ class DictBrowser:
 
     def __setitem__(self, key: str, value):
         path = key.split("/")
-        d = self._dict
+        d: Union[dict, list] = self._dict
         i = 0
         while True:
             if i < (len(path) - 1):
+                if isinstance(d, list):
+                    int_path = int(path[i])
+                    d = d[int_path]
+                    i += 1
+                    continue
                 if d.get(path[i], None) is None:
                     d[path[i]] = {}
                 d = d[path[i]]
             elif i == (len(path) - 1):
+                if isinstance(d, list):
+                    int_path = int(path[i])
+                    if value is None:
+                        try:
+                            d.pop(int_path)
+                        except:pass
+                    d[int_path] = value
+                    break
                 if value is None:
                     try:
                         del d[path[i]]
@@ -86,7 +110,7 @@ class DictBrowser:
 
     def __delitem__(self, key:str):
         path = key.split("/")
-        d = self._dict
+        d: Union[dict, list] = self._dict
         i = 0
         while True:
             if i < (len(path) - 1):
@@ -94,6 +118,9 @@ class DictBrowser:
                     d[path[i]] = {}
                 d = d[path[i]]
             elif i == (len(path) - 1):
+                if isinstance(d, list):
+                    d.pop(int(path[i]))
+                    return
                 if d.get(path[i], None) is None:
                     return
                 del d[path[i]]
