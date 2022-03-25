@@ -2,6 +2,7 @@ import datetime
 import logging
 import threading
 from typing import Union
+from Tools.Devices.Filters.RoundingFilter import RoundingFilter
 
 from Tools.Devices.Filters.TooLowFilter import TooLowFilter
 
@@ -44,7 +45,7 @@ from Mods.kaifa import kaifatest
 
 class Reader(threading.Thread):
 
-    __slots__ = ("_serial", "_supplier", "_sensors", "_lastStructs", "_register_late", "_devInfo", "kaifaConfig", "_config", "_pm", "_master_log", "_log", "_do_register")
+    __slots__ = ("_serial", "_supplier", "_sensors", "_lastStructs", "_register_late", "_devInfo", "kaifaConfig", "_config", "_pm", "_master_log", "_log", "_do_register", "_shutdown", "_serial_errors")
 
     _serial: serial.Serial
     _supplier: Union[kr.SupplierEVN, kr.SupplierTINETZ]
@@ -54,6 +55,7 @@ class Reader(threading.Thread):
     _devInfo: Discovery.DeviceInfo
     kaifaConfig: kr.Config
     _pm: PluginManager
+    _serial_errors: int
 
     def __init__(self, subConfig: PluginConfig, logger: logging.Logger) -> None:
         threading.Thread.__init__(self)
@@ -62,15 +64,26 @@ class Reader(threading.Thread):
         self._log = logger
         self._sensors = {}
         self._do_register = False
+        self._shutdown = False
 
         # Create and modify original config object
         self.kaifaConfig = kr.Config(None)
         self.kaifaConfig._config = self._config
-        _, self._serial, self._supplier = kr.setup(self.kaifaConfig, self._log)
-        self._log.info(f"Serial Port {self._serial.name} erfolgreich geöffnet.")
+        self._serial_errors = 0
 
+    def callback(self, observation: Union[kr.Decrypt, None]):
+        if observation is None:
+            self._serial_errors += 1
+            if self._serial_errors > 15:
+                self._serial_errors = 0
+                try:
+                    self._log.info("Resetting Serial Connection...")
+                    self._serial.close()
+                except:
+                    self._log.exception("Resetting Serial Connection failed!")
+            return
+        self._serial_errors = 0
 
-    def callback(self, observation: kr.Decrypt):
         self._log.debug("Processing Kaifa data...")
         structs = kaifatest.getStructs(observation._data_decrypted, self._log)
         self._lastStructs = structs
@@ -92,13 +105,26 @@ class Reader(threading.Thread):
         self._log.debug("Processing Kaifa data done")
 
     def run(self) -> None:
-        try:
-            kr.mainLoop(self.kaifaConfig, self._log, self._serial, self._supplier, self.callback)
-        except Exception:
-            self._log.exception("Kaifa Serial MainLoop")
+        self._shutdown = False
+        while not self._shutdown:
+            try:
+                self._master_log.getChild("KR").setLevel(logging.DEBUG)
+                _, self._serial, self._supplier = kr.setup(self.kaifaConfig, self._master_log.getChild("KR"))
+                self._log.info(f"Serial Port {self._serial.name} erfolgreich geöffnet.")
+                kr.mainLoop(self.kaifaConfig, self._log, self._serial, self._supplier, self.callback)
+            except serial.PortNotOpenError:
+                pass
+            except Exception:
+                self._log.exception("Kaifa Serial MainLoop")
+                import time
+                time.sleep(5)
     
     def stop(self):
-        self._serial.close()
+        self._shutdown = True
+        try:
+            self._serial.close()
+        except:
+            pass
 
     def register(self, pm: PluginManager):
         self._pm = pm
@@ -157,11 +183,13 @@ class Reader(threading.Thread):
             if obis_str == kaifatest.ObisNames.ActiveEnergy_out_str:
                 sensor.addFilter(TooLowFilter(0.1, self._log))
             sensor.addFilter(DeltaFilter.DeltaFilter(0.0001, self._log))
+            sensor.addFilter(RoundingFilter(3, self._log))
 
             if value > 0:
                 sensor.state(value)
             self._sensors[obis_str] = sensor
         self._do_register = False
+        self._master_log.getChild("KR").setLevel(logging.INFO)
     
     def resend(self):
         for sens in self._sensors.values():

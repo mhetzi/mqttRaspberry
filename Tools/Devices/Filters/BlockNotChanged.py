@@ -1,5 +1,5 @@
 import logging
-from Tools.Devices.Filters import BaseFilter, DontSend
+from Tools.Devices.Filters import BaseFilter, DontSend, SilentDontSend
 import math
 import logging
 
@@ -12,7 +12,7 @@ class BlockNotChanged(BaseFilter):
 
     def filter(self, new_value):
         if new_value == self._last_valid_value:
-            raise DontSend
+            raise SilentDontSend
         self._last_valid_value = new_value
         return new_value
 

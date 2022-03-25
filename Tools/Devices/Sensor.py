@@ -1,5 +1,6 @@
 import math
 from os import stat
+from typing import Union
 import paho.mqtt.client as mclient
 import Tools.Config as conf
 import Tools.Autodiscovery as autodisc
@@ -8,7 +9,7 @@ import logging
 import json
 from  Tools.PluginManager import PluginManager
 import enum
-from Tools.Devices.Filters import BaseFilter, DontSend
+from Tools.Devices.Filters import BaseFilter, DontSend, SilentDontSend
 import json
 
 from Tools.Config import DictBrowser
@@ -85,7 +86,7 @@ class Sensor:
             raise DontSend
         return ms
         
-    def state(self, state=None, force_send=False, keypath=None) -> mclient.MQTTMessageInfo:
+    def state(self, state=None, force_send=False, keypath=None) -> Union[mclient.MQTTMessageInfo, None]:
         if keypath is not None:
             browse = DictBrowser(state)
             try:
@@ -93,6 +94,8 @@ class Sensor:
                 self._log.debug(f"Filtering extracted state {new_state}")
                 new_state = self._callFilters(new_state)
                 browse[keypath] = new_state 
+            except SilentDontSend:
+                return None
             except DontSend:
                 self._log.exception("Filtering failed!")
                 return None
@@ -101,6 +104,8 @@ class Sensor:
         else:
             try:
                 state = self._callFilters(state)
+            except SilentDontSend:
+                return None
             except DontSend:
                 self._log.exception("Filtering failed!")
                 return None
@@ -114,13 +119,25 @@ class Sensor:
             self.online()
             sleep(1)
         self._log.debug(f"Sending on {self._topics.state} payload {payload}")
-        return self._pm._client.publish(self._topics.state, payload=payload)
+
+        try:
+            return self._pm._client.publish(self._topics.state, payload=payload)
+        except:
+            self._log.exception(f"Konnte {payload = } nicht versenden!")
 
     def resend(self):
         return self._pm._client.publish(self._topics.state, payload=self._playload)
     
     def offline(self):
-        return self._pm._client.publish(self._topics.ava_topic, payload="offline", retain=True)
+        try:
+            return self._pm._client.publish(self._topics.ava_topic, payload="offline", retain=True)
+        except Exception as e:
+            self._log.exception("Markieren des Sensors als offline fehlgeschlagen!")
+            return None
     def online(self):
-        return self._pm._client.publish(self._topics.ava_topic, payload="online", retain=True)
+        try:
+            return self._pm._client.publish(self._topics.ava_topic, payload="online", retain=True)
+        except Exception as e:
+            self._log.exception("Markieren des Sensors als online fehlgeschlagen!")
+            return None
         

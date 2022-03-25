@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import getopt
+import ssl
 import sys
 import logging
 import threading
@@ -110,10 +111,14 @@ class Launcher:
             self.pm.enable_mods()
             while True:
                 try:
-                    self.mqtt_client.loop_forever(timeout=30, retry_first_connection=True)
+                    self.mqtt_client.loop_start()
                     break
                 except ConnectionRefusedError:
-                    self.pm.start_mqtt_client()
+                   self.mqtt_client, deviceID = self.pm.start_mqtt_client()
+                   continue
+                except ssl.SSLEOFError:
+                    self.mqtt_client, deviceID = self.pm.start_mqtt_client()
+                    continue
                 except Exception as e:
                     raise e
             return True
@@ -135,13 +140,7 @@ class Launcher:
             self.pm.shutdown()
         except Exception:
             self._log.exception("MQTT Hauptthread gestorben")
-            try:
-                self.reload_event.set()
-                self.pm.shutdown()
-            except:
-                pass
-            if one_shot:
-                exit(-1)
+            self.exit(0,0)
         return False
 
     def launch(self):
@@ -254,16 +253,24 @@ class Launcher:
 
         self.relaunch(systemd)
 
-    def exit(self, signum, frame):
+    def exit(self, signum, frame, skip_mqtt=False):
         self.reload_event.set()
         self.reload = False
         self._log.info("Zeit zum Begraben gehn...\n PluginManager wird heruntergefahren...")
-        self.pm.shutdown()
-        self._log.info("MQTT Thread wird gestoppt...")
-        self.mqtt_client.loop_stop()
+        try:
+            self.pm.shutdown()
+        except:
+            pass
+        if not skip_mqtt:
+            self._log.info("MQTT Thread wird gestoppt...")
+            try:
+                self.mqtt_client.loop_stop()
+            except: pass
         self._log.info("Config wird entladen...")
-        self.config.save()
-        self.config.stop()
+        try:
+            self.config.save()
+            self.config.stop()
+        except: self._log.exception("Fehler beim speichern der Datei!")
         self._log.info("Beende mich...")
         if faulthandler.is_enabled():
             faulthandler.disable()

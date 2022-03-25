@@ -56,7 +56,10 @@ class BinarySensor:
     def turn(self, state=None):
         if isinstance(state, dict):
             state = json.dumps(state)
-        self._pm._client.publish(self._topics.state, payload=state.encode('utf-8'))
+        try:
+            self._pm._client.publish(self._topics.state, payload=state.encode('utf-8'))
+        except:
+            self._log.exception(f"Error while sending {state = }")
 
     def turnOn(self, json=None):
         if json is not None and self._jsattrib:

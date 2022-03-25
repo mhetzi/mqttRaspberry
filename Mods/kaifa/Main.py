@@ -37,8 +37,11 @@ class KaifaPlugin(PluginInterface):
     def set_pluginManager(self, pm: PluginManager):
         self._plugin_manager = pm
         for dev in self._devices:
-            self.__logger.debug("Starte Serial Reader...")
-            dev.start()
+            try:
+                self.__logger.debug("Starte Serial Reader...")
+                dev.start()
+            except:
+                self.__logger.exception("Starten von Serial Reader fehlgeschlagen!")
 
     def register(self, wasConnected=False):
         if self._plugin_manager is not None:

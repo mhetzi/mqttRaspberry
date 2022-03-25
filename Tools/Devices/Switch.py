@@ -66,7 +66,10 @@ class Switch:
             self.online()
         payload = state.encode('utf-8')
         self._log.debug(f"Switch \n{self._topics.state =} \n{payload =}")
-        return self._pm._client.publish(self._topics.state, payload=payload,qos=qos)
+        try:
+            return self._pm._client.publish(self._topics.state, payload=payload,qos=qos)
+        except:
+            self._log.exception(f"Error while sending {payload = }!")
 
     def turnOn(self, json=None, qos=0):
         if json is not None and self._jsattrib:
@@ -86,7 +89,15 @@ class Switch:
 
     def offline(self):
         self.is_online = False
-        return self._pm._client.publish(self._topics.ava_topic, payload="offline", retain=True)
+        try:
+            return self._pm._client.publish(self._topics.ava_topic, payload="offline", retain=True)
+        except:
+            self._log.exception("offline(): ")
+            return None
     def online(self):
         self.is_online = True
-        return self._pm._client.publish(self._topics.ava_topic, payload="online", retain=True)
+        try:
+            return self._pm._client.publish(self._topics.ava_topic, payload="online", retain=True)
+        except:
+            self._log.exception("online(): ")
+            return None

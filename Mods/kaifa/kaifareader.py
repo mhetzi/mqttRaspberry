@@ -420,6 +420,10 @@ def mainLoop(g_cfg: Config, g_log: logging.Logger, g_ser: serial.Serial, g_suppl
                 g_log.debug("pos: {} | {}".format(frame1_start_pos, frame2_start_pos))
                 g_log.debug("incomplete segment: {} ".format(stream))
                 g_log.debug("received chunk: {} ".format(byte_chunk))
+
+                if callable(data_callback):
+                    data_callback(None)
+                    g_log.debug("CALL DONE")
                 continue
 
             g_log.debug("pos: {} | {}".format(frame1_start_pos, frame2_start_pos))

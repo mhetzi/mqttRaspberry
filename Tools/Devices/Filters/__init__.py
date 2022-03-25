@@ -7,3 +7,6 @@ class BaseFilter:
 
 class DontSend(Exception):
     pass
+
+class SilentDontSend(DontSend):
+    pass
