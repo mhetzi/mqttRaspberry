@@ -82,7 +82,10 @@ class Reader(threading.Thread):
             if symbol == kaifatest.EnumValues.Wh:
                 symbol = kaifatest.EnumValues.kWh
                 value = value / 1000
-            sensor.state(value)
+            try:
+                state = sensor.state(value)
+            except:
+                self._log.exception("Konnte Kaifa update nicht senden!")
 
         if self._do_register:
             self._register()
@@ -134,6 +137,7 @@ class Reader(threading.Thread):
                 value = value / 1000
             if obis_str == kaifatest.ObisNames.PowerFactor_str:
                 symbol = "%"
+                value = value * 100
             
             name = kaifatest.ObisNames.getFriendlyName(obis_str)
             if name is None:
