@@ -93,7 +93,8 @@ class PluginManager:
         return (cease_continuous_run, continuous_thread)
 
     def __init__(self, logger: logging.Logger, config: tc.BasicConfig):
-        self.logger = logger.getChild("PluginManager")
+        self.logger = logger.getChild("PM")
+        self.logger.setLevel(logging.NOTSET)
         self.config = config
         self._client = None
         self._client_name = None
@@ -116,7 +117,7 @@ class PluginManager:
                 if x.getConfigKey() == key:
                     try:
                         self.logger.info("Konfiguriere Plugin...")
-                        plugin = x.getPlugin(client=self._client, opts=self.config, logger=self.logger.parent,
+                        plugin = x.getPlugin(client=self._client, opts=self.config, logger=self.logger,
                                         device_id=self._client_name)
                         self.logger.info("Plugin konfiguriert")
                         break

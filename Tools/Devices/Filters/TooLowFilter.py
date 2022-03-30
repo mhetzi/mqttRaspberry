@@ -9,7 +9,6 @@ class TooLowFilter(BaseFilter):
 
     def __init__(self, min_value=None, logger=None) -> None:
         super().__init__()
-        self._log = logging.getLogger("Launch") if logger is None else logger.getChild("TooLow")
         self.set_min_value(min_value)
 
     def set_min_value(self, max_val):

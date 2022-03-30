@@ -9,6 +9,7 @@ class RoundingFilter(BaseFilter):
     def __init__(self, ndigits:int, logger=None) -> None:
         super().__init__()
         self._log = logging.getLogger("Launch") if logger is None else logger.getChild("TooLow")
+        self._log.setLevel(logging.NOTSET)
         self.set_ndigits(ndigits)
 
     def set_ndigits(self, ndigits:int):

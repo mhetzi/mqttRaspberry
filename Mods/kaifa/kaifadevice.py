@@ -108,10 +108,10 @@ class Reader(threading.Thread):
         self._shutdown = False
         while not self._shutdown:
             try:
-                self._master_log.getChild("KR").setLevel(logging.DEBUG)
+                self._master_log.setLevel(logging.DEBUG)
                 _, self._serial, self._supplier = kr.setup(self.kaifaConfig, self._master_log.getChild("KR"))
                 self._log.info(f"Serial Port {self._serial.name} erfolgreich geöffnet.")
-                kr.mainLoop(self.kaifaConfig, self._log, self._serial, self._supplier, self.callback)
+                kr.mainLoop(self.kaifaConfig, self._master_log.getChild("KR"), self._serial, self._supplier, self.callback)
             except serial.PortNotOpenError:
                 pass
             except Exception:
@@ -141,7 +141,7 @@ class Reader(threading.Thread):
     
     def _register(self):
         # Make New Device for Kaifa Smart Meter
-        self._log.debug("Build HA Device info...")
+        self._master_log.debug("Build HA Device info...")
         sys_dev = Discovery.Topics.get_std_devInf()
         self._devInfo = Discovery.DeviceInfo()
         
@@ -152,6 +152,7 @@ class Reader(threading.Thread):
         self._devInfo.IDs = [meterID]
 
         self._log = self._master_log.getChild(meterID)
+        #self._log.setLevel(logging.NOTSET)
         
         if self._config.get("obis_enabled", None) is None:
             self._config["obis_enabled"] = kaifatest.ALL_OBIS_NAMES
@@ -167,7 +168,7 @@ class Reader(threading.Thread):
             
             name = kaifatest.ObisNames.getFriendlyName(obis_str)
             if name is None:
-                self._log.warn(f"Obis String {obis_str} is unknown!")
+                self._log.warning(f"Obis String {obis_str} is unknown!")
                 continue
             
             sensor = Sensor.Sensor(
@@ -189,7 +190,7 @@ class Reader(threading.Thread):
                 sensor.state(value)
             self._sensors[obis_str] = sensor
         self._do_register = False
-        self._master_log.getChild("KR").setLevel(logging.INFO)
+        self._master_log.setLevel(logging.INFO)
     
     def resend(self):
         for sens in self._sensors.values():

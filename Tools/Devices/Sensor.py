@@ -21,8 +21,9 @@ class Sensor:
     _is_offline = True
     _has_offline = False
 
-    def __init__(self, logger:logging.Logger, pman: PluginManager, name: str, sensor_type: SensorDeviceClasses, measurement_unit: str='', ava_topic=None, ownOfflineTopic=False, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None, nodeID=None):
-        self._log = logger.getChild("Sensor")
+    def __init__(self, log:logging.Logger, pman: PluginManager, name: str, sensor_type: SensorDeviceClasses, measurement_unit: str='', ava_topic=None, ownOfflineTopic=False, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None, nodeID=None):
+        self._log = log.getChild("Sensor")
+        self._log.setLevel(logging.NOTSET)
         self._log.debug("Sensor Object für {} mit custom uid {} erstellt.".format(name, unique_id))
         self._pm = pman
         self._name = name
@@ -83,7 +84,7 @@ class Sensor:
         for filter in self._filters:
             ms = filter.filter(ms)
         if math.isnan(ms):
-            raise DontSend
+            raise SilentDontSend
         return ms
         
     def state(self, state=None, force_send=False, keypath=None) -> Union[mclient.MQTTMessageInfo, None]:
@@ -111,11 +112,11 @@ class Sensor:
                 return None
         payload = state.encode('utf-8') if self._jsattrib else str(state)
         if self._playload == payload and not force_send:
-            self._log.info("new payload == old payload ignoring...")
+            self._log.debug("new payload == old payload ignoring...")
             return None
         self._playload = payload
         if self._is_offline:
-            self._log.info("Was offline, become online")
+            self._log.debug("Was offline, become online")
             self.online()
             sleep(1)
         self._log.debug(f"Sending on {self._topics.state} payload {payload}")
@@ -129,12 +130,14 @@ class Sensor:
         return self._pm._client.publish(self._topics.state, payload=self._playload)
     
     def offline(self):
+        self._is_offline = True
         try:
             return self._pm._client.publish(self._topics.ava_topic, payload="offline", retain=True)
         except Exception as e:
             self._log.exception("Markieren des Sensors als offline fehlgeschlagen!")
             return None
     def online(self):
+        self._is_offline = False
         try:
             return self._pm._client.publish(self._topics.ava_topic, payload="online", retain=True)
         except Exception as e:

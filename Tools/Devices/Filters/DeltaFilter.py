@@ -10,6 +10,7 @@ class DeltaFilter(BaseFilter):
     def __init__(self, delta=None, logger=None) -> None:
         super().__init__()
         self._log = logging.getLogger("Launch") if logger is None else logger.getChild("Delta")
+        self._log.setLevel(logging.NOTSET)
         if delta != None:
             self.set_delta(delta)
 
