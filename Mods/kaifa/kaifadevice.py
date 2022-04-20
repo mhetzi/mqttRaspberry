@@ -152,7 +152,7 @@ class Reader(threading.Thread):
         self._devInfo.IDs = [meterID]
 
         self._log = self._master_log.getChild(meterID)
-        #self._log.setLevel(logging.NOTSET)
+        self._log.setLevel(logging.NOTSET)
         
         if self._config.get("obis_enabled", None) is None:
             self._config["obis_enabled"] = kaifatest.ALL_OBIS_NAMES
