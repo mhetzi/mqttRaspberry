@@ -202,7 +202,8 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
             sensor_type=st,
             ava_topic=TaCoePlugin.get_device_online_topic(addr),
             value_template="{{ value_json.value }}",
-            json_attributes=True
+            json_attributes=True,
+            measurement_unit=channel[3].getUnit()
         )
         return bs
 
