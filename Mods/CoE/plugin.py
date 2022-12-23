@@ -152,7 +152,7 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
         dev = autodisc.DeviceInfo()
         dev.IDs = [f"S_{addr}_{channel[0]}"]
         dev.via_device = self._via_devices[addr].IDs[0]
-        dev.name = f"DNode: {channel[0]}"
+        dev.name = f"ANode: {channel[0]}"
         dev.mfr = "TA"
         dev.sw_version = "1.0"
         dev.model = "CoE Analog"
@@ -196,7 +196,7 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
         bs = Sensor.Sensor(
             log=self._logger,
             pman=self._pluginManager,
-            name=f"DInput: {channel[1]}",
+            name=f"AInput: {channel[1]}",
             device=dev,
             unique_id=f"{dev.IDs[0]}_{channel[1]}",
             sensor_type=st,

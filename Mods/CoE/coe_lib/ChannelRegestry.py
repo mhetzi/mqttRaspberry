@@ -92,7 +92,7 @@ class CanNodeReg:
         return self.nodes[node].getBytesForPage(page)
 
 class AnalogChannels:
-    __slots__ = ("channels", "_nodes")
+    __slots__ = ("channels", "_nodes", "_dirty_pages", "on_changed_value")
 
     channels: dict[str, ANALOG_CHANNEL_TYPE]
     _nodes: CanNodeReg | None
@@ -102,6 +102,7 @@ class AnalogChannels:
         self._nodes = nodes
         self.channels = {}
         self._dirty_pages = {}
+        self.on_changed_value = self._on_changed_value
 
     def getChannelData(self, node: int, channel: int) -> ANALOG_CHANNEL_TYPE:
         ids = self.getChannelID(node, channel)
@@ -124,7 +125,7 @@ class AnalogChannels:
             if old_data is None or old_data[2] != data[2]:
                 self.on_changed_value(msg.ip, data)
 
-    def on_changed_value(self, addr: str, channel: ANALOG_CHANNEL_TYPE):
+    def _on_changed_value(self, addr: str, channel: ANALOG_CHANNEL_TYPE):
         raise NotImplementedError()
 
     def setChannel(self, node: int, channel: int, val: float, type: MeasureType) -> bytes:
