@@ -16,6 +16,15 @@ import Tools.ResettableTimer as rTimer
 from Tools.Config import BasicConfig, PluginConfig
 from Tools.Devices import Sensor, BinarySensor
 
+try:
+    import bitstring
+except ImportError as ie:
+    try:
+        import Tools.error as err
+        err.try_install_package('bitstring', throw=ie, ask=False)
+    except err.RestartError:
+        import bitstring
+
 from Mods.CoE.coe_lib.ChannelRegestry import CanNodeReg, AnalogChannels, DigitalChannels, ANALOG_CHANNEL_TYPE, DIGITAL_CHANNEL_TYPE
 from Mods.CoE.coe_lib.PacketReader import PacketReader
 from Mods.CoE.coe_lib import Datatypes
