@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 import threading
 import schedule
+import typing
 
 class ResettableTimer:
 
-    def __init__(self, interval:float, function, userval=None, autorun=True):
+    def __init__(self, interval:int, function:typing.Callable[[object|None], None], userval=None, autorun=True):
         self._userval = userval
         self._func = function
         self._interval = interval
@@ -27,7 +28,7 @@ class ResettableTimer:
         self.cancel()
 
     def start(self):
-        self._shed_task = schedule.every(interval=self._interval).seconds
+        self._shed_task = schedule.every(interval=int(self._interval)).seconds
         self._shed_task.do(self._bootstrap)
 
     def cancel(self):

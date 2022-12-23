@@ -48,6 +48,9 @@ class ConsoleInputTools:
                 return number
             except ValueError:
                 try:
+                    if isinstance(map_no_input_to, int):
+                        number = int(i)
+                        return number
                     number = float(i)
                     return number
                 except ValueError:

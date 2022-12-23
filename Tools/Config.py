@@ -209,6 +209,10 @@ class AbstractConfig:
     def __delitem__(self, key:str):
         pass
 
+    @abstractmethod
+    def markFileAsDirty(self):
+        pass
+
 class BasicConfig(AbstractConfig):
     _is_in_saving = False
     _dict_browser: DictBrowser = None
@@ -269,6 +273,8 @@ class BasicConfig(AbstractConfig):
         if delayed:
             self.autoSave.reset()
             return
+        if self.autoSave is not None:
+            self.autoSave.cancel()
         if not self.file_is_dirty:
             return
         self._is_in_saving = True
@@ -392,6 +398,10 @@ class BasicConfig(AbstractConfig):
         key = "PLUGINS/{}".format(key)
         del self._dict_browser[key]
         
+    def markFileAsDirty(self):
+        self.file_is_dirty = True
+        self.save(True)
+
 
 if FILEWATCHING:
     class FileWatchingConfig(watchevents.FileSystemEventHandler, BasicConfig):
@@ -474,6 +484,9 @@ class PluginConfig(AbstractConfig):
     def __delitem__(self, key:str):
         key = "{}/{}".format(self._pname, key)
         del self._main[key]
+        
+    def markFileAsDirty(self):
+        self._main.markFileAsDirty()
     
 
 def config_factory(pfad: pathlib.Path, logger: logging.Logger, do_load=False, filesystem_listen=True) -> BasicConfig:

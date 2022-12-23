@@ -45,6 +45,35 @@ class SensorDeviceClasses(DeviceClass, enum.Enum):
     POWER_FACTOR = "power_factor" # in percentage
     VOLTAGE = "voltage"
 
+    VA = "apparent_power" # Apparent power in VA.
+    AQI = "aqi" # Air Quality Index
+    CO2 = "carbon_dioxide" # Carbon Dioxide in CO2 (Smoke)
+    CO = "carbon_monoxide" # Carbon Monoxide in CO (Gas CNG/LPG)
+    DATE = "date" # Date string (ISO 8601)
+    DISTANCE = "distance" # Generic distance in km, m, cm, mm, mi, yd, or in
+    DURATION = "duration" # Duration in days, hours, minutes or seconds
+    FREQU = "frequency" # Frequency in Hz, kHz, MHz or GHz
+    GAS = "gas" # Gasvolume in m³ or ft³
+    MOISTURE = "moisture" # Percentage of water in a substance
+    MONETARY = "monetary" # The monetary value
+    NITROGEN_DIOXIDE = "nitrogen_dioxide" # Concentration of Nitrogen Dioxide in µg/m³
+    NITROGEN_MONOXIDE = "nitrogen_monoxide" # Concentration of Nitrogen Monoxide in µg/m³
+    NITROUS_OXIDE = "nitrous_oxide" # Concentration of Nitrous Oxide in µg/m³
+    OZONE = "ozone" # Concentration of Ozone in µg/m³
+    PM1 = "pm1" # Concentration of particulate matter less than 1 micrometer in µg/m³
+    PM1_0 = "pm10" # Concentration of particulate matter less than 10 micrometers in µg/m³
+    PM2_5 = "pm25" # Concentration of particulate matter less than 2.5 micrometers in µg/m³
+    PRECIPATION = "precipitation" # Accumulated precipitation in in or mm
+    PRECIPITATION_INTENS = "precipitation_intensity" # Precipitation intensity in in/d, in/h, mm/d, or mm/h
+    REACTIVE_PWR = "reactive_power" # Reactive power in var
+    SPEED = "speed" # Generic speed in ft/s, in/d, in/h, km/h, kn, m/s, mph, or mm/d
+    SUPLPGUR_DIOXIDE = "sulphur_dioxide" # Concentration of sulphur dioxide in µg/m³
+    VOC = "volatile_organic_compounds" # Concentration of volatile organic compounds in µg/m³
+    VOL = "volume" # Generic volume in L, mL, gal, fl. oz., m³, or ft³
+    WATER = "water" # Water consumption in L, gal, m³, or ft³
+    WEIGHT = "weight" # Generic mass in kg, g, mg, µg, oz, or lb
+    WIND_SPEED = "wind_speed" # Wind speed in ft/s, km/h, kn, m/s, or mph
+
     GENERIC_SENSOR = None
 
 
@@ -237,8 +266,8 @@ class Topics:
                 "identifiers": device.IDs,
                 "manufacturer": device.mfr,
                 "model": device.model,
-                "model": device.name,
-                "sw_version": device.sw_version
+                "name": device.name,
+                "sw_version": device.sw_version,
             }
             if device.via_device is not None:
                 p["device"]["via_device"] = device.via_device

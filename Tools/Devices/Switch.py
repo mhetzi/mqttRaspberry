@@ -10,12 +10,11 @@ class Switch:
     _pm: PluginManager
 
     def __init__(self, logger:logging.Logger, pman: PluginManager, callback, name: str, measurement_unit: str='', ava_topic=None, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None):
-        if not callable(callback):
-            raise AttributeError("callback not callable")
         self._log = logger.getChild("Switch")
         self._log.debug("Switch Object für {} mit custom uid {} erstellt.".format(name, unique_id))
         self._pm = pman
-        self._callback = callback
+        if callable(callback):
+            self._callback = callback
         self._name = name
         self._munit = measurement_unit
         self._vt = value_template
@@ -35,6 +34,9 @@ class Switch:
     def __del__(self):
         if self._pm is not None and self._pm._client is not None:
             self._pm._client.message_callback_remove(self._topics.command)
+
+    def _callback(self, message, state_requested=False):
+        raise NotImplementedError
 
     def register(self):
 
@@ -64,6 +66,8 @@ class Switch:
     def turn(self, state=None, qos=0):
         if not self.is_online:
             self.online()
+        if isinstance(state, dict):
+            state = json.dumps(state)
         payload = state.encode('utf-8')
         self._log.debug(f"Switch \n{self._topics.state =} \n{payload =}")
         try:
@@ -72,7 +76,7 @@ class Switch:
             self._log.exception(f"Error while sending {payload = }!")
 
     def turnOn(self, json=None, qos=0):
-        if json is not None and self._jsattrib:
+        if json is not None and not self._jsattrib:
             self._log.error("Sending json without declaring json_attributes true. Homeassistant does not like that!")
             raise AttributeError("Sending json without declaring json_attributes true. Homeassistant does not like that!")
         if json is None:
@@ -80,7 +84,7 @@ class Switch:
         return self.turn(json, qos=qos)
 
     def turnOff(self, json=None, qos=0):
-        if json is not None and self._jsattrib:
+        if json is not None and not self._jsattrib:
             self._log.error("Sending json without declaring json_attributes true. Homeassistant does not like that!")
             raise AttributeError("Sending json without declaring json_attributes true. Homeassistant does not like that!")
         if json is None:

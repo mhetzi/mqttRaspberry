@@ -29,7 +29,12 @@ import Tools.Config as tc
 from abc import ABC, abstractmethod
 
 class PluginInterface(ABC):
-    __slots__ = ()
+    __slots__ = ("_pluginManager", "_client", "_config", "_logger", "_device_id")
+
+    _client: mclient.Client
+    _config: tc.BasicConfig | tc.PluginConfig
+    _logger: logging.Logger
+    _device_id: str
     
     # Do necessary registrations, this gets called on (re)connect with the mqtt broker 
     @abstractmethod
@@ -184,6 +189,7 @@ class PluginManager:
             try:
                 x.register(self._wasConnected)
             except:
+                self.logger.exception("Fehler beim Regestrieren des Plugins, Retry")
                 try:
                     x.register()
                 except:

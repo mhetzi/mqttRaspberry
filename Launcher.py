@@ -182,7 +182,7 @@ class Launcher:
                     --no-reload             Neuladen des Server bei externen änderungen der Konfigurationsdatei ausschalten
                     -? -h --help            Diese Nachricht anzeigen
                     --door-hall-calibnoise  Noise Level von dem Halleffekt Sensor von Raspberry Tor ermitteln
-                    --configure-all-plugins Alle Plugins Konfigureieren, wird eines Konfiguriert wird es
+                    --configure-all-plugins Alle Plugins Konfigurieren, wird eines Konfiguriert wird es
                                             beim nächsten Start automatisch geladen.
                     --log                   Log in Datei speichern und nicht in der Konsole ausgeben
                     --debug                 Zeit im log anzeigen, überschreibt systemd logger format

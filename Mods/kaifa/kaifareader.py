@@ -101,7 +101,7 @@ class DataType:
     Structure = 0x02
     CompactArray = 0x13
 
-class Config:
+class   Config:
     def __init__(self, file):
         self._file = file
         self._config = {}

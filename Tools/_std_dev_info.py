@@ -45,6 +45,10 @@ class DevInfoFactory:
         MACs.append(open("/sys/devices/virtual/dmi/id/modalias").readline().replace("\n",""))
 
     @staticmethod
+    def read_machine_id(MACs:list, devInf:ad.DeviceInfo):
+        MACs.append(open("/etc/machine-id").readline().replace("\n",""))
+
+    @staticmethod
     def build_std_device_info(log: logging.Logger) -> ad.DeviceInfo:
         devInf = ad.DeviceInfo()
         devInf.name = platform.node()
@@ -54,10 +58,14 @@ class DevInfoFactory:
                 DevInfoFactory.read_pi_model(MACs, devInf, log)
             except:
                 log.exception("Kein Raspberry Pi Model")
-                try:
-                    DevInfoFactory.read_computer_model(MACs, devInf)
-                except:
-                    log.exception("Kein Computer Model")
+            try:
+                DevInfoFactory.read_machine_id(MACs, devInf)
+            except:
+                log.exception("Keine Machine ID")
+            try:
+                DevInfoFactory.read_computer_model(MACs, devInf)
+            except:
+                log.exception("Kein Computer Model")
             try:
                 ip_link_proc = subprocess.run(["ip", "link"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 for MAC in re.findall("..:..:..:..:..:..", ip_link_proc.stdout.decode('utf-8')):
