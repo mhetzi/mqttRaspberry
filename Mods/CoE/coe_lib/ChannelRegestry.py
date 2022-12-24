@@ -113,8 +113,10 @@ class AnalogChannels:
     
     def submitMessage(self, msg: Message.AnalogMessage):
         node = msg.canNode
-        for idx in range(0,3):
-            channel = msg.page_nr + idx - 1
+        for idx in range(0,4):
+            if msg.page_content[idx][1] == MeasureType.NONE:
+                continue
+            channel = (((msg.page_nr - 1) * 4) + idx) + 1
             ids = self.getChannelID(node, channel)
             data: ANALOG_CHANNEL_TYPE = (
                 node, channel, msg.page_content[idx][0], msg.page_content[idx][1]
@@ -175,7 +177,7 @@ class DigitalChannels:
     def submitMessage(self, msg: Message.DigitalMessage):
         node = msg.canNode
         for idx in range(0,15):
-            channel = msg.page_nr + idx
+            channel = ((msg.page_nr * 4) + idx)
             ids = self.getChannelID(node, channel)
             data: DIGITAL_CHANNEL_TYPE = (
                 node, channel, msg.page_content[idx]
