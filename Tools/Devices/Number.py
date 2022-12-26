@@ -80,7 +80,7 @@ class Number:
         if isinstance(state, dict):
             state = json.dumps(state)
         payload = state.encode('utf-8')
-        self._log.debug(f"Switch \n{self._topics.state =} \n{payload =}")
+        self._log.debug(f"number \n{self._topics.state =} \n{payload =}")
         try:
             return self._pm._client.publish(self._topics.state, payload=payload,qos=qos)
         except:

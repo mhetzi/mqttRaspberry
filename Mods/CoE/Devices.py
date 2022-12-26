@@ -97,6 +97,7 @@ class CoeOutNumber(Number):
         if data is None:
             raise Exception("Outgoind Data Packet is None")
         self._udp.sendBytes(data)
+        self.state(f)
     
     def state(self, state: float, qos=0):
         self._call_is_number(state)
