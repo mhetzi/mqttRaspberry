@@ -280,7 +280,10 @@ class BasicConfig(AbstractConfig):
         self._is_in_saving = True
         self._logger.debug("[1/3] Erstelle Backup der alten Konfig...")
         if self._conf_path.exists():
-            self._conf_path.with_suffix(".cbackup").unlink()
+            try:
+                self._conf_path.with_suffix(".cbackup").unlink()
+            except FileNotFoundError:
+                pass
             self._conf_path.rename(self._conf_path.with_suffix(".cbackup"))
         self._logger.debug("[2/3] Öffne Konfigurationsdatei zum speichern" + str(self._conf_path.absolute()))
         with self._conf_path.open("w") as json_file:

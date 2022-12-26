@@ -30,11 +30,12 @@ from Mods.CoE.coe_lib.PacketReader import PacketReader
 from Mods.CoE.coe_lib import Datatypes
 from Mods.CoE.coe_lib import Message
 from Mods.CoE import getConfigKey
-from Mods.CoE.Switch import CoeOutSwitch
+from Mods.CoE.Devices import CoeOutSwitch, CoeOutNumber
 from Mods.CoE.udp_sender import UDP_Sender
+from Mods.CoE import get_sensor_class_from_mt
 
 class TaCoePlugin(Tools.PluginManager.PluginInterface):
-    __slots__ = ("_udp", "_timer", "_from_cmi_analog", "_from_cmi_digital", "sensors", "_via_devices", "_switches", "_to_cmi_digital", "_upd_senders", "_last_online")
+    __slots__ = ("_udp", "_timer", "_from_cmi_analog", "_from_cmi_digital", "sensors", "_via_devices", "_switches", "_to_cmi_digital", "_to_cmi_analog", "_upd_senders", "_last_online")
 
     _udp: PacketReader | None
     _timer: schedule.Job
@@ -46,6 +47,7 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
     @staticmethod
     def get_device_online_topic(addr: str):
         return f"device_online/TA_CMI_{addr}/online"
+
 
     def __init__(self, client: mclient.Client, opts: BasicConfig, logger: logging.Logger, device_id: str):
         self._client = client
@@ -60,6 +62,7 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
         self._from_cmi_digital: dict[int, DigitalChannels] = {}
         self._from_cmi_analog: dict[int, AnalogChannels] = {}
         self._to_cmi_digital: dict[str, DigitalChannels] = {}
+        self._to_cmi_analog: dict[str, AnalogChannels] = {}
 
         self._switches = {}
         self.sensors: dict[str, Sensor.Sensor | BinarySensor.BinarySensor] = {}            
@@ -69,6 +72,56 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
 
     def sendStates(self):
         pass
+
+    def register_switches(self, cdata: dict, cmi: str, dev: autodisc.DeviceInfo):
+        for idx in range(0, len(cdata["switches"])):
+            s = cdata["switches"][idx]
+            sw = CoeOutSwitch(
+                logger=self._logger,
+                pman=self._pluginManager,
+                name=s["name"],
+                node=s["node"],
+                channel= s["channel"],
+                device=dev,
+                udp_sender=self._upd_senders[f"{cmi}_D"]
+            )
+
+            def update_last_state(b:bool):
+                self._config["CMIs"][cmi]["switches"][idx]["last"] = b
+                
+            sw._call_is_on_off = update_last_state
+
+            if s.get("last", False):
+                sw.turnOn()
+            else:
+                sw.turnOff()
+            sw.register()
+
+    def register_analog_outs(self, cdata: dict, cmi: str, dev: autodisc.DeviceInfo):
+        for idx in range(0, len(cdata["analog"])):
+            s = cdata["analog"][idx]
+            sw = CoeOutNumber(
+                logger=self._logger,
+                pman=self._pluginManager,
+                name=s["name"],
+                node=s["node"],
+                channel= s["channel"],
+                device=dev,
+                udp_sender=self._upd_senders[f"{cmi}_A"],
+                measure_type=Datatypes.MeasureType(s["mt"])
+            )
+            sw.max = 110
+            sw.min = -50
+            sw.step = 0.5
+
+            def update_last_state(n: float):
+                self._config["CMIs"][cmi]["analog"][idx]["last"] = n
+                
+            sw._call_is_number = update_last_state
+
+            sw.state(self._config["CMIs"][cmi]["analog"][idx]["last"])
+            sw.register()
+
 
     def register(self, wasConnected=False):
         if self._udp is None:
@@ -82,8 +135,11 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
             self._via_devices = {}
 
             for cmi, cdata in cmis.items():
-                self._to_cmi_digital[cmi] = DigitalChannels(CanNodeReg())
-                self._upd_senders[cmi] = UDP_Sender(self._to_cmi_digital[cmi], cmi, 5441, self._logger)
+                reg = CanNodeReg()
+                self._to_cmi_digital[cmi] = DigitalChannels(reg)
+                self._to_cmi_analog[cmi] = AnalogChannels(reg)
+                self._upd_senders[f"{cmi}_D"] = UDP_Sender(self._to_cmi_digital[cmi], cmi, 5441, self._logger)
+                self._upd_senders[f"{cmi}_A"] = UDP_Sender(self._to_cmi_analog[cmi],  cmi, 5441, self._logger)
 
                 dev = autodisc.DeviceInfo()
                 dev.IDs.append(f"TACMIIP: {cmi}")
@@ -92,29 +148,12 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
                 dev.name = f"CMI: {cmi}"
                 dev.via_device = autodisc.Topics.get_std_devInf().IDs[0]
                 self._via_devices[cmi] = dev
-
-                for idx in range(0, len(cdata["switches"])):
-                    s = cdata["switches"][idx]
-                    sw = CoeOutSwitch(
-                        logger=self._logger,
-                        pman=self._pluginManager,
-                        name=s["name"],
-                        node=s["node"],
-                        channel= s["channel"],
-                        device=dev,
-                        udp_sender=self._upd_senders[cmi]
-                    )
-        
-                    def update_last_state(b:bool):
-                        self._config["CMIs"][cmi]["switches"][idx]["last"] = b
-                        
-                    sw._call_is_on_off = update_last_state
-
-                    if s.get("last", False):
-                        sw.turnOn()
-                        continue
-                    sw.turnOff()
-                    sw.register()
+                if not isinstance(cdata.get("switches", None), list):
+                    cdata["switches"] = []
+                self.register_switches(cdata, cmi, dev)
+                if not isinstance(cdata.get("analog", None), list):
+                    cdata["analog"] = []
+                self.register_analog_outs(cdata, cmi, dev)
                 
 
         if self._config.get(f"{getConfigKey()}/deregister", False):
@@ -157,41 +196,7 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
         dev.sw_version = "1.0"
         dev.model = "CoE Analog"
 
-        st = Sensor.SensorDeviceClasses.GENERIC_SENSOR
-        match channel[3]:
-            case Datatypes.MeasureType.TEMPERATURE | Datatypes.MeasureType.CELSIUS | Datatypes.MeasureType.KELVIN:
-                st = Sensor.SensorDeviceClasses.TEMPERATURE
-            case Datatypes.MeasureType.SECONDS | Datatypes.MeasureType.MINUTES | Datatypes.MeasureType.DAYS | Datatypes.MeasureType.HOURS:
-                st = Sensor.SensorDeviceClasses.DURATION
-            case Datatypes.MeasureType.KILOWATT:
-                st = Sensor.SensorDeviceClasses.POWER
-            case Datatypes.MeasureType.KILOWATTHOURS | Datatypes.MeasureType.MEGAWATTHOURS:
-                st = Sensor.SensorDeviceClasses.ENERGY
-            case Datatypes.MeasureType.VOLT:
-                st = Sensor.SensorDeviceClasses.VOLTAGE
-            case Datatypes.MeasureType.MILLIAMPERE:
-                st = Sensor.SensorDeviceClasses.CURRENT
-            case Datatypes.MeasureType.LITER:
-                st = Sensor.SensorDeviceClasses.WATER
-            case Datatypes.MeasureType.Hz:
-                st = Sensor.SensorDeviceClasses.FREQU
-            case Datatypes.MeasureType.BAR:
-                st = Sensor.SensorDeviceClasses.PRESSURE
-            case Datatypes.MeasureType.KILLOMETER | Datatypes.MeasureType.METER | Datatypes.MeasureType.MILLIMETER:
-                st = Sensor.SensorDeviceClasses.DISTANCE
-            case Datatypes.MeasureType.KUBIKMETER:
-                st = Sensor.SensorDeviceClasses.VOL
-            case Datatypes.MeasureType.KMH | Datatypes.MeasureType.METERSECOND:
-                st = Sensor.SensorDeviceClasses.SPEED
-            case Datatypes.MeasureType.MILLIMETER_DAY | Datatypes.MeasureType.MILLIMETER_HOUR:
-                st = Sensor.SensorDeviceClasses.PRECIPITATION_INTENS
-            case Datatypes.MeasureType.MILLIMETER:
-                st = Sensor.SensorDeviceClasses.PRECIPATION
-            case Datatypes.MeasureType.EUR | Datatypes.MeasureType.USD:
-                st = Sensor.SensorDeviceClasses.MONETARY
-            case _:
-                self._logger.warning("MeasurementType from CoE Packet unknown!")
-                st = Sensor.SensorDeviceClasses.GENERIC_SENSOR
+        st = get_sensor_class_from_mt(channel[3])
 
         bs = Sensor.Sensor(
             log=self._logger,

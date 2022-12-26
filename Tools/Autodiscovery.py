@@ -26,6 +26,7 @@ class Component(enum.Enum):
     SENSOR  = "sensor"
     LOCK    = "lock"
     CLIMATE = "climate"
+    NUMBER  = "number"
 
 class DeviceClass:
     pass

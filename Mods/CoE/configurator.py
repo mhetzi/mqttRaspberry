@@ -38,7 +38,7 @@ class CoEConfigurator:
             if action == 2:
                 if edit_cmi is None:
                     edit_cmi = ConsoleInputTools.get_input("IP Addresse des CMI: ")
-                    config["CMIs"][edit_cmi] = {"switches": []}
+                    config["CMIs"][edit_cmi] = {"switches": [], "analog": []}
                 if ConsoleInputTools.get_bool_input("Schalter bearbeiten? ", False):
                     print("Folgende Schalter wurden hinzugefügt: ")
                     for idx in range(0, len(config["CMIs"][edit_cmi]["switches"])):
@@ -53,6 +53,29 @@ class CoEConfigurator:
                         #s["name"], cmi, s["node"], s["channel"]
                     s = {"name": name, "node": node, "channel": channel-1, "last": False}
                     config["CMIs"][edit_cmi]["switches"].append(s)
+                    config.markFileAsDirty()
+                if ConsoleInputTools.get_bool_input("Analoge Ausgänge bearbeiten? "):
+                    print("Folgende Ausgänge wurden hinzugefügt: ")
+                    if not isinstance(config["CMIs"][edit_cmi].get("analog", None), list):
+                        config["CMIs"][edit_cmi]["analog"] = []
+                    for idx in range(0, len(config["CMIs"][edit_cmi]["analog"])):
+                        print(f" {idx+1}: {config['CMIs'][edit_cmi]['analog'][idx]['name']}")
+                    nr: int = ConsoleInputTools.get_number_input("Welche Nr. soll entfernt werden? 0 für keiner. ", int(0))
+                    if nr > 0 and nr <= len(config["CMIs"][edit_cmi]["analog"]):
+                        del config["CMIs"][edit_cmi]["analog"][nr-1]
+                        continue
+                    name = ConsoleInputTools.get_input("Welcher Name soll der Ausgang bekommen? ", False, None)
+                    node = ConsoleInputTools.get_number_input("Auf welche CAN Node ID soll der Ausgang senden? ")
+                    channel = ConsoleInputTools.get_number_input("Auf welchen Netzwerkausgang soll der Ausgang senden? ")
+                    from Mods.CoE.coe_lib.Datatypes import MeasureType
+                    print("Verfügbare Datentypen: ")
+                    for data in MeasureType:
+                        print(f"{data.name} = {data.value}")
+                        
+                    mt = MeasureType(int(ConsoleInputTools.get_number_input("Um welchen Datentyp handelt es sich? ", 0)))
+                        #s["name"], cmi, s["node"], s["channel"]
+                    s = {"name": name, "node": node, "channel": channel-1, "last": 0.0, "mt": mt}
+                    config["CMIs"][edit_cmi]["analog"].append(s)
                     config.markFileAsDirty()
 
 

@@ -1,6 +1,8 @@
 from . import Message
 from .Datatypes import MeasureType
 import bitstring
+from math import ceil
+import struct
 
 ANALOG_CHANNEL_TYPE = tuple[int, int, float, MeasureType]
 DIGITAL_CHANNEL_TYPE = tuple[int, int, bool]
@@ -49,15 +51,28 @@ class CanNode:
             for _ in range(0, 11):
                 barr.append(int(0).to_bytes(1, byteorder="little"))
         elif page > 0 and page < 9:
-            vals: tuple[float, float,float, float] = self.pages[page][:4]
-            types: tuple[MeasureType, MeasureType,MeasureType, MeasureType] = self.pages[page][4:]
-            
-            for v in range(0, 5):
-                barr.append(int(vals[v] * types[v].getScaleFactor()))
-            for v in range(0, 5):
-                barr.append(types[v].to_bytes(1, "little"))
-
+            #vals: tuple[float, float,float, float] = self.pages[page][:4]
+            #types: tuple[MeasureType, MeasureType,MeasureType, MeasureType] = self.pages[page][4:]
+            #
+            #for v in range(0, 4):
+            #    barr.append(int(vals[v] * types[v].getScaleFactor()).to_bytes(2, "big"))
+            #for v in range(0, 4):
+            #    barr.append(types[v].to_bytes(1, "big"))
+            barr.append(
+                struct.pack(
+                    "<hhhhcccc",
+                    int(self.pages[page][0] * self.pages[page][4].getScaleFactor()),
+                    int(self.pages[page][1] * self.pages[page][5].getScaleFactor()),
+                    int(self.pages[page][2] * self.pages[page][6].getScaleFactor()),
+                    int(self.pages[page][3] * self.pages[page][7].getScaleFactor()),
+                    self.pages[page][4].to_bytes(1, "little"),
+                    self.pages[page][5].to_bytes(1, "little"),
+                    self.pages[page][6].to_bytes(1, "little"),
+                    self.pages[page][7].to_bytes(1, "little")
+                )
+            )
         return barr.bytes
+
 
 class CanNodeReg:
     __slots__ = ("nodes")
@@ -134,7 +149,7 @@ class AnalogChannels:
         channel = channel
         ids = self.getChannelID(node, channel)
         self.channels[ids] = (node, channel, val, type)
-        page = int(channel / 4)
+        page = int(ceil(channel / 4))
         page_idx = int(channel % 4)
 
         if self._dirty_pages.get(node, None) is None:
