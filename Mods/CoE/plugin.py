@@ -180,7 +180,7 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
             name=f"DInput: {channel[0]}_{channel[1]}",
             binary_sensor_type=BinarySensor.BinarySensorDeviceClasses.GENERIC_SENSOR,
             device=dev,
-            unique_id=f"{dev.IDs[0]}_{channel[1]}",
+            unique_id=f"{dev.IDs[0]}_{channel[0]}_{channel[1]}",
             ava_topic=TaCoePlugin.get_device_online_topic(addr),
             value_template="{{ value_json.value }}",
             json_attributes=True
@@ -201,9 +201,9 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
         bs = Sensor.Sensor(
             log=self._logger,
             pman=self._pluginManager,
-            name=f"AInput: {channel[1]}",
+            name=f"AInput: {channel[0]}_{channel[1]}",
             device=dev,
-            unique_id=f"{dev.IDs[0]}_{channel[1]}",
+            unique_id=f"{dev.IDs[0]}_{channel[0]}_{channel[1]}",
             sensor_type=st,
             ava_topic=TaCoePlugin.get_device_online_topic(addr),
             value_template="{{ value_json.value }}",
