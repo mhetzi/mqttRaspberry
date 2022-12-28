@@ -71,7 +71,8 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
         self._pluginManager = pm
 
     def sendStates(self):
-        pass
+        for sensor in self.sensors.values():
+            sensor.resend()
 
     def register_switches(self, cdata: dict, cmi: str, dev: autodisc.DeviceInfo):
         for idx in range(0, len(cdata["switches"])):

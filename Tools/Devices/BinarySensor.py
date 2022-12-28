@@ -31,6 +31,7 @@ class BinarySensor:
             node_id=nodeID,
             subnode_id=subnode_id
             )
+        self._state = ""
     
     def register(self):
 
@@ -55,9 +56,9 @@ class BinarySensor:
 
     def turn(self, state=None):
         if isinstance(state, dict):
-            state = json.dumps(state)
+            self._state = json.dumps(state)
         try:
-            self._pm._client.publish(self._topics.state, payload=state.encode('utf-8'))
+            self._pm._client.publish(self._topics.state, payload=self._state.encode('utf-8'))
         except:
             self._log.exception(f"Error while sending {state = }")
 
@@ -83,6 +84,9 @@ class BinarySensor:
             return self.turnOn()
         self._log.debug("{}: ausschalten.".format(self._name))
         return self.turnOff()
+
+    def resend(self):
+        return self._pm._client.publish(self._topics.state, payload=self._state)
 
     def reset(self):
         pass
