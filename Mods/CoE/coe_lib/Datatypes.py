@@ -47,7 +47,7 @@ class MeasureType(enum.IntEnum):
     def getScaleFactor(self):
         __scaling = {
             MeasureType.TEMPERATURE: 10,
-            MeasureType.KILOWATT: 100,
+            MeasureType.KILOWATT: 10,
             MeasureType.KILOWATTHOURS: 10,
             MeasureType.PERCENT: 10
         }
