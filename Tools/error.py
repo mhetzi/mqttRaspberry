@@ -8,9 +8,12 @@ class RestartError(Exception):
 class InSystemModeError(Exception):
    pass
 
+def get_base_prefix_compat():
+    """Get base/real prefix, or sys.prefix if there is none."""
+    return getattr(sys, "base_prefix", None) or getattr(sys, "real_prefix", None) or sys.prefix
+
 def is_venv():
-   return (hasattr(sys, 'real_prefix') or
-         (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix))
+   return get_base_prefix_compat() != sys.prefix
 
 def try_install_package(package:str, throw=ImportError(), ask=True, retry=5):
    if not is_venv():
