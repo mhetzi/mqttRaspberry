@@ -32,31 +32,7 @@ from time import sleep
 POWER_SWITCHE_ONLINE_TOPIC = "online/{}/logindPower"
 SLEEP_SWITCHE_ONLINE_TOPIC = "online/{}/logindSleep"
 
-global_glibthread = None
-
-class GlibThread(threading.Thread):
-    def __init__(self):
-        super().__init__(name="logind_ml", daemon=False)
-        self.loop = GLib.MainLoop()
-    
-    #Only starts Thread if not alive
-    def safe_start(self):
-        if not self.is_alive():
-            self.start()
-
-    def run(self):
-        self.loop.run()
-    def shutdown(self):
-        self.loop.quit()
-    
-    @staticmethod
-    def getThread():
-        global global_glibthread
-
-        if isinstance(global_glibthread, GlibThread):
-            return global_glibthread
-        glibthread = GlibThread()
-        return glibthread
+from Mods.linux.dbus_common import GlibThread, init_dbus
 
 class IdleMonitor:
     _idle_watch_id = None
@@ -240,7 +216,7 @@ class logindDbus:
         self._login1 = None
         self._logger = logger
         self._mainloop = None
-        self.thread_gml = GlibThread.getThread()
+        self.thread_gml = GlibThread.getThread().add_instance_lock()
         
         self.sleeping = False
         self.shutdown = False
@@ -257,10 +233,7 @@ class logindDbus:
         self._idle_monitor = None
     
     def _setup_dbus_interfaces(self):
-        from dbus.mainloop.glib import DBusGMainLoop
-        self._mainloop = DBusGMainLoop(set_as_default=True)
-        import dbus.mainloop.glib as gml
-        gml.threads_init()
+        init_dbus()
 
         self._bus    = dbus.SystemBus(mainloop=self._mainloop)
         self._session_bus = dbus.SessionBus(mainloop=self._mainloop)
@@ -517,15 +490,15 @@ class logindConfig:
 
     def configure(self, conff: conf.BasicConfig, logger:logging.Logger):
         from Tools import ConsoleInputTools
-        conf = conff.PluginConfig(conff, "logind")
+        con = conf.PluginConfig(conff, "logind")
 
-        conf["allow_power_off"] = ConsoleInputTools.get_bool_input("\nErlaube Ausschalten: ", True)
-        conf["allow_suspend"] = ConsoleInputTools.get_bool_input("\nErlaube Bereitschaftsmodus: ", True)
-        conf["allow_reboot"] = ConsoleInputTools.get_bool_input("\nErlaube Neustarten: ", True)
-        conf["allow_inhibit"] = ConsoleInputTools.get_bool_input("\nErlaube Blockieren von Schlafmodus: ", True)
+        con["allow_power_off"] = ConsoleInputTools.get_bool_input("\nErlaube Ausschalten: ", True)
+        con["allow_suspend"] = ConsoleInputTools.get_bool_input("\nErlaube Bereitschaftsmodus: ", True)
+        con["allow_reboot"] = ConsoleInputTools.get_bool_input("\nErlaube Neustarten: ", True)
+        con["allow_inhibit"] = ConsoleInputTools.get_bool_input("\nErlaube Blockieren von Schlafmodus: ", True)
         if ConsoleInputTools.get_bool_input("\nBenutze anderen Namen: ", True):
-            conf["custom_name"] = ConsoleInputTools.get_input("\nDen Namen Bitte: ", True)
-        conf["inactivity_ms"] = ConsoleInputTools.get_number_input("\nInaktivität nach x Millisekunden: ")
+            con["custom_name"] = ConsoleInputTools.get_input("\nDen Namen Bitte: ", True)
+        con["inactivity_ms"] = ConsoleInputTools.get_number_input("\nInaktivität nach x Millisekunden: ")
 
 
 class PluginLoader:
