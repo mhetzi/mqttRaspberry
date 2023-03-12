@@ -1,6 +1,9 @@
+import gi
 gi.require_version('GLib', '2.0')
 from gi.repository import GLib
 __global_glibthread = None
+
+import threading
 
 class GlibThread(threading.Thread):
     def __init__(self):
