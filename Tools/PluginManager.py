@@ -160,7 +160,7 @@ class PluginManager:
                 else:
                     self.logger.info("Modul {} wird von der Konfig nicht spezifiziert, werde es wieder entladen...".format(str(foo)))
             except ImportError as x:
-                self.logger.exception("Kann Modul {} nicht laden!".format(foo))
+                self.logger.exception("Kann Modul {} nicht laden!".format(x))
             except AttributeError:
                 self.logger.warning("Modul hat nur attribute: {}. PluginLoader ist nicht dabei!".format(foo.__dict__))
             except RuntimeError as x:

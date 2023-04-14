@@ -4,6 +4,14 @@ import logging
 import sys
 from typing import Union
 from dataclasses import dataclass
+try:
+    import dataclasses_json
+except ImportError as ie:
+    import Tools.error as err
+    try:
+        err.try_install_package('dataclasses-json', throw=ie, ask=False) # Dont ask, plugin is wanted! So try to get it up and running
+    except err.RestartError:
+        import dataclasses_json
 from dataclasses_json import dataclass_json
 from dataclasses_json.api import DataClassJsonMixin
 

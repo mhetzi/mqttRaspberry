@@ -2,15 +2,6 @@
 Könnte sein dass es nur als Benutzerservice (systemctl --user) funktioniert!
 Could be that this Plugin only works when run as user service (systemctl --user)!
 """
-try:
-    import dbus
-except ImportError as ie:
-    try:
-        import Tools.error as err
-        err.try_install_package('dbus-python', throw=ie, ask=True)
-    except err.RestartError:
-        import dbus
-
 from typing import IO, Union
 import paho.mqtt.client as mclient
 import Tools.Config as conf
@@ -23,16 +14,49 @@ import schedule
 import json
 import os
 import threading
-import gi
-gi.require_version('GLib', '2.0')
-from gi.repository import GLib
+#try:
+#    import gi
+#    gi.require_version('GLib', '2.0')
+#    from gi.repository import GLib
+#except Exception as e:
+#    logging.exception(e)
+#    pass
+
+try:
+    import dasbus
+except ImportError as ie:
+    try:
+        import Tools.error as err
+        err.try_install_package('dasbus', throw=ie, ask=True)
+    except err.RestartError:
+        import dasbus
+
+from dasbus.connection import SystemMessageBus
+from dasbus.connection import SessionMessageBus
+
+import Mods.linux.dbus_common
 
 from time import sleep
 
 POWER_SWITCHE_ONLINE_TOPIC = "online/{}/logindPower"
 SLEEP_SWITCHE_ONLINE_TOPIC = "online/{}/logindSleep"
 
-from Mods.linux.dbus_common import GlibThread, init_dbus
+#from Mods.linux.dbus_common import GlibThread, init_dbus
+
+class PluginLoader:
+
+    @staticmethod
+    def getConfigKey():
+        return "logind"
+
+    @staticmethod
+    def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        return logindDbus(client, opts, logger.getChild("logind"), device_id)
+
+    @staticmethod
+    def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
+        logindConfig().configure(conf, logger.getChild("logind"))
+
 
 class IdleMonitor:
     _idle_watch_id = None
@@ -41,7 +65,7 @@ class IdleMonitor:
     _is_idle  = False
     __sheduler_fails = 0
 
-    def __init__(self, interval:int, log:logging.Logger, pm: PluginMan.PluginManager, bus: dbus.SystemBus, netName="E_NOTSET"):
+    def __init__(self, interval:int, log:logging.Logger, pm: PluginMan.PluginManager, bus: SessionMessageBus, netName="E_NOTSET"):
         self._log  = log.getChild("Mutter.IdleMonitor")
         self._timeout = interval
 
@@ -60,23 +84,22 @@ class IdleMonitor:
         if self._register_delay_id is not None:
             schedule.cancel_job(self._register_delay_id)
         if self._idle_watch_id is not None:
-            self.idlemon.RemoveWatch(self._idle_watch_id)
+            self.proxy.RemoveWatch(self._idle_watch_id)
         if self._active_watch_id is not None:
-            self.idlemon.RemoveWatch(self._active_watch_id)
+            self.proxy.RemoveWatch(self._active_watch_id)
         self._bsensor.turnOff()
     
     def _delayed_register(self):
         try:
-            self.proxy     = self._bus.get_object('org.gnome.Mutter.IdleMonitor', '/org/gnome/Mutter/IdleMonitor/Core')
-            self.idlemon   = dbus.Interface(self.proxy, "org.gnome.Mutter.IdleMonitor")
+            self.proxy     = self._bus.get_proxy('org.gnome.Mutter.IdleMonitor', '/org/gnome/Mutter/IdleMonitor/Core')
 
-            self._idle_watch_id = self.idlemon.AddIdleWatch(self._timeout)
-            self._active_watch_id = self.idlemon.AddUserActiveWatch()
+            self._idle_watch_id = self.proxy.AddIdleWatch(self._timeout)
+            self._active_watch_id = self.proxy.AddUserActiveWatch()
 
-            self.idlemon.connect_to_signal("WatchFired", self.isIdle)   
+            self.proxy.WatchFired.connect(lambda x: self.isIdle(x))   
 
             self._bsensor.register()
-            idleing = self.idlemon.GetIdletime()
+            idleing = self.proxy.GetIdletime()
             if idleing > self._timeout:
                 self._bsensor.turnOff()
                 self._is_idle = True
@@ -89,8 +112,8 @@ class IdleMonitor:
             if self._IdelingPolling is not None:
                 schedule.cancel_job(self._IdelingPolling)
             self._IdelingPolling = schedule.every(2).minutes.do(self.isIdleDead)
-        except dbus.exceptions.DBusException:
-            self._log.warning("DBus Signale von Mutter verbinden fehlgeschlagen! Wird in 30 Sekunden erneut probiert,,,")
+        except Exception:
+            self._log.exception("DBus Signale von Mutter verbinden fehlgeschlagen! Wird in 30 Sekunden erneut probiert,,,")
             pass
 
     def register(self):
@@ -101,20 +124,23 @@ class IdleMonitor:
 
     def isIdle(self, id):
         self._log.debug("isIdle: ID: {}".format(id))
-        if id == self._idle_watch_id:
-            self._bsensor.turnOff()
-            if self._active_watch_id is not None:
-                self.idlemon.RemoveWatch(self._active_watch_id)
-            self._active_watch_id = self.idlemon.AddUserActiveWatch()
-        elif id == self._active_watch_id:
-            self._bsensor.turnOn()
-            if self._active_watch_id is not None:
-                self.idlemon.RemoveWatch(self._active_watch_id)
-            self._active_watch_id = None
+        try:
+            if id == self._idle_watch_id:
+                self._bsensor.turnOff()
+                if self._active_watch_id is not None:
+                    self.proxy.RemoveWatch(self._active_watch_id)
+                self._active_watch_id = self.proxy.AddUserActiveWatch()
+            elif id == self._active_watch_id:
+                self._bsensor.turnOn()
+                if self._active_watch_id is not None:
+                    self.proxy.RemoveWatch(self._active_watch_id)
+                self._active_watch_id = None
+        except:
+            self._log.exception("isIdle Exception!")
 
     def isIdleDead(self):
         try:
-            idleing = self.idlemon.GetIdletime()
+            idleing = self.proxy.GetIdletime()
             isIdle = idleing > self._timeout
             if isIdle != self._is_idle:
                 self._log.info("Polling Idle zeigt dass uns das Event nicht erreicht hat.")
@@ -125,7 +151,7 @@ class IdleMonitor:
                     self._log.warning("Polling Idle zeigt dass uns das Event definitiv nicht erreicht hat. Signale werden neu eingerichte...")
                     self.stop()
                     self.register()
-        except dbus.exceptions.DBusException:
+        except Exception:
             self._log.exception("isIdleDead():")
             from time import sleep
             sleep(2.5)
@@ -142,25 +168,29 @@ class Session:
     isGUI = False
     _lock = None
 
-    def __init__(self, log:logging.Logger, pm: PluginMan.PluginManager, bus_path:str, bus: dbus.SystemBus):
-        self._proxy     = bus.get_object('org.freedesktop.login1', bus_path)
-        self.session    = dbus.Interface(self._proxy, 'org.freedesktop.login1.Session')
-        self.properties = dbus.Interface(self._proxy, 'org.freedesktop.DBus.Properties')
-        self.isGUI      = "seat" in self.properties.Get("org.freedesktop.login1.Session", "Seat")[0]
-        self.name       = self.properties.Get("org.freedesktop.login1.Session", "Id")
-        self.isRemote   = self.properties.Get("org.freedesktop.login1.Session", "Remote")
-        self.uname      = self.properties.Get("org.freedesktop.login1.Session", "Name")
-        self.uID        = self.properties.Get("org.freedesktop.login1.Session", "User")
-        self.lockedHint = self.properties.Get("org.freedesktop.login1.Session", "LockedHint")
+    _glib_thr = None
+
+    def __init__(self, log:logging.Logger, pm: PluginMan.PluginManager, bus_path:str, bus: SystemMessageBus):
+        self._proxy     = bus.get_proxy('org.freedesktop.login1', bus_path)
+        self._proxy_m     = bus.get_proxy('org.freedesktop.login1', bus_path)
+        self.session    = bus.get_proxy('org.freedesktop.login1.Session', bus_path)
+        #self.properties = dbus.Interface(self._proxy, 'org.freedesktop.DBus.Properties')
+        self.isGUI      = "seat" in self._proxy.Get("org.freedesktop.login1.Session", "Seat")[0]
+        self.name       = self._proxy.Get("org.freedesktop.login1.Session", "Id")
+        self.isRemote   = self._proxy.Get("org.freedesktop.login1.Session", "Remote")
+        self.uname      = self._proxy.Get("org.freedesktop.login1.Session", "Name")
+        self.uID        = self._proxy.Get("org.freedesktop.login1.Session", "User")
+        self.lockedHint = self._proxy.Get("org.freedesktop.login1.Session", "LockedHint")
 
         self._log = log.getChild("Session")
         self._pman = pm
 
         self._lock_notify   = None
         self._unlock_notify = None
+        self._glib_thr      = Mods.linux.dbus_common.init_dbus()
 
     def _process_prop_changed(self, src, dic, arr):
-        self.lockedHint: dbus.Boolean = self.properties.Get("org.freedesktop.login1.Session", "LockedHint")
+        self.lockedHint = self._proxy.Get("org.freedesktop.login1.Session", "LockedHint")
         if self.lockedHint:
             self._lock.lock()
         else:
@@ -177,9 +207,9 @@ class Session:
             )
             self._lock.register()
 
-            self._lock_notify    = self.session.connect_to_signal("Lock",   self._lock.lock  )
-            self._unlock_notify  = self.session.connect_to_signal("Unlock", self._lock.unlock)
-            self.properties.connect_to_signal("PropertiesChanged", self._process_prop_changed)
+            self._lock_notify    = self._proxy.Lock.connect  ( self._lock.lock()  )
+            self._unlock_notify  = self._proxy.Unlock.connect( self._lock.unlock() )
+            self._proxy.PropertiesChanged.connect( self._process_prop_changed )
             self._process_prop_changed(None, None, None)
     
     def stop(self):
@@ -189,15 +219,20 @@ class Session:
             self._unlock_notify.remove()
 
     def terminate(self):
-        self.session.Terminate()
+        self._proxy.Terminate()
     
     def lock(self):
         self._log.info("OK Locking session")
-        self.session.Lock()
+        try:
+            self._proxy._handler._call_method("org.freedesktop.login1.Session", "Lock", None, None)
+            #self._proxy_m.Lock()
+        except:
+            self._log.exception("Lock failed!")
 
     def unloock(self):
         self._log.info("OK Unlocking session")
-        self.session.Unlock()
+        self._proxy._handler._call_method("org.freedesktop.login1.Session", "Unlock", None, None)
+        #self._proxy_m.Unlock()
     
     def callback(self, state_requested=False, message=LockState.LOCK):
         if message == LockState.LOCK:
@@ -216,7 +251,6 @@ class logindDbus:
         self._login1 = None
         self._logger = logger
         self._mainloop = None
-        self.thread_gml = GlibThread.getThread().add_instance_lock()
         
         self.sleeping = False
         self.shutdown = False
@@ -233,17 +267,21 @@ class logindDbus:
         self._idle_monitor = None
     
     def _setup_dbus_interfaces(self):
-        init_dbus()
+        #init_dbus()
 
-        self._bus    = dbus.SystemBus(mainloop=self._mainloop)
-        self._session_bus = dbus.SessionBus(mainloop=self._mainloop)
-        self._proxy  = self._bus.get_object('org.freedesktop.login1', '/org/freedesktop/login1')
-        self._login1 = dbus.Interface(self._proxy, 'org.freedesktop.login1.Manager')
-
-        self._nsess_notiy = self._login1.connect_to_signal("SessionNew",     lambda sID, path: self._mod_session(add=True,  path=path) )
-        self._rsess_notiy = self._login1.connect_to_signal("SessionRemoved", lambda sID, path: self._mod_session(add=False, path=path) )
+        self._bus    = SystemMessageBus()
+        self._session_bus = SessionMessageBus()
+        self._proxy  = self._bus.get_proxy('org.freedesktop.login1', '/org/freedesktop/login1')
         
-        for session in self._login1.ListSessions():
+        #self._login1 = dbus.Interface(self._proxy, 'org.freedesktop.login1.Manager')
+
+        self._nsess_notiy = self._proxy.SessionNew.connect(     lambda sID, path: self._mod_session(add=True,  path=path) )
+        self._rsess_notiy = self._proxy.SessionRemoved.connect( lambda sID, path: self._mod_session(add=False,  path=path) )
+
+        #self._nsess_notiy = self._login1.connect_to_signal("SessionNew",     lambda sID, path: self._mod_session(add=True,  path=path) )
+        #self._rsess_notiy = self._login1.connect_to_signal("SessionRemoved", lambda sID, path: self._mod_session(add=False, path=path) )
+        
+        for session in self._proxy.ListSessions():
             self._logger.info("Neue Benutzersession gefunden {} auf {} in Pfad {}.".format(session[2], session[3], session[4]))
             self._mod_session(add=True, path=session[4])
         
@@ -273,7 +311,7 @@ class logindDbus:
         netName = autodisc.Topics.get_std_devInf().name if self._config.get("custom_name", None) is None else self._config.get("custom_name", None)
         # Kann ich ausschalten?
 
-        if self._login1.CanPowerOff() == "yes" and self._config.get("allow_power_off", True):
+        if self._proxy.CanPowerOff() == "yes" and self._config.get("allow_power_off", True):
             self._switches["isOn"] = Switch(
                 self._logger,
                 self._pluginManager,
@@ -281,11 +319,11 @@ class logindDbus:
                 name="{} Eingeschaltet".format(netName),
                 ava_topic=POWER_SWITCHE_ONLINE_TOPIC.format(self._pluginManager._client_name)
             )
-            self._bus.add_signal_receiver(handler_function=self.sendShutdown, signal_name="PrepareForShutdown")
+            self._proxy.PrepareForShutdown.connect(self.sendShutdown)
             self._switches["isOn"].register()
         # Kann ich suspend?
 
-        if self._login1.CanSuspend() == "yes" and self._config.get("allow_suspend", True):
+        if self._proxy.CanSuspend() == "yes" and self._config.get("allow_suspend", True):
             self._switches["suspend"] = Switch(
                 self._logger,
                 self._pluginManager,
@@ -293,11 +331,11 @@ class logindDbus:
                 name="{} Schlafen".format(netName), icon="mdi:sleep",
                 ava_topic=SLEEP_SWITCHE_ONLINE_TOPIC.format(self._pluginManager._client_name)
             )
-            self._bus.add_signal_receiver(handler_function=self.sendSuspend, signal_name="PrepareForSleep")
+            self._proxy.PrepareForSleep.connect(self.sendSuspend)
             self._switches["suspend"].register()
         # Kann ich neustarten?
 
-        if self._login1.CanReboot() == "yes" and self._config.get("allow_reboot", True):
+        if self._proxy.CanReboot() == "yes" and self._config.get("allow_reboot", True):
             self._switches["reboot"] = Switch(
                 self._logger,
                 self._pluginManager,
@@ -323,18 +361,16 @@ class logindDbus:
         if self._idle_monitor is not None:
             self._idle_monitor.register()
 
-        if not wasConnected:
-            self.thread_gml.safe_start()
 
     def inhibit_delay(self, sleep=False):
         if sleep:
-            delay_lock = self._login1.Inhibit(
+            delay_lock = self._proxy.Inhibit(
                 'sleep:shutdown',
                 'mqttScript',
                 'Publish Powerstatus (Standby) to Network',
                 'delay'
                 )
-            self._sleep_delay_lock = os.fdopen(delay_lock.take(), "r", -1)
+            self._sleep_delay_lock = os.fdopen(delay_lock, "r", -1)
             self._logger.debug("Sleep delayed")
         elif not sleep and self._sleep_delay_lock is not None:
             self._sleep_delay_lock.close()
@@ -371,23 +407,15 @@ class logindDbus:
             self._logger.info("[4/6] IdleMonitor entfernt Signale und Watches...")
             self._idle_monitor.stop()
 
-        self._logger.info("[5/6] Beende Glib MainLoop")
-        self.thread_gml.shutdown()
-        try:
-            self._logger.info("[6/6] Warten auf Glib MainLoop")
-            self.thread_gml.join()
-        except:
-            self._logger.debug("Glib MainLoop join failed!")
-
     def inhibit(self):
         if self.inhibit_lock > 1:
             return self.inhibit_lock
-        self.inhibit_lock = self._login1.Inhibit(
+        self.inhibit_lock = self._proxy.Inhibit(
             'sleep:shutdown',
             'mqttScript',
             'Inhibation requested from HomeAssistant',
             'block'
-            ).take()
+            )
         return self.inhibit_lock
     
     def uninhibit(self):
@@ -397,18 +425,18 @@ class logindDbus:
 
     def findGraphicalSession(self) -> str:
         uid = os.getuid()
-        arr = self._login1.ListSessions()
+        arr = self._proxy.ListSessions()
         for a in arr:
             if uid == a[1] and "seat" in a[4]:
                 return str(a[0])
     
     def lockGraphicSession(self):
         session_id = self.findGraphicalSession()
-        self._login1.LockSession(session_id)
+        self._proxy.LockSession(session_id)
 
     def unlockGraphicSession(self):
         session_id = self.findGraphicalSession()
-        self._login1.UnlockSession(session_id)
+        self._proxy.UnlockSession(session_id)
 
     def sendSuspend(self, sig):
         self._logger.debug(f"Suspend: {sig = }")
@@ -463,15 +491,15 @@ class logindDbus:
             return
         msg = message.payload.decode('utf-8')
         if userdata == "isOn" and msg == "OFF":
-            self._login1.PowerOff(True)
+            self._proxy.PowerOff(True)
             self._switches["isOn"].turnOff()
         elif userdata == "suspend" and msg == "ON":
             self.sleeping = True
-            self._login1.Suspend(True)
+            self._proxy.Suspend(True)
             self._switches["suspend"].turnOn()
             self._idle_monitor.stop()
         elif userdata == "reboot" and msg == "ON": 
-            self._login1.Reboot(True)
+            self._proxy.Reboot(True)
         elif userdata == "inhibit" and msg == "ON":
             if self.inhibit_lock < 1:
                 self.inhibit()
@@ -499,18 +527,3 @@ class logindConfig:
         if ConsoleInputTools.get_bool_input("\nBenutze anderen Namen: ", True):
             con["custom_name"] = ConsoleInputTools.get_input("\nDen Namen Bitte: ", True)
         con["inactivity_ms"] = ConsoleInputTools.get_number_input("\nInaktivität nach x Millisekunden: ")
-
-
-class PluginLoader:
-
-    @staticmethod
-    def getConfigKey():
-        return "logind"
-
-    @staticmethod
-    def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        return logindDbus(client, opts, logger.getChild("logind"), device_id)
-
-    @staticmethod
-    def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
-        logindConfig().configure(conf, logger.getChild("logind"))
