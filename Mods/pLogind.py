@@ -218,6 +218,9 @@ class Session:
         if self._unlock_notify is not None:
             self._unlock_notify.remove()
 
+        if self._glib_thr is not None:
+            Mods.linux.dbus_common.deinit_dbus()
+
     def terminate(self):
         self._proxy.Terminate()
     
