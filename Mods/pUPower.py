@@ -54,7 +54,9 @@ class Device:
             "NativePath": self._proxy.Get("org.freedesktop.UPower.Device", "NativePath").get_string(),
             "Serial": self._proxy.Get("org.freedesktop.UPower.Device", "Serial").get_string()
         }
-        self._sensor.state(state, force_send, keypath="soc")
+        if self._sensor is None:
+            return None
+        return self._sensor.state(state, force_send, keypath="soc")
 
     def register(self):
             self._sensor = Sensor(
@@ -75,6 +77,13 @@ class Device:
     def stop(self):
         pass
 
+    def resend(self):
+        if self._sensor is None:
+            self.register()
+            return
+        self._sensor.register()
+        self._process_prop_changed(None, None, None, True)
+
 class uPowerDbus(PluginMan.PluginInterface):
     _sleep_delay_lock: Union[IO, None] = None
 
@@ -87,7 +96,7 @@ class uPowerDbus(PluginMan.PluginInterface):
         #self.thread_gml = GlibThread.getThread()
         self._glib_thread = None
 
-        self.sessions = {}
+        self.sessions: dict[str, Device] = {}
         self._config = conf.PluginConfig(opts, PluginLoader.getConfigKey())
 
     
@@ -123,8 +132,12 @@ class uPowerDbus(PluginMan.PluginInterface):
 
     def register(self, wasConnected=False):
         self._setup_dbus_interfaces()
+        if wasConnected:
+            self.sendStates()
 
     def sendStates(self):
+        for dev in self.sessions.values():
+            pass
         return super().sendStates()
 
     def stop(self):
