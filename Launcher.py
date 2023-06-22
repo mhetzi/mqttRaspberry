@@ -31,6 +31,8 @@ else:
     threading.Thread._bootstrap_original = threading.Thread._bootstrap
     threading.Thread._bootstrap = _name_hack
 
+import Tools.PropagetingThread as propt
+propt.installProagetingThread()
 
 try:
     import setproctitle
@@ -112,13 +114,14 @@ class Launcher:
             while True:
                 try:
                     self.mqtt_client.loop_start()
+                    thread: propt.PropagatingThread = self.mqtt_client._thread
+                    exc = thread.join()
+                    if isinstance(exc, BaseException):
+                        raise exc
                     break
-                except ConnectionRefusedError:
+                except ConnectionRefusedError | ssl.SSLEOFError | OSError:
                    self.mqtt_client, deviceID = self.pm.start_mqtt_client()
                    continue
-                except ssl.SSLEOFError:
-                    self.mqtt_client, deviceID = self.pm.start_mqtt_client()
-                    continue
                 except Exception as e:
                     raise e
             return True

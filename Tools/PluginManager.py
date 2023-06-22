@@ -239,6 +239,7 @@ class PluginManager:
     def start_mqtt_client(self):
         self.logger.debug("Erstelle MQTT Client...")
         cc = self.config.get_client_config()
+        
         client = mclient.Client(client_id=cc.client_id, clean_session=cc.clean_session)
         self.logger.debug("Client erstellt.")
 
