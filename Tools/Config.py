@@ -285,7 +285,7 @@ class BasicConfig(AbstractConfig):
             except FileNotFoundError:
                 pass
             self._conf_path.rename(self._conf_path.with_suffix(".cbackup"))
-        self._logger.debug("[2/3] Öffne Konfigurationsdatei zum speichern" + str(self._conf_path.absolute()))
+        self._logger.debug("[2/3] Öffne Konfigurationsdatei zum speichern " + str(self._conf_path.absolute()))
         with self._conf_path.open("w") as json_file:
             json.dump(self._config, json_file, indent=2)
             self._logger.info("[3/3] Gespeichert...")

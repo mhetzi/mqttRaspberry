@@ -27,6 +27,7 @@ class Component(enum.Enum):
     LOCK    = "lock"
     CLIMATE = "climate"
     NUMBER  = "number"
+    BUTTON = "button"
 
 class DeviceClass:
     pass
@@ -229,6 +230,9 @@ class Topics:
             p["payload_on"]  = 1
             p["payload_off"] = 0
         
+        if self._component == Component.BUTTON:
+            p["payload_press"] = "p"
+
         if icon is not None:
             p["icon"] = icon
 
