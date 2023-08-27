@@ -34,6 +34,7 @@ except ImportError as ie:
 
 from dasbus.connection import SystemMessageBus
 from dasbus.connection import SessionMessageBus
+from dasbus.error import DBusError
 
 import Mods.linux.dbus_common
 
@@ -95,10 +96,13 @@ class SystemdUnit:
     def switch_toggle(self, state_requested=False, message=None):
         if message is not None:
             msg = message.payload.decode('utf-8')
-            if msg == "OFF":
-                self._proxy.Stop("replace")
-            elif msg == "ON":
-                self._proxy.Start("replace")
+            try:
+                if msg == "OFF":
+                    self._proxy.Stop("replace")
+                elif msg == "ON":
+                    self._proxy.Start("replace")
+            except DBusError:
+                self._logger.exception("Setting Systemd Unit failed.")
 
     def register(self, plugin_manager: PluginMan.PluginManager):
         self._button = Button(

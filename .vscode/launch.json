@@ -46,14 +46,39 @@
             "justMyCode": false
         },
         {
-            "name": "Python: Launcher Fedora",
+            "name": "Python: Launcher Fedora Configure",
             "type": "python",
             "request": "launch",
             "module": "Launcher",
             "console": "integratedTerminal",
             "args": [
                 "--config", "/opt/mqttScripts/config/mqttra.config",
-                "--debug", "systemd"
+                "--debug", "systemd",
+                "--configure"
+            ],
+            "justMyCode": false
+        },
+        {
+            "name": "Python: Launcher Debug",
+            "type": "python",
+            "request": "launch",
+            "module": "Launcher",
+            "console": "integratedTerminal",
+            "args": [
+                "--config", "/opt/mqttScripts/config/mqttra_debug.config",
+                "--debug", "--systemd"
+            ],
+            "justMyCode": false
+        },
+        {
+            "name": "Python: Launcher Debug conf",
+            "type": "python",
+            "request": "launch",
+            "module": "Launcher",
+            "console": "integratedTerminal",
+            "args": [
+                "--config", "/opt/mqttScripts/config/mqttra_debug.config",
+                "--debug", "--configure"
             ],
             "justMyCode": false
         },
@@ -90,7 +115,7 @@
         },
         {
             "name": "Python: Current File (External Terminal)",
-            "type": "python3",
+            "type": "python",
             "request": "launch",
             "program": "${file}",
             "console": "externalTerminal"
