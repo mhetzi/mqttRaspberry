@@ -221,15 +221,8 @@ class Launcher:
             err.set_system_mode(systemd)
         except:
             pass
-        
-        if door_hall_calib_mode:
-            self._log.info("Ermittle noise für Halleffekt Sensor (Raspberry Tor)...")
-            import Mods.DoorOpener.calibrate as calib
-            calib.Calibrate.run_calibration(conf=self.config, logger=self._log)
-            self._log.info("Noise ermittelt. Beende anwendung.")
-            return
 
-        elif conf_all_mods:
+        if conf_all_mods:
             pm = pman.PluginManager(self._log, self.config)
             pm.run_configurator()
             self.config.save()

@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import pathlib
-from Tools.PluginManager import PluginManager
 import paho.mqtt.client as mclient
 import Tools.Config as conf
 import logging
@@ -15,7 +14,12 @@ from Tools.Devices.Sensor import Sensor, SensorDeviceClasses
 from Tools.Devices.Filters.DeltaFilter import DeltaFilter
 from Tools.Devices.Filters.TooHighFilter import TooHighFilter
 
-class PluginLoader:
+from Tools import PluginManager
+
+class PluginLoader(PluginManager.PluginLoader):
+    @staticmethod
+    def getNeededPipModules() -> list[str]:
+        return []
 
     @staticmethod
     def getConfigKey():
@@ -30,8 +34,8 @@ class PluginLoader:
         OneWireConf(conf).run()
 
 
-class OneWireTemp:
-    _plugin_manager: PluginManager = None
+class OneWireTemp(PluginManager.PluginInterface):
+    _plugin_manager: PluginManager.PluginManager | None = None
 
     def _reset_daily(self):
         for d in self._paths:

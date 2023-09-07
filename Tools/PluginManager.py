@@ -26,15 +26,16 @@ except ImportError as ie:
 
 import Tools.Config as tc
 
-from abc import ABC, abstractmethod
+import dataclasses
+from abc import ABC, abstractmethod, abstractstaticmethod
 
+@dataclasses.dataclass(slots=True)
 class PluginInterface(ABC):
-    __slots__ = ("_pluginManager", "_client", "_config", "_logger", "_device_id")
-
     _client: mclient.Client
     _config: tc.BasicConfig | tc.PluginConfig
     _logger: logging.Logger
     _device_id: str
+    _pluginManager = None
     
     # Do necessary registrations, this gets called on (re)connect with the mqtt broker 
     @abstractmethod
@@ -51,6 +52,31 @@ class PluginInterface(ABC):
     # Give the PluginManager instance to the Plugin
     @abstractmethod
     def set_pluginManager(self, pm): pass
+
+
+@dataclasses.dataclass(slots=True)
+class PluginLoader(ABC):
+    @staticmethod
+    @abstractmethod 
+    def getConfigKey() -> str: raise NotImplementedError()
+
+    @staticmethod
+    @abstractmethod 
+    def getPlugin(client: mclient.Client, opts: tc.BasicConfig, logger: logging.Logger, device_id: str) -> PluginInterface: raise NotImplementedError()
+
+    @staticmethod
+    @abstractmethod 
+    def runConfig(conf: tc.BasicConfig, logger:logging.Logger): raise NotImplementedError()
+
+    @staticmethod
+    @abstractmethod
+    def getNeededPipModules() -> list[str]: raise NotImplementedError()
+
+@dataclasses.dataclass(slots=True)
+class ConfiguratorInterface(ABC):
+    @staticmethod
+    @abstractmethod
+    def getConfigSchema() -> dict: raise NotImplementedError()
 
 class PluginManager:
 
@@ -134,10 +160,10 @@ class PluginManager:
                 continue
             self.configured_list[key] = plugin
 
-    def needed_plugins(self, get_config=False):
+    def needed_plugins(self, get_config=False) -> list[PluginLoader]:
         import Mods
         import importlib.util
-        self.needed_list = []
+        self.needed_list: list[PluginLoader] = []
 
         p = Path(Mods.__path__[0])
         lp = [str(x) for x in list(p.glob('*.py')) if str(x.name).startswith("p", 0)]
@@ -152,7 +178,7 @@ class PluginManager:
                 spec = importlib.util.spec_from_file_location("module.name", x)
                 foo = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(foo)
-                pInfo = foo.PluginLoader()
+                pInfo: PluginLoader = foo.PluginLoader()
 
                 if pInfo.getConfigKey() in plugin_names or get_config:
                     self.needed_list.append(pInfo)
@@ -166,10 +192,11 @@ class PluginManager:
             except RuntimeError as x:
                 self.logger.exception("Modul %s hat RuntimeError verursacht. Die Nachricht war: %s ", foo, x.args)
             except err.InSystemModeError:
-                self.logger.error("Kann Modul nicht installieren. In Systemd Modus!")
-            except Exception as x:
-                self.logger.exception("Modul {} hat eine Exception verursacht. NICHT laden.".format(foo), x)
+                self.logger.exception("Kann Modul nicht installieren. In Systemd Modus!")
+            except Exception as ex:
+                self.logger.exception("Modul %s hat eine Exception verursacht. NICHT laden.", x)
             i += 1
+        return self.needed_list
 
     def register_mods(self):
         self.logger.info("Regestriere Plugins in MQTT")
@@ -224,6 +251,10 @@ class PluginManager:
                 pass
             except Exception as x:
                 self.logger.exception(x)
+
+    def get_configs(self):
+        self.needed_plugins(True)
+        return self.needed_list
 
     def run_configurator(self):
         self.needed_plugins(True)

@@ -1,21 +1,13 @@
 # -*- coding: utf-8 -*-
-from ast import Delete
-from typing import Union
 from Tools import ConsoleInputTools
-from Tools.PluginManager import PluginManager, PluginInterface
+from Tools import PluginManager
 from Tools.Config import PluginConfig
 
 import paho.mqtt.client as mclient
 import Tools.Config as conf
 import logging
-import os
-import re
-import schedule
-import io
-import json
-import math
 
-class PluginLoader:
+class PluginLoader(PluginManager.PluginLoader):
 
     @staticmethod
     def getConfigKey():
@@ -30,8 +22,16 @@ class PluginLoader:
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
         KaifaPluginConfig(conf).run()
 
+    @staticmethod
+    def getNeededPipModules() -> list[str]:
+        try:
+            import serial
+        except ImportError as ie:
+            return ["pyserial"]
+        return []
 
-class KaifaPluginConfig:
+
+class KaifaPluginConfig(PluginManager.PluginInterface):
     def __init__(self, conf: conf.BasicConfig):
         self.c = PluginConfig(conf, PluginLoader.getConfigKey())
         meters = self.c.get("meter", default=None)

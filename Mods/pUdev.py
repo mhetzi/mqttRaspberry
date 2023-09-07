@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from typing import Union
 from Tools import ConsoleInputTools
-from Tools.PluginManager import PluginManager, PluginInterface
+from Tools import PluginManager
 from Tools.Config import PluginConfig
 
 import paho.mqtt.client as mclient
@@ -16,7 +16,7 @@ import math
 
 from Tools.Devices.Sensor import Sensor
 
-class PluginLoader:
+class PluginLoader(PluginManager.PluginLoader):
 
     @staticmethod
     def getConfigKey():
@@ -30,6 +30,14 @@ class PluginLoader:
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
         UdevPluginConfig(conf).run()
+    
+    @staticmethod
+    def getNeededPipModules() -> list[str]:
+        try:
+            import pyudev
+        except ImportError as ie:
+            return ["pyudev"]
+        return []
 
 
 class UdevPluginConfig:

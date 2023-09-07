@@ -4,14 +4,13 @@ import Tools.Config as conf
 import Tools.Autodiscovery as ad
 from Tools.Devices.Sensor import Sensor, SensorDeviceClasses
 from Tools.Devices.Filters import DeltaFilter, TooHighFilter, MinTimeElapsed
-from Tools.PluginManager import PluginManager
+from Tools import PluginManager
 
 import logging
 import os
-import re
 import schedule
 
-class PluginLoader:
+class PluginLoader(PluginManager.PluginLoader):
 
     @staticmethod
     def getConfigKey():
@@ -24,12 +23,17 @@ class PluginLoader:
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
         RaspberryPiCpuTempConfig(conf).run()
+    
+    @staticmethod
+    def getNeededPipModules() -> list[str]:
+        return []
 
 
-class RaspberryPiCpuTemp:
+class RaspberryPiCpuTemp(PluginManager.PluginInterface):
     _shed_Job = None
     _sensor: Sensor
-    _plugin_manager: PluginManager
+    _plugin_manager: PluginManager.PluginManager
+    _file = None
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         self._config = conf.PluginConfig(opts, "rpiCPUtemp")

@@ -9,8 +9,9 @@ import schedule
 import weakref
 
 from Mods.victron.Constants import CONFIG_NAME
+from Tools.PluginManager import PluginLoader as PLuginLoadeInterface
 
-class PluginLoader:
+class PluginLoader(PLuginLoadeInterface):
 
     @staticmethod
     def getConfigKey():
@@ -29,6 +30,14 @@ class PluginLoader:
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
         VeDirectConfig(conf).run()
+
+    @staticmethod
+    def getNeededPipModules() -> list[str]:
+        try:
+            import serial
+        except ImportError as ie:
+            return ["pyserial"]
+        return []
 
 
 class VeDirectConfig:

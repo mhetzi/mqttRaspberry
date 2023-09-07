@@ -6,7 +6,9 @@ import Tools.Config as conf
 import logging
 import subprocess
 
-class PluginLoader:
+from Tools import PluginManager
+
+class PluginLoader(PluginManager.PluginLoader):
 
     @staticmethod
     def getConfigKey():
@@ -19,9 +21,13 @@ class PluginLoader:
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
         ShellSwitchConf(conf).run()
+    
+    @staticmethod
+    def getNeededPipModules() -> list[str]:
+        return []
 
 
-class ShellSwitch:
+class ShellSwitch(PluginManager.PluginInterface):
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         self._config = conf.PluginConfig(opts, "ShellSwitch")
@@ -126,6 +132,8 @@ class ShellSwitch:
             if self._config["entrys"][name].get("setOnLoad", True):
                 self.exec_switch(name, self._config["entrys"][name]["wasOn"], simulate=True)
 
+    def set_pluginManager(self, pm):
+        pass
 
 class ShellSwitchConf:
     def __init__(self, opts: conf.BasicConfig):

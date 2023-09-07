@@ -9,8 +9,9 @@ import os
 import errno
 import json
 
+from Tools import PluginManager
 
-class PluginLoader:
+class PluginLoader(PluginManager.PluginLoader):
 
     @staticmethod
     def getConfigKey():
@@ -24,9 +25,13 @@ class PluginLoader:
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
         from Tools import ConsoleInputTools
         conf["JsonPipe/Path"] = ConsoleInputTools.get_input("Pfad zur namedpipe angeben. (Pipe muss nicht vorhanden sein.)", True)
+    
+    @staticmethod
+    def getNeededPipModules() -> list[str]:
+        return []
 
 
-class JsonPipe(threading.Thread):
+class JsonPipe(threading.Thread, PluginManager.PluginInterface):
 
     def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         threading.Thread.__init__(self)
@@ -90,3 +95,6 @@ class JsonPipe(threading.Thread):
             self.__client.publish(d["t"], d["p"], d.get("r", False))
         except json.decoder.JSONDecodeError:
             self.__logger.error("Json konnte nicht dekodiert werden.")
+
+    def set_pluginManager(self, pm):
+        pass
