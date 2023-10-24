@@ -35,7 +35,7 @@ from Mods.CoE.udp_sender import UDP_Sender
 from Mods.CoE import get_sensor_class_from_mt
 
 class TaCoePlugin(Tools.PluginManager.PluginInterface):
-    __slots__ = ("_udp", "_timer", "_from_cmi_analog", "_from_cmi_digital", "sensors", "_via_devices", "_switches", "_to_cmi_digital", "_to_cmi_analog", "_upd_senders", "_last_online")
+    __slots__ = ("_udp", "_timer", "_from_cmi_analog", "_from_cmi_digital", "sensors", "_via_devices", "_switches", "_to_cmi_digital", "_to_cmi_analog", "_upd_senders", "_last_online", "_pluginManager")
 
     _udp: PacketReader | None
     _timer: schedule.Job
