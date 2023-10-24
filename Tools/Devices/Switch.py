@@ -8,6 +8,7 @@ import enum
 
 class Switch:
     _pm: PluginManager
+    _last_state = None
 
     def __init__(self, logger:logging.Logger, pman: PluginManager, callback, name: str, measurement_unit: str='', ava_topic=None, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None):
         self._log = logger.getChild("Switch")
@@ -64,6 +65,7 @@ class Switch:
         self._callback(state_requested=True, message=None)
 
     def turn(self, state=None, qos=0):
+        self._last_state = state
         if not self.is_online:
             self.online()
         if isinstance(state, dict):
@@ -105,3 +107,6 @@ class Switch:
         except:
             self._log.exception("online(): ")
             return None
+    
+    def resend(self):
+        self.turn(self._last_state)

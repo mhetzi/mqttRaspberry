@@ -1,30 +1,54 @@
 # -*- coding: utf-8 -*-
 import paho.mqtt.client as mclient
-from Tools import Config, Pin, Autodiscovery, ConsoleInputTools
+from Tools import Config, Autodiscovery, ConsoleInputTools
 import logging
 import time
 import schedule
+from Tools import PluginManager
+
+DEPENDENCIES_LOADED=True
 
 try:
     import gpiozero
+    from Tools import Pin
 except ImportError as ie:
-    try:
-        import Tools.error as err
-        err.try_install_package('gpiozero', throw=ie, ask=True)
-    except err.RestartError:
-        import gpiozero
+    DEPENDENCIES_LOADED = False
 
-class PluginLoader:
+class PluginLoader(PluginManager.PluginLoader):
+    @staticmethod
+    def getNeededPipModules() -> list[str]:
+        try:
+            import gpiozero
+            from Tools import Pin
+        except ImportError as ie:
+            return ["gpiozero"]
+        return []
+
     @staticmethod
     def getConfigKey():
         return "RaspberryPiGPIO"
 
     @staticmethod
     def getPlugin(client: mclient.Client, opts: Config.BasicConfig, logger: logging.Logger, device_id: str):
+        try:
+            import gpiozero
+            from Tools import Pin
+        except ImportError as ie:
+            import Tools.error as err
+            err.try_install_package('gpiozero', throw=ie, ask=False)
         return RaspberryPiGpio(client, opts, logger, device_id)
 
     @staticmethod
     def runConfig(conf: Config.BasicConfig, logger:logging.Logger):
+        try:
+            import gpiozero
+            from Tools import Pin
+        except ImportError as ie:
+            try:
+                import Tools.error as err
+                err.try_install_package('gpiozero', throw=ie, ask=False)
+            except err.RestartError:
+                import gpiozero
         conf["RaspberryPiGPIO"] = []
         while True:
             from builtins import KeyboardInterrupt
@@ -50,115 +74,115 @@ class PluginLoader:
                 if i != "y" and i != "Y":
                     break
 
+if DEPENDENCIES_LOADED:
+    class RaspberryPiGpio:
 
-class RaspberryPiGpio:
+        def __init__(self, client: mclient.Client, opts: Config.BasicConfig, logger: logging.Logger, device_id: str):
+            self.__client = client
+            self.__logger = logger.getChild("rPiGPIO")
+            self._config = opts
+            self._pins = []
+            self._device_id = device_id
+            self._registered_callback_topics = []
 
-    def __init__(self, client: mclient.Client, opts: Config.BasicConfig, logger: logging.Logger, device_id: str):
-        self.__client = client
-        self.__logger = logger.getChild("rPiGPIO")
-        self._config = opts
-        self._pins = []
-        self._device_id = device_id
-        self._registered_callback_topics = []
+        def register(self):
+            self.__logger.debug("Regestriere Raspberry GPIO...")
+            from gpiozero.pins.native import NativeFactory
+            from gpiozero import Device
 
-    def register(self):
-        self.__logger.debug("Regestriere Raspberry GPIO...")
-        from gpiozero.pins.native import NativeFactory
-        from gpiozero import Device
+            Device.pin_factory = NativeFactory()
 
-        Device.pin_factory = NativeFactory()
+            for p in self._config.get("RaspberryPiGPIO", []):
+                pin = Pin.Pin(p["Pin"], Pin.PinDirection(p["direction"]))
+                if p.get("pulse_width", None) is not None:
+                    pin.set_pulse_width(p["pulse_width"])
+                d = {
+                    "n": p["name"],
+                    "p": pin
+                }
+                if pin.get_direction() == Pin.PinDirection.OUT:
+                    t = self._config.get_autodiscovery_topic(Autodiscovery.Component.SWITCH, p["name"], Autodiscovery.SensorDeviceClasses.GENERIC_SENSOR)
+                else:
+                    t = self._config.get_autodiscovery_topic(Autodiscovery.Component.BINARY_SENROR, p["name"], Autodiscovery.BinarySensorDeviceClasses.GENERIC_SENSOR)
+                d["t"] = t
+                if p.get("meassurement_value", None) is not None:
+                    d["mv"] = p["meassurement_value"]
+                else:
+                    d["mv"] = ""
+                if p.get("isPulse", None) is not None:
+                    d["isPulse"] = p["isPulse"]
+                else:
+                    d["isPulse"] = False
+                if d.get("init", None) is not None:
+                    pin.output(d["init"])
+                self._pins.append(d)
+                self.__logger.debug("Pin config gebaut. N: {}, P: {}, D: {}, isPulse: {}".format(d["n"], p["Pin"], pin.get_direction(), d["isPulse"]))
+            for d in self._pins:
+                self.register_pin(d)
+            self.__logger.debug("Regestriere Schedule Jobs für ¼ Stündliche resend Aufgaben...")
+            schedule.every(15).minutes.do(RaspberryPiGpio.send_updates, self)
 
-        for p in self._config.get("RaspberryPiGPIO", []):
-            pin = Pin.Pin(p["Pin"], Pin.PinDirection(p["direction"]))
-            if p.get("pulse_width", None) is not None:
-                pin.set_pulse_width(p["pulse_width"])
-            d = {
-                "n": p["name"],
-                "p": pin
-            }
-            if pin.get_direction() == Pin.PinDirection.OUT:
-                t = self._config.get_autodiscovery_topic(Autodiscovery.Component.SWITCH, p["name"], Autodiscovery.SensorDeviceClasses.GENERIC_SENSOR)
-            else:
-                t = self._config.get_autodiscovery_topic(Autodiscovery.Component.BINARY_SENROR, p["name"], Autodiscovery.BinarySensorDeviceClasses.GENERIC_SENSOR)
-            d["t"] = t
-            if p.get("meassurement_value", None) is not None:
-                d["mv"] = p["meassurement_value"]
-            else:
-                d["mv"] = ""
-            if p.get("isPulse", None) is not None:
-                d["isPulse"] = p["isPulse"]
-            else:
-                d["isPulse"] = False
-            if d.get("init", None) is not None:
-                pin.output(d["init"])
-            self._pins.append(d)
-            self.__logger.debug("Pin config gebaut. N: {}, P: {}, D: {}, isPulse: {}".format(d["n"], p["Pin"], pin.get_direction(), d["isPulse"]))
-        for d in self._pins:
-            self.register_pin(d)
-        self.__logger.debug("Regestriere Schedule Jobs für ¼ Stündliche resend Aufgaben...")
-        schedule.every(15).minutes.do(RaspberryPiGpio.send_updates, self)
-
-    def register_pin(self, d: dict):
-        pin = d["p"]
-        name = d["n"]
-        topic = d["t"]
-        meas_val = d["mv"]
-        self.__logger.debug("Regestriere {} unter {}".format(name, topic.state))
-
-        if pin.get_direction() == Pin.PinDirection.OUT:
-            uid = "switch.rPiGPIO-{}.{}".format(Autodiscovery.Topics.get_std_devInf().pi_serial, name.replace(" ", "_"))
-            self.__logger.debug("Pushe Config")
-            if topic.config is not None:
-                self.__client.publish(topic.config, topic.get_config_payload(name, meas_val, None, unique_id=uid), retain=True)
-            self.__logger.debug("SUB")
-            self.__client.subscribe(topic.command)
-            time.sleep(2)
-            self.__logger.debug("Bin switch. Regestriere msqtt callback unter {}".format(topic.command))
-            self.__client.message_callback_add(topic.command, self.on_message)
-            self._registered_callback_topics.append(topic.command)
-
-        else:
-            self.__logger.debug("Bin kein switch. Brauche kein callback.")
-            uid = "binary_sensor.rPiGPIO-{}.{}".format(Autodiscovery.Topics.get_std_devInf().pi_serial,  name.replace(" ", "_"))
-            if topic.config is not None:
-                self.__client.publish(topic.config, topic.get_config_payload(name, meas_val, None, unique_id=uid), retain=True)
-            pin.set_detect(self.send_updates, Pin.PinEventEdge.BOTH)
-        self.send_updates()
-
-    def on_message(self, client, userdata, message: mclient.MQTTMessage):
-        self.__logger.debug("on_message( {},{} )".format(message.topic, message.payload.decode('utf-8')))
-        for d in self._pins:
-            if d["t"].command == message.topic:
-                if message.payload.decode('utf-8') == "ON" and d["isPulse"]:
-                    d["p"].pulse()
-                elif message.payload.decode('utf-8') == "ON":
-                    self.__logger.debug("Einschalten")
-                    d["p"].turnOn()
-                elif message.payload.decode('utf-8') == "OFF":
-                    self.__logger.debug("Ausschalten")
-                    d["p"].turnOff()
-                elif message.payload.decode('utf-8') == "PULSE":
-                    d["p"].pulse()
-                self.send_updates()
-                return
-        self.__logger.warning("Habe keinen Pin für message gefunden :(")
-
-    def sendStates(self):
-        self.send_updates()
-
-    def stop(self):
-        for reg in self._registered_callback_topics:
-            self.__client.message_callback_remove(reg)
-
-    @staticmethod
-    def convert_input_to_string(to_convert: int) -> str:
-        if to_convert == 0:
-            return "OFF"
-        elif to_convert == 1:
-            return "ON"
-
-    def send_updates(self):
-        for d in self._pins:
+        def register_pin(self, d: dict):
             pin = d["p"]
+            name = d["n"]
             topic = d["t"]
-            self.__client.publish(topic.state, self.convert_input_to_string(pin.input()))
+            meas_val = d["mv"]
+            self.__logger.debug("Regestriere {} unter {}".format(name, topic.state))
+
+            if pin.get_direction() == Pin.PinDirection.OUT:
+                uid = "switch.rPiGPIO-{}.{}".format(Autodiscovery.Topics.get_std_devInf().pi_serial, name.replace(" ", "_"))
+                self.__logger.debug("Pushe Config")
+                if topic.config is not None:
+                    self.__client.publish(topic.config, topic.get_config_payload(name, meas_val, None, unique_id=uid), retain=True)
+                self.__logger.debug("SUB")
+                self.__client.subscribe(topic.command)
+                time.sleep(2)
+                self.__logger.debug("Bin switch. Regestriere msqtt callback unter {}".format(topic.command))
+                self.__client.message_callback_add(topic.command, self.on_message)
+                self._registered_callback_topics.append(topic.command)
+
+            else:
+                self.__logger.debug("Bin kein switch. Brauche kein callback.")
+                uid = "binary_sensor.rPiGPIO-{}.{}".format(Autodiscovery.Topics.get_std_devInf().pi_serial,  name.replace(" ", "_"))
+                if topic.config is not None:
+                    self.__client.publish(topic.config, topic.get_config_payload(name, meas_val, None, unique_id=uid), retain=True)
+                pin.set_detect(self.send_updates, Pin.PinEventEdge.BOTH)
+            self.send_updates()
+
+        def on_message(self, client, userdata, message: mclient.MQTTMessage):
+            self.__logger.debug("on_message( {},{} )".format(message.topic, message.payload.decode('utf-8')))
+            for d in self._pins:
+                if d["t"].command == message.topic:
+                    if message.payload.decode('utf-8') == "ON" and d["isPulse"]:
+                        d["p"].pulse()
+                    elif message.payload.decode('utf-8') == "ON":
+                        self.__logger.debug("Einschalten")
+                        d["p"].turnOn()
+                    elif message.payload.decode('utf-8') == "OFF":
+                        self.__logger.debug("Ausschalten")
+                        d["p"].turnOff()
+                    elif message.payload.decode('utf-8') == "PULSE":
+                        d["p"].pulse()
+                    self.send_updates()
+                    return
+            self.__logger.warning("Habe keinen Pin für message gefunden :(")
+
+        def sendStates(self):
+            self.send_updates()
+
+        def stop(self):
+            for reg in self._registered_callback_topics:
+                self.__client.message_callback_remove(reg)
+
+        @staticmethod
+        def convert_input_to_string(to_convert: int) -> str:
+            if to_convert == 0:
+                return "OFF"
+            elif to_convert == 1:
+                return "ON"
+
+        def send_updates(self):
+            for d in self._pins:
+                pin = d["p"]
+                topic = d["t"]
+                self.__client.publish(topic.state, self.convert_input_to_string(pin.input()))

@@ -1,6 +1,9 @@
 from threading import Thread
 
 class PropagatingThread(Thread):
+    exc = None
+    ret = None
+    
     def run(self):
         self.exc = None
         try:

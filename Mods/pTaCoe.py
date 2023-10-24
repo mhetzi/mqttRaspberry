@@ -5,9 +5,9 @@ import Tools.Config as conf
 import logging
 
 from Mods.CoE import getConfigKey
+from Tools import PluginManager
 
-
-class PluginLoader:
+class PluginLoader(PluginManager.PluginLoader):
 
     @staticmethod
     def getConfigKey():
@@ -22,4 +22,12 @@ class PluginLoader:
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
         from Mods.CoE.configurator import CoEConfigurator
         CoEConfigurator().configure(conf)
+    
+    @staticmethod
+    def getNeededPipModules() -> list[str]:
+        try:
+            import bitstring
+        except ImportError as ie:
+            return ["bitstring"]
+        return []
 

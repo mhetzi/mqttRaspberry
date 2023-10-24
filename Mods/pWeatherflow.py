@@ -3,9 +3,9 @@
 import paho.mqtt.client as mclient
 import Tools.Config as conf
 import logging
+from Tools.PluginManager import PluginLoader as pl
 
-
-class PluginLoader:
+class PluginLoader(pl):
 
     @staticmethod
     def getConfigKey():
@@ -21,3 +21,6 @@ class PluginLoader:
         import Mods.Weatherflow.configurator as s
         s.WeatherflowConfigurator().configure(conf)
 
+    @staticmethod
+    def getNeededPipModules() -> list[str]:
+        return []

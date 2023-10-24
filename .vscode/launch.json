@@ -83,6 +83,17 @@
             "justMyCode": false
         },
         {
+            "name": "Python: Configure Debug conf",
+            "type": "python",
+            "request": "launch",
+            "module": "Configure",
+            "console": "integratedTerminal",
+            "args": [
+                "--config", "/opt/mqttScripts/config/mqttra_debug.config",
+            ],
+            "justMyCode": false
+        },
+        {
             "name": "Python: Launcher Fedora (nonsystemd)",
             "type": "python",
             "request": "launch",
