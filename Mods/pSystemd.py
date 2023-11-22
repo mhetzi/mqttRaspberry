@@ -158,14 +158,27 @@ try:
             self._proxy  = self._bus.get_proxy('org.freedesktop.systemd1', '/org/freedesktop/systemd1')
             self._manager_proxy = self._bus.get_proxy('org.freedesktop.systemd1', '/org/freedesktop/systemd1', "org.freedesktop.systemd1.Manager")
 
-        def createUnit(self, unit_name) -> SystemdUnit | None:
+        def loadUnit(self, unit_name: str) -> SystemdUnit | None:
+            if self._bus is not None:
+                try:
+                    self._logger.info(f"Try to load Unit {unit_name}...")
+                    up = self._manager_proxy.LoadUnit(unit_name)
+                    return self.createUnit(unit_name, up, try_load=False)
+                except:
+                    self._logger.exception(f"Loading of Unit {unit_name} failed!")
+            return None
+
+        def createUnit(self, unit_name, unit_path=None, try_load=True) -> SystemdUnit | None:
             if self._bus is not None:
                 try:
                     self._logger.debug(f"Create Unit: {unit_name}")
-                    unit_path = self._manager_proxy.GetUnit(unit_name)
+                    if unit_path is None:
+                        unit_path = self._manager_proxy.GetUnit(unit_name)
                     return SystemdUnit(path=unit_path, unit=unit_name, bus=self._bus, logger=self._logger.getChild(unit_name))
                 except Exception:
                     self._logger.exception(f"Creating Unit: {unit_name} failed!")
+                    if try_load:
+                        return self.loadUnit(unit_name)
                     return None
             return None
 
