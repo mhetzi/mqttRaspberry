@@ -331,7 +331,7 @@ if BUILD_PLGUIN:
                     self._logger,
                     self._pluginManager,
                     lambda state_requested, message: self.sw_call(userdata="isOn",state_requested=state_requested, message=message),
-                    name="{} Eingeschaltet".format(netName),
+                    name="Eingeschaltet",
                     ava_topic=POWER_SWITCHE_ONLINE_TOPIC.format(self._pluginManager._client_name)
                 )
                 self._proxy.PrepareForShutdown.connect(self.sendShutdown)
@@ -343,7 +343,7 @@ if BUILD_PLGUIN:
                     self._logger,
                     self._pluginManager,
                     lambda state_requested, message: self.sw_call(userdata="suspend",state_requested=state_requested, message=message),
-                    name="{} Schlafen".format(netName), icon="mdi:sleep",
+                    name="Schlafen", icon="mdi:sleep",
                     ava_topic=SLEEP_SWITCHE_ONLINE_TOPIC.format(self._pluginManager._client_name)
                 )
                 self._proxy.PrepareForSleep.connect(self.sendSuspend)
@@ -355,7 +355,7 @@ if BUILD_PLGUIN:
                     self._logger,
                     self._pluginManager,
                     lambda state_requested, message: self.sw_call(userdata="reboot",state_requested=state_requested, message=message),
-                    name="{} Neustarten".format(netName), icon="mdi:restart"
+                    name="Neustarten", icon="mdi:restart"
                 )
                 self._switches["reboot"].register()
             # Kann ich inhibit
@@ -365,7 +365,7 @@ if BUILD_PLGUIN:
                     self._logger,
                     self._pluginManager,
                     lambda state_requested, message: self.sw_call(userdata="inhibit",state_requested=state_requested, message=message),
-                    name="{} Nicht schlafen".format(netName), icon="mdi:sleep-off"
+                    name="Nicht schlafen", icon="mdi:sleep-off"
                 )
                 self._switches["inhibit"].register()
             
