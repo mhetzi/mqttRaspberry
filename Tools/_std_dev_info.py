@@ -31,7 +31,7 @@ class DevInfoFactory:
         devInf.mfr = "Raspberry"
         try:
             serial = open("/proc/cpuinfo", "r").read()
-            serial = re.findall("Serial.*?$", serial)[0].replace(" ", "").replace("Serial:", "").replace("\t", "")
+            serial = re.findall("Serial.*", serial)[0].replace(" ", "").replace("\t", "")
             MACs.append(serial)
         except:
             log.exception("Kann Seriennummer nicht ermitteln")
@@ -67,11 +67,12 @@ class DevInfoFactory:
             except:
                 log.exception("Kein Computer Model")
             try:
-                ip_link_proc = subprocess.run(["ip", "link"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                for MAC in re.findall("..:..:..:..:..:..", ip_link_proc.stdout.decode('utf-8')):
-                    if MAC != "ff:ff:ff:ff:ff:ff" and MAC != "00:00:00:00:00:00":
-                        MACs.append(MAC)
-                        log.info("Füge MAC {} hinzu".format(MAC))
+                if len(MACs) == 0:
+                    ip_link_proc = subprocess.run(["ip", "link"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    for MAC in re.findall("..:..:..:..:..:..", ip_link_proc.stdout.decode('utf-8')):
+                        if MAC != "ff:ff:ff:ff:ff:ff" and MAC != "00:00:00:00:00:00":
+                            MACs.append(MAC)
+                            log.info("Füge MAC {} hinzu".format(MAC))
             except:
                 log.exception("IDs")
         elif sys.platform == "win32":
