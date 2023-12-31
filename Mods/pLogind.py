@@ -215,7 +215,7 @@ if BUILD_PLGUIN:
                     self._pman,
                     self.callback,
                     "GUI-Anmeldung {}".format(self.uname),
-                    unique_id="lock.logind.session.gui.{}.screenlock".format(self.uname)
+                    unique_id=f"lock.logind.{autodisc.Topics.get_std_devInf().name}.session.gui.{self.uname}.screenlock"
                 )
                 self._lock.register()
 
