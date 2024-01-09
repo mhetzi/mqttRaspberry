@@ -105,7 +105,7 @@ class OneWireTemp(PluginManager.PluginInterface):
         self.__logger.debug("Sensoren für {} werden erstellt...".format(self._paths))
         for d in self._paths:
             unique_id = "sensor.w1-{}.{}".format(d["i"], d["n"])
-            sensor = Sensor(self.__logger, self._plugin_manager, d["n"], SensorDeviceClasses.TEMPERATURE, "C", unique_id=unique_id, value_template="{{ value_json.now }}", json_attributes=True, ownOfflineTopic=True)
+            sensor = Sensor(self.__logger, self._plugin_manager, d["n"], SensorDeviceClasses.TEMPERATURE, "°C", unique_id=unique_id, value_template="{{ value_json.now }}", json_attributes=True, ownOfflineTopic=True)
             sensor.addFilter( TooHighFilter(500.0, self.__logger) )
             sensor.addFilter( DeltaFilter(self._config["w1t/diff/{}".format(d["i"])], self.__logger) )
             sensor.register()

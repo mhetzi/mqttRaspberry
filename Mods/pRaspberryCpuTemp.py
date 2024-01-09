@@ -65,7 +65,7 @@ class RaspberryPiCpuTemp(PluginManager.PluginInterface):
             self._plugin_manager,
             n,
             SensorDeviceClasses.TEMPERATURE,
-            "C"
+            "°C"
         )
         self._sensor.register()
         self._sensor.addFilter( MinTimeElapsed.MinTimeElapsedFilter(5.0, self.__logger) )
