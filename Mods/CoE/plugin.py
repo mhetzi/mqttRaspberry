@@ -35,14 +35,15 @@ from Mods.CoE.udp_sender import UDP_Sender
 from Mods.CoE import get_sensor_class_from_mt
 
 class TaCoePlugin(Tools.PluginManager.PluginInterface):
-    __slots__ = ("_udp", "_timer", "_from_cmi_analog", "_from_cmi_digital", "sensors", "_via_devices", "_switches", "_to_cmi_digital", "_to_cmi_analog", "_upd_senders", "_last_online", "_pluginManager")
+    __slots__ = ("_udp", "_timer", "_from_cmi_analog", "_from_cmi_digital", "sensors", "_via_devices", "_switches", "_numbers", "_to_cmi_digital", "_to_cmi_analog", "_upd_senders", "_last_online", "_pluginManager", "_rtimer")
 
     _udp: PacketReader | None
     _timer: schedule.Job
     _via_devices: dict[str, autodisc.DeviceInfo]
-    _switches: dict[str, CoeOutSwitch]
+    _switches: list[CoeOutSwitch]
     _upd_senders: dict[str, UDP_Sender]
     _last_online: dict[str, datetime.datetime]
+    _numbers: list[CoeOutNumber]
 
     @staticmethod
     def get_device_online_topic(addr: str):
@@ -64,8 +65,11 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
         self._to_cmi_digital: dict[str, DigitalChannels] = {}
         self._to_cmi_analog: dict[str, AnalogChannels] = {}
 
-        self._switches = {}
-        self.sensors: dict[str, Sensor.Sensor | BinarySensor.BinarySensor] = {}            
+        self._switches = []
+        self._numbers = []
+        self.sensors: dict[str, Sensor.Sensor | BinarySensor.BinarySensor] = {}
+
+        self._rtimer = rTimer.ResettableTimer(interval=120, function=lambda: self.sendStates)
 
     def set_pluginManager(self, pm: Tools.PluginManager.PluginManager):
         self._pluginManager = pm
@@ -73,6 +77,11 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
     def sendStates(self):
         for sensor in self.sensors.values():
             sensor.resend()
+        for sw in self._switches:
+            sw.resend()
+        for nb in self._numbers:
+            nb.resend()
+        self._rtimer.reset()
 
     def register_switches(self, cdata: dict, cmi: str, dev: autodisc.DeviceInfo):
         for idx in range(0, len(cdata["switches"])):
@@ -89,6 +98,7 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
 
             def update_last_state(b:bool):
                 self._config["CMIs"][cmi]["switches"][idx]["last"] = b
+                self._rtimer.reset()
                 
             sw._call_is_on_off = update_last_state
 
@@ -97,6 +107,7 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
             else:
                 sw.turnOff()
             sw.register()
+            self._switches.append(sw)
 
     def register_analog_outs(self, cdata: dict, cmi: str, dev: autodisc.DeviceInfo):
         for idx in range(0, len(cdata["analog"])):
@@ -117,12 +128,13 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
 
             def update_last_state(n: float):
                 self._config["CMIs"][cmi]["analog"][idx]["last"] = n
+                self._rtimer.reset()
                 
             sw._call_is_number = update_last_state
 
             sw.state(self._config["CMIs"][cmi]["analog"][idx]["last"])
             sw.register()
-
+            self._numbers.append(sw)
 
     def register(self, wasConnected=False):
         if self._udp is None:

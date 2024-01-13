@@ -33,6 +33,7 @@ class Number:
         self.step = 1.0
         self.min = 0.0
         self.max = 100.0
+        self._last_val = None
     
     def __del__(self):
         if self._pm is not None and self._pm._client is not None:
@@ -81,10 +82,14 @@ class Number:
             state = json.dumps(state)
         payload = state.encode('utf-8')
         self._log.debug(f"number \n{self._topics.state =} \n{payload =}")
+        self._last_val = state
         try:
             return self._pm._client.publish(self._topics.state, payload=payload,qos=qos)
         except:
             self._log.exception(f"Error while sending {payload = }!")
+
+    def resend(self):
+        self.state(self._last_val)
 
     def offline(self):
         self.is_online = False
