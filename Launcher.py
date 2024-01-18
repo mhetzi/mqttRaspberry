@@ -162,8 +162,8 @@ class Launcher:
 
         while True:
             try:
-                opts, args = getopt.gnu_getopt(t_args, "h?sdc:l:",
-                                               ["help", "config=", "systemd", "no-reload", "door-hall-calibnoise", "configure-all-plugins", "log=", "debug"])
+                opts, args = getopt.gnu_getopt(t_args, "h?sdc:l:p:",
+                                               ["help", "config=", "systemd", "no-reload", "door-hall-calibnoise", "configure-all-plugins", "configure_plugin=", "log=", "debug"])
                 break
             except getopt.error as e:
                 opt = e.msg.replace("option ", "").replace(" not recognized", "")
@@ -195,6 +195,8 @@ class Launcher:
                 door_hall_calib_mode = True
             elif opt == "--configure-all-plugins":
                 conf_all_mods = True
+            elif opt == "--configure_plugin" or "-p":
+                conf_all_mods = arg
             elif opt == "--log":
                 try:
                     if arg is not None:
@@ -224,7 +226,10 @@ class Launcher:
 
         if conf_all_mods:
             pm = pman.PluginManager(self._log, self.config)
-            pm.run_configurator()
+            if isinstance(conf_all_mods, str):
+                pm.run_configurator(conf_all_mods)
+            else:
+                pm.run_configurator()
             self.config.save()
             i = input("Beenden= [N/y]")
             if i == "y" or i == "Y":

@@ -267,9 +267,11 @@ class PluginManager:
         self.needed_plugins(True)
         return self.needed_list
 
-    def run_configurator(self):
+    def run_configurator(self, name=None):
         self.needed_plugins(True)
         for n in self.needed_list:
+            if name and n.getConfigKey() != name:
+                continue
             i = input("\nPlugin {} Konfigurieren? [N/y]".format(n.getConfigKey()))
             if i == "y" or i == "Y":
                 try:

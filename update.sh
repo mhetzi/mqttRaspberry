@@ -135,7 +135,7 @@ if [ "$1" == "configure" ]
 then
     #git reset --hard testing;
     source /opt/mqttScripts/venv/bin/activate
-    ./Launcher.py --config /opt/mqttScripts/config/mqttra.config --configure
+    ./Launcher.py --config /opt/mqttScripts/config/mqttra.config --configure $2
     exit $?
 fi
 
