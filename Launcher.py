@@ -187,6 +187,7 @@ class Launcher:
                     --door-hall-calibnoise  Noise Level von dem Halleffekt Sensor von Raspberry Tor ermitteln
                     --configure-all-plugins Alle Plugins Konfigurieren, wird eines Konfiguriert wird es
                                             beim nächsten Start automatisch geladen.
+                    --configure_plugin=plugin Bestimmtes Plugin konfigurieren.
                     --log                   Log in Datei speichern und nicht in der Konsole ausgeben
                     --debug                 Zeit im log anzeigen, überschreibt systemd logger format
                 """)
