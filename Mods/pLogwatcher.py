@@ -99,8 +99,8 @@ try:
                     for filter in self.filtered:
                         if filter in line:
                             found = True
-                            self._logger.debug(f"{filter} in {line}")
-                    self.bsens.turnOnOff(found)
+                            #self._logger.debug(f"{filter} in {line}")
+                    self.bsens.turnOnOffOnce(found)
                 if self.sens:
                     self.sens.state(line)
 
@@ -108,6 +108,7 @@ try:
             if self.binary:
                 self.bsens = BinarySensor(logger=self._logger, pman=plugin_manager, name=self.name, binary_sensor_type=BinarySensorDeviceClasses.PROBLEM)
                 self.bsens.register()
+                
             else:
                 self.sens = Sensor(self._logger, pman=plugin_manager, name=self.name, sensor_type=SensorDeviceClasses.GENERIC_SENSOR)
                 self.sens.register()

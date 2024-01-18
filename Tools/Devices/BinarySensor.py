@@ -32,6 +32,7 @@ class BinarySensor:
             subnode_id=subnode_id
             )
         self._state = ""
+        self._once = None
     
     def register(self):
 
@@ -83,6 +84,11 @@ class BinarySensor:
             return self.turnOn()
         self._log.debug("{}: ausschalten.".format(self._name))
         return self.turnOff()
+    
+    def turnOnOffOnce(self, state: bool):
+        if self._once != state:
+            self.turnOnOff(state)
+            self._once = state
 
     def resend(self):
         return self._pm._client.publish(self._topics.state, payload=self._state)
