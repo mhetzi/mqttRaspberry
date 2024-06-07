@@ -5,6 +5,7 @@ from logging import Logger
 from Tools.PluginManager import PluginManager
 from Tools.Autodiscovery import DeviceInfo
 from Mods.CoE.coe_lib.ChannelRegestry import DigitalChannels, MeasureType
+from Mods.CoE.coe_lib.ChannelRegestry import AnalogChannels
 from Mods.CoE.udp_sender import UDP_Sender
 from Mods.CoE import get_sensor_class_from_mt
 import json
@@ -93,13 +94,15 @@ class CoeOutNumber(Number):
             return
         msg = message.payload.decode('utf-8')
         f = float(msg)
-        data = self._udp._channels.setChannel(self._node, self._channel, f, self._mt)
+        channel: AnalogChannels = self._udp._channels
+        data = channel.setChannel(node=self._node, channel=self._channel, val=f, type=self._mt)
         if data is None:
             raise Exception("Outgoind Data Packet is None")
         self._udp.sendBytes(data)
         self.state(f)
     
     def state(self, state: float, qos=0):
+        state = float(state)
         self._call_is_number(state)
         return super().state( {
             "value": state,
