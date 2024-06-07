@@ -81,7 +81,7 @@ class CoeOutNumber(Number):
             value_template="{{ value_json.value }}", 
             json_attributes=True, 
             device=device, 
-            unique_id=f"CoE_SW_OUT_{udp_sender._addr}_{node}_{channel+1}",
+            unique_id=f"CoE_NUMBER_OUT_{udp_sender._addr}_{node}_{channel+1}",
             device_class=get_sensor_class_from_mt(measure_type)
         )
         self._channel = channel
@@ -102,14 +102,16 @@ class CoeOutNumber(Number):
         self.state(f)
     
     def state(self, state: float, qos=0):
-        state = float(state)
-        self._call_is_number(state)
-        return super().state( {
-            "value": state,
-            "node":  self._node,
-            "chan":  self._channel+1,
-            "attribution": "TA RT GmbH, Amaliendorf"
-        }, qos=qos )
+        if isinstance(state, float) or isinstance(state, int):
+            self._call_is_number(state)
+            return super().state( {
+                "value": state,
+                "node":  self._node,
+                "chan":  self._channel+1,
+                "attribution": "TA RT GmbH, Amaliendorf"
+            }, qos=qos )
+        return super().state(state=state, qos=qos)
+        
 
     def __call__(self, state: float, qos=0):
         return self.state(state, qos=qos)
