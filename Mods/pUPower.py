@@ -24,8 +24,6 @@ class PluginLoader(PluginManager.PluginLoader):
 
     @staticmethod
     def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        import Tools.error as err
-        err.try_install_package('dasbus', throw=ImportError(), ask=False)
         return uPowerDbus(client, opts, logger.getChild(PluginLoader.getConfigKey()), device_id)
 
     @staticmethod
@@ -35,9 +33,9 @@ class PluginLoader(PluginManager.PluginLoader):
     @staticmethod
     def getNeededPipModules() -> list[str]:
         try:
-            import pyudev
+            import dasbus
         except ImportError as ie:
-            return ["pyudev"]
+            return ["dasbus"]
         return []
 
 from time import sleep

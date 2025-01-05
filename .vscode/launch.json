@@ -59,13 +59,26 @@
             "justMyCode": false
         },
         {
+            "name": "Python: Configure logwatcher",
+            "type": "python",
+            "request": "launch",
+            "module": "Launcher",
+            "console": "integratedTerminal",
+            "args": [
+                "--config", "/opt/mqttScripts/config/mqttra.config",
+                "--debug", "systemd",
+                "--configure_plugin=logwatcher"
+            ],
+            "justMyCode": false
+        },
+        {
             "name": "Python: Launcher Debug",
             "type": "python",
             "request": "launch",
             "module": "Launcher",
             "console": "integratedTerminal",
             "args": [
-                "--config", "/opt/mqttScripts/config/mqttra_debug.config",
+                "--config", "/opt/mqttScripts/config/mqttra.config",
                 "--debug", "--systemd"
             ],
             "justMyCode": false
