@@ -28,8 +28,8 @@ class PluginLoader(PluginManager.PluginLoader):
         return pl(client, PluginConfig(opts, PluginLoader.getConfigKey()), logger, device_id)
 
     @staticmethod
-    def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
-        UdevPluginConfig(conf).run()
+    def runConfig(bc: conf.BasicConfig, logger:logging.Logger):
+        UdevPluginConfig(bc).run()
     
     @staticmethod
     def getNeededPipModules() -> list[str]:
@@ -41,9 +41,9 @@ class PluginLoader(PluginManager.PluginLoader):
 
 
 class UdevPluginConfig:
-    def __init__(self, conf: conf.BasicConfig):
+    def __init__(self, bc: conf.BasicConfig):
         self.__ids = []
-        self.c = PluginConfig(conf, PluginLoader.getConfigKey())
+        self.c = PluginConfig(bc, PluginLoader.getConfigKey())
 
     def run(self):
         self.c["displays/enabled"] = ConsoleInputTools.get_bool_input("Process Monitor States", False)

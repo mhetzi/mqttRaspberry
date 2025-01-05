@@ -29,8 +29,8 @@ class PluginLoader(PluginManager.PluginLoader):
         return uPowerDbus(client, opts, logger.getChild(PluginLoader.getConfigKey()), device_id)
 
     @staticmethod
-    def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
-        uPowerConfig().configure(conf, logger.getChild("logind"))
+    def runConfig(bc: conf.BasicConfig, logger:logging.Logger):
+        uPowerConfig().configure(bc, logger.getChild("logind"))
     
     @staticmethod
     def getNeededPipModules() -> list[str]:
@@ -183,7 +183,7 @@ class uPowerConfig:
     def __init__(self):
         pass
 
-    def configure(self, conff: conf.BasicConfig, logger:logging.Logger):
+    def configure(self, bc: conf.BasicConfig, logger:logging.Logger):
         from Tools import ConsoleInputTools
-        conf = conff.PluginConfig(conff, "uPower")
-        conf["_"] = "" 
+        c = conf.PluginConfig(bc, "uPower")
+        c["_"] = "" 

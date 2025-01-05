@@ -94,8 +94,7 @@ class CoeOutNumber(Number):
             return
         msg = message.payload.decode('utf-8')
         f = float(msg)
-        channel: AnalogChannels = self._udp._channels
-        data = channel.setChannel(node=self._node, channel=self._channel, val=f, type=self._mt)
+        data = self._udp._channels.setChannel(node=self._node, channel=self._channel, val=f, type=self._mt)
         if data is None:
             raise Exception("Outgoind Data Packet is None")
         self._udp.sendBytes(data)
