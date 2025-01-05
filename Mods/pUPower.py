@@ -9,6 +9,7 @@ import Tools.Autodiscovery as autodisc
 from Tools import PluginManager
 from Tools.Devices.BinarySensor import BinarySensor
 from Tools.Devices.Sensor import Sensor, SensorDeviceClasses
+from Tools.Devices.Filters import BlockNotChanged
 import logging
 import schedule
 import json
@@ -63,6 +64,7 @@ try:
                     unique_id=f"lock.upower.device.{self.name}",
                     value_template="{{value_json.soc}}"
                 )
+                self._sensor._ignored_counter = 0
                 self._sensor.register()
 
                 self._proxy.PropertiesChanged.connect( self._process_prop_changed )
@@ -97,10 +99,12 @@ try:
         def _setup_dbus_interfaces(self):
             self._glib_thread = Mods.linux.dbus_common.init_dbus()
 
+            self._logger.debug("Getting dbus busses...")
             self._bus    = SystemMessageBus()
             self._session_bus = SessionMessageBus()
             self._proxy  = self._bus.get_proxy('org.freedesktop.UPower', '/org/freedesktop/UPower')
 
+            self._logger.debug("Subscribing to dbus notifications...")
             self._nsess_notiy = self._proxy.DeviceAdded(   lambda sID, path: self._mod_device(add=True,  path=path) )
             self._rsess_notiy = self._proxy.DeviceRemoved( lambda sID, path: self._mod_device(add=False, path=path) )
             
@@ -125,13 +129,14 @@ try:
             self._pluginManager = pm
 
         def register(self, wasConnected=False):
+            self._logger.debug("Register dbus interface...")
             self._setup_dbus_interfaces()
-            if wasConnected:
+            if not wasConnected:
                 self.sendStates()
 
         def sendStates(self):
             for dev in self.sessions.values():
-                pass
+                dev.resend()
             return super().sendStates()
 
         def stop(self):

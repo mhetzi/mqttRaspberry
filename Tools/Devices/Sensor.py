@@ -20,6 +20,7 @@ class Sensor:
     _mainState = None
     _is_offline = True
     _has_offline = False
+    _ignored_counter = -1
 
     def __init__(self, log:logging.Logger, pman: PluginManager, name: str, sensor_type: SensorDeviceClasses, measurement_unit: str='', ava_topic=None, ownOfflineTopic=False, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None, nodeID=None):
         self._log = log.getChild("Sensor")
@@ -113,7 +114,10 @@ class Sensor:
         payload = state.encode('utf-8') if self._jsattrib else str(state)
         if self._playload == payload and not force_send:
             self._log.debug("new payload == old payload ignoring...")
-            return None
+            self._ignored_counter = (self._ignored_counter + 1) if self._ignored_counter > -1 else self._ignored_counter
+            if self._ignored_counter < 20:
+                return None
+            self._ignored_counter = 0
         self._playload = payload
         if self._is_offline:
             self._log.debug("Was offline, become online")
