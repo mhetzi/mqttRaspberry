@@ -41,6 +41,7 @@ class PluginLoader(PluginMan.PluginLoader):
         try:
             import dasbus
         except ImportError as ie:
+            import Tools.error as err
             err.try_install_package('dasbus', throw=ie, ask=False)
         return logindDbus(client, opts, logger.getChild("logind"), device_id)
 

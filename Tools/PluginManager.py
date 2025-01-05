@@ -27,7 +27,7 @@ except ImportError as ie:
 import Tools.Config as tc
 
 import dataclasses
-from abc import ABC, abstractmethod, abstractstaticmethod
+from abc import ABC, abstractmethod
 
 @dataclasses.dataclass(slots=True)
 class PluginInterface(ABC):
@@ -144,6 +144,32 @@ class PluginManager:
         self.shed_thread = None
         self._discovery_topics = self.config.getIndependendFile("discovery_topics", no_watchdog=True, do_load=True)[0]
         self.discovery_topics = tc.PluginConfig(self._discovery_topics, "Registry")
+
+    def get_pip_list(self):
+        pip_list: list[str] = []
+        mep = list(self.config.get_all_plugin_names())
+        i = 0
+        while i < len(mep):
+            key = mep[i]
+            self.logger.debug("[{}/{}] Teste Pip {}.".format(1+i, len(mep), key))
+            i += 1
+            for x in self.needed_list:
+                try:
+                    pip_list = pip_list + x.getNeededPipModules()
+                except NotImplementedError:
+                    pass
+                except Exception as e:
+                    self.logger.exception("Exception while preparing pip list!")
+        if len(pip_list) > 0:
+            from Tools.error import RestartError
+            try:
+                from Tools.error import try_install_packages
+                try_install_packages(pip_list, ask=False)
+            except RestartError:
+                pass
+            except:
+                self.logger.exception("Installing required Packages failed!")
+
 
     def enable_mods(self):
         self.scheduler_event, self.shed_thread = self.run_scheduler_continuously()

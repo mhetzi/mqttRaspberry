@@ -15,29 +15,6 @@ import json
 import os
 import threading
 
-
-class PluginLoader(PluginManager.PluginLoader):
-
-    @staticmethod
-    def getConfigKey():
-        return "uPower"
-
-    @staticmethod
-    def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        return uPowerDbus(client, opts, logger.getChild(PluginLoader.getConfigKey()), device_id)
-
-    @staticmethod
-    def runConfig(bc: conf.BasicConfig, logger:logging.Logger):
-        uPowerConfig().configure(bc, logger.getChild("logind"))
-    
-    @staticmethod
-    def getNeededPipModules() -> list[str]:
-        try:
-            import dasbus
-        except ImportError as ie:
-            return ["dasbus"]
-        return []
-
 from time import sleep
 
 try:
@@ -185,3 +162,26 @@ class uPowerConfig:
         from Tools import ConsoleInputTools
         c = conf.PluginConfig(bc, "uPower")
         c["_"] = "" 
+
+
+class PluginLoader(PluginManager.PluginLoader):
+
+    @staticmethod
+    def getConfigKey():
+        return "uPower"
+
+    @staticmethod
+    def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        return uPowerDbus(client, opts, logger.getChild(PluginLoader.getConfigKey()), device_id)
+
+    @staticmethod
+    def runConfig(bc: conf.BasicConfig, logger:logging.Logger):
+        uPowerConfig().configure(bc, logger.getChild("logind"))
+    
+    @staticmethod
+    def getNeededPipModules() -> list[str]:
+        try:
+            import dasbus
+        except ImportError as ie:
+            return ["dasbus"]
+        return []

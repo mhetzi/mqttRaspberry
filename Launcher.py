@@ -109,6 +109,7 @@ class Launcher:
             except:
                 self._log.info("Remote Debugging (ptvsd) nicht verfügbar")
             self.pm.needed_plugins()
+            self.pm.get_pip_list()
             self.mqtt_client, deviceID = self.pm.start_mqtt_client()
             self.pm.enable_mods()
             while True:
