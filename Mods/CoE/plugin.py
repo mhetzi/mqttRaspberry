@@ -161,7 +161,7 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
                 dev = autodisc.DeviceInfo()
                 dev.IDs.append(f"TACMIIP: {cmi}")
                 dev.mfr = "Technische Alternative RT GmbH, Amaliendorf"
-                dev.model = "CMI"
+                dev.model = f"CMI CoE v{CoE_version}"
                 dev.name = f"CMI: {cmi}"
                 dev.via_device = autodisc.Topics.get_std_devInf().IDs[0]
                 self._via_devices[cmi] = dev

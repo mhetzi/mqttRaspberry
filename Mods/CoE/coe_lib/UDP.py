@@ -40,9 +40,9 @@ class UdpServer(threading.Thread):
         self._shutdown = True
         try:
             self._sock.shutdown(socket.SHUT_RDWR)
+            self.join()
         except:
-            pass
-        self.join()
+            self.__logger.exception("Exception ")
 
 
 if __name__ == '__main__':
