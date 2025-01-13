@@ -17,7 +17,6 @@ class UdpServer(threading.Thread):
         self.on_message = self.__on_message
 
     def run(self):
-        super().run()
         while not self._shutdown:
             self.__logger.debug("Recv")
             data, address = self._sock.recvfrom(14)

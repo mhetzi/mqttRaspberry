@@ -10,13 +10,16 @@ class PropagatingThread(Thread):
             if hasattr(self, '_Thread__target'):
                 # Thread uses name mangling prior to Python 3.
                 self.ret = self._Thread__target(*self._Thread__args, **self._Thread__kwargs)
-            else:
+            elif hasattr(self, '_target'):
                 self.ret = self._target(*self._args, **self._kwargs)
         except BaseException as e:
             self.exc = e
 
     def joinNoRaise(self, timeout=None):
-        super(PropagatingThread, self).join(timeout)
+        try:
+            super(PropagatingThread, self).join(timeout)
+        except RuntimeError:
+            pass
         return (self.ret, self.exc)
 
     def join(self, timeout=None):
