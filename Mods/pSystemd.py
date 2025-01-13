@@ -176,7 +176,8 @@ try:
                         unit_path = self._manager_proxy.GetUnit(unit_name)
                     return SystemdUnit(path=unit_path, unit=unit_name, bus=self._bus, logger=self._logger.getChild(unit_name))
                 except Exception:
-                    self._logger.exception(f"Creating Unit: {unit_name} failed!")
+                    if not try_load:
+                        self._logger.exception(f"Creating Unit: {unit_name} failed!")
                     if try_load:
                         return self.loadUnit(unit_name)
                     return None
