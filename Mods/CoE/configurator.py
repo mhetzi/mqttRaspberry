@@ -19,6 +19,7 @@ class CoEConfigurator:
         
         while True:
             action = ConsoleInputTools.get_number_input("Drücke 1 zum entfernen, 2 zum hinzufügen, 3 zum bearbeiten, 0 zum beenden", 0)
+            was_action = action
             if action == 0:
                 break
             edit_cmi = None
@@ -26,7 +27,7 @@ class CoEConfigurator:
                 print("Folgende CMIs wurden hinzugefügt:")
                 for idx in range(0, len(config["CMIs"].keys())):
                     print(f" {idx+1}: {list(config['CMIs'].keys())[idx]}")
-                nr: int = ConsoleInputTools.get_number_input("Welche Nr. soll entfernt werden?", int(0))
+                nr: int = ConsoleInputTools.get_number_input(f"Welche Nr. soll { "entfernt" if nr == 1 else "bearbeitet" } werden?", int(0))
                 if nr == 0 or nr > len(config["CMIs"].keys()):
                     continue
                 edit_cmi = list(config["CMIs"].keys())[nr-1]
@@ -38,7 +39,10 @@ class CoEConfigurator:
             if action == 2:
                 if edit_cmi is None:
                     edit_cmi = ConsoleInputTools.get_input("IP Addresse des CMI: ")
-                    config["CMIs"][edit_cmi] = {"switches": [], "analog": []}
+                    version = ConsoleInputTools.get_number_input("CoE Version? 1 oder 2", 1)
+                    config["CMIs"][edit_cmi] = {"switches": [], "analog": [], "CoE_version": version}
+                if was_action == 3:
+                    config["CMIs"][edit_cmi]["CoE_version"] = ConsoleInputTools.get_number_input("CoE Version? 1 oder 2", config["CMIs"][edit_cmi].get("CoE_version", 1))
                 if ConsoleInputTools.get_bool_input("Schalter bearbeiten? ", False):
                     print("Folgende Schalter wurden hinzugefügt: ")
                     for idx in range(0, len(config["CMIs"][edit_cmi]["switches"])):

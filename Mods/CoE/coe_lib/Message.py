@@ -8,18 +8,20 @@ ANALOG_PAGE_CONTENT = tuple[ANALOG_PAGE_ENTRY,ANALOG_PAGE_ENTRY,ANALOG_PAGE_ENTR
 DIGITA_PAGE_CONTENT = tuple[bool,bool,bool,bool,bool,bool,bool,bool,bool,bool,bool,bool,bool,bool,bool,bool]
 
 class Message:
-    __slots__=("__bytes", "canNode", "page_nr", "page_content", "ip")
+    __slots__=("__bytes", "canNode", "page_nr", "page_content", "ip", "_raw")
 
     ip: str
     canNode: int
     page_nr: int
     page_content: tuple
+    _raw: bytes
 
     def __init__(self, raw: bytes|None) -> None:
         if raw is None:
             return
         self.canNode = raw[0]
         self.page_nr = raw[1]
+        self._raw = raw
     
     def isDigital(self):
         return False
@@ -32,7 +34,12 @@ class AnalogMessage(Message):
 
     def __init__(self, raw: bytes) -> None:
         super().__init__(raw)
-        data = struct.unpack_from('<hhhhcccc', raw, 2)
+    
+    def parse(self, version=1):
+        if version == 1:
+            data = struct.unpack_from('<hhhhcccc', self._raw, 2)
+        elif version == 2:
+            data = struct.unpack_from('<iiiicccc', self._raw, 2)
         meastypes = (
             Datatypes.MeasureType.from_bytes(data[4], byteorder='little'),
             Datatypes.MeasureType.from_bytes(data[5], byteorder='little'),

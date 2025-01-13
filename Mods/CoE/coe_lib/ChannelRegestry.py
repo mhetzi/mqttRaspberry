@@ -8,14 +8,16 @@ ANALOG_CHANNEL_TYPE = tuple[int, int, float, MeasureType]
 DIGITAL_CHANNEL_TYPE = tuple[int, int, bool]
 
 class CanNode:
-    __slots__ = ("pages", "node")
+    __slots__ = ("pages", "node", "_coe_version")
 
     pages: dict[int, list | tuple]
     node: int
+    _coe_version: int
 
-    def __init__(self, node: int) -> None:
+    def __init__(self, node: int, coe_version=1) -> None:
         self.node = node
         self.pages = {}
+        self._coe_version = coe_version
         self.pages[0] = []
         self.pages[9] = []
         for i in range(0 ,16):
@@ -60,7 +62,7 @@ class CanNode:
             #    barr.append(types[v].to_bytes(1, "big"))
             barr.append(
                 struct.pack(
-                    "<hhhhcccc",
+                    "<hhhhcccc" if self._coe_version == 1 else "<iiiicccc",
                     int(self.pages[page][0] * self.pages[page][4].getScaleFactor()),
                     int(self.pages[page][1] * self.pages[page][5].getScaleFactor()),
                     int(self.pages[page][2] * self.pages[page][6].getScaleFactor()),
@@ -75,12 +77,13 @@ class CanNode:
 
 
 class CanNodeReg:
-    __slots__ = ("nodes")
+    __slots__ = ("nodes", "coe_version")
 
     nodes: dict[int, CanNode]
 
-    def __init__(self) -> None:
+    def __init__(self, CoE_version=1) -> None:
         self.nodes = {}
+        self.coe_version = CoE_version
 
     def submitMessage(self, msg: Message.DigitalMessage | Message.AnalogMessage):
         pass
@@ -100,24 +103,25 @@ class CanNodeReg:
 
     def updateAnalogPageEntry(self, node: int, page: int, pageIndex: int, val: float, t: MeasureType) -> bytes:
         if self.nodes.get(node, None) is None:
-            self.nodes[node] = CanNode(node)
+            self.nodes[node] = CanNode(node, coe_version=self.coe_version)
             self.nodes[node].node = node
 
         self.nodes[node].updatePageEntry(page, pageIndex, (val, t))
         return self.nodes[node].getBytesForPage(page)
 
 class AnalogChannels:
-    __slots__ = ("channels", "_nodes", "_dirty_pages", "on_changed_value")
+    __slots__ = ("channels", "_nodes", "_dirty_pages", "on_changed_value", "_CoE_version")
 
     channels: dict[str, ANALOG_CHANNEL_TYPE]
     _nodes: CanNodeReg | None
     _dirty_pages: dict[int, list[int]] # [node, list[page]]
 
-    def __init__(self, nodes: CanNodeReg | None) -> None:
+    def __init__(self, nodes: CanNodeReg | None, version=1) -> None:
         self._nodes = nodes
         self.channels = {}
         self._dirty_pages = {}
         self.on_changed_value = self._on_changed_value
+        self._CoE_version = version
 
     def getChannelData(self, node: int, channel: int) -> ANALOG_CHANNEL_TYPE:
         ids = self.getChannelID(node, channel)
@@ -127,6 +131,7 @@ class AnalogChannels:
         return f"A_{node}_{channel}"
     
     def submitMessage(self, msg: Message.AnalogMessage):
+        msg.parse(self._CoE_version)
         node = msg.canNode
         for idx in range(0,4):
             if msg.page_content[idx][1] == MeasureType.NONE:
@@ -157,10 +162,14 @@ class AnalogChannels:
         if page not in self._dirty_pages[node]:
             self._dirty_pages[node].append(page)
 
-        return self._nodes.updateAnalogPageEntry(node, page, page_idx, val, type)
+        if self._nodes is not None:
+            return self._nodes.updateAnalogPageEntry(node, page, page_idx, val, type)
+        return bytes()
     
     def getBytesForAllWrittenPages(self) -> list[bytes]:
         l: list[bytes] = []
+        if self._nodes is None:
+            return l
         for node, page_list in self._dirty_pages.items():
             for page in page_list:
                 l.append( self._nodes.getPageEntry(node, page) )
@@ -170,13 +179,13 @@ class AnalogChannels:
 
 
 class DigitalChannels:
-    __slots__ = ("channels", "_nodes", "_dirty_pages", "on_changed_value")
+    __slots__ = ("channels", "_nodes", "_dirty_pages", "on_changed_value", "_CoE_version")
 
     channels: dict[str, DIGITAL_CHANNEL_TYPE]
     _nodes: CanNodeReg | None
     _dirty_pages: dict[int, list[int]] # [node, list[page]]
 
-    def __init__(self, nodes: CanNodeReg | None, callback=None) -> None:
+    def __init__(self, nodes: CanNodeReg | None) -> None:
         self._nodes = nodes
         self.channels = {}
         self._dirty_pages = {}
@@ -214,10 +223,14 @@ class DigitalChannels:
         if page not in self._dirty_pages[node]:
             self._dirty_pages[node].append(page)
 
+        if self._nodes is None:
+            return bytes()
         return self._nodes.updateDigitalPageEntry(node, page, channel - 15 if page == 9 else channel, b)
     
     def getBytesForAllWrittenPages(self) -> list[bytes]:
         l: list[bytes] = []
+        if self._nodes is None:
+            return l
         for node, page_list in self._dirty_pages.items():
             for page in page_list:
                 l.append( self._nodes.getPageEntry(node, page) )

@@ -148,9 +148,13 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
             self._via_devices = {}
 
             for cmi, cdata in cmis.items():
-                reg = CanNodeReg()
+                if cdata.get("CoE_version", 0) == 0:
+                    cdata["CoE_version"] = 1
+                CoE_version = cdata["CoE_version"]
+
+                reg = CanNodeReg(CoE_version=CoE_version)
                 self._to_cmi_digital[cmi] = DigitalChannels(reg)
-                self._to_cmi_analog[cmi] = AnalogChannels(reg)
+                self._to_cmi_analog[cmi] = AnalogChannels(reg, version=CoE_version)
                 self._upd_senders[f"{cmi}_D"] = UDP_Sender(self._to_cmi_digital[cmi], cmi, 5441, self._logger)
                 self._upd_senders[f"{cmi}_A"] = UDP_Sender(self._to_cmi_analog[cmi],  cmi, 5441, self._logger)
 
