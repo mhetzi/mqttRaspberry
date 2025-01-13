@@ -15,6 +15,10 @@ class PropagatingThread(Thread):
         except BaseException as e:
             self.exc = e
 
+    def joinNoRaise(self, timeout=None):
+        super(PropagatingThread, self).join(timeout)
+        return (self.ret, self.exc)
+
     def join(self, timeout=None):
         super(PropagatingThread, self).join(timeout)
         if self.exc:

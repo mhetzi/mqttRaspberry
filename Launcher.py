@@ -116,7 +116,7 @@ class Launcher:
                 try:
                     self.mqtt_client.loop_start()
                     thread: propt.PropagatingThread = self.mqtt_client._thread
-                    exc = thread.join()
+                    ret, exc = thread.joinNoRaise()
                     if isinstance(exc, BaseException):
                         raise exc
                     break

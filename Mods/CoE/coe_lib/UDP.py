@@ -40,9 +40,12 @@ class UdpServer(threading.Thread):
         self._shutdown = True
         try:
             self._sock.shutdown(socket.SHUT_RDWR)
+        except:
+            pass
+        try:
             self.join()
         except:
-            self.__logger.exception("Exception ")
+            self.__logger.exception("Shutdown of CoE UDP Thread exception")
 
 
 if __name__ == '__main__':
