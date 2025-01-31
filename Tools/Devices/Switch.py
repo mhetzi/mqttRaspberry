@@ -70,6 +70,8 @@ class Switch:
             self.online()
         if isinstance(state, dict):
             state = json.dumps(state)
+        elif isinstance(state, bool):
+            state = "ON" if state else "OFF"
         payload = state.encode('utf-8')
         self._log.debug(f"Switch \n{self._topics.state =} \n{payload =}")
         try:
