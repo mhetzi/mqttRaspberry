@@ -10,9 +10,7 @@ from Tools import PluginManager
 from Tools.Devices.Switch import Switch
 import logging
 import schedule
-import json
-import os
-import threading
+from Tools import ResettableTimer
 
 from time import sleep
 
@@ -38,6 +36,8 @@ try:
             self._config = conf.PluginConfig(opts, PluginLoader.getConfigKey())
             self._sw = None
 
+            self._timer = ResettableTimer.ResettableTimer(10, lambda n: self.sendStates(), autorun=False)
+
         
         def _setup_dbus_interfaces(self):
             self._glib_thread = Mods.linux.dbus_common.init_dbus()
@@ -50,14 +50,15 @@ try:
             self._nsess_notiy = self._proxy.ActiveChanged( lambda b: self.activeChanged(b) )
 
         def activeChanged(self, active:bool):
-            self.sw_call(None, True)
+            if self._sw is not None:
+                self._sw.turn(state=active)
         
         def sw_call(self, message, state_requested:bool):
             if self._proxy is None or self._sw is None:
                 return
             if message:
                 self._proxy.SetActive(bool(message))
-            self._sw.turn(state=self._proxy.GetActive())
+            self._timer.reset()
 
         def set_pluginManager(self, pm:PluginManager.PluginManager):
             self._pluginManager = pm
@@ -78,7 +79,8 @@ try:
             self.sendStates()
 
         def sendStates(self):
-            self.sw_call(None, True)
+            if self._sw is not None and self._proxy is not None:
+                return self._sw.turn(state=self._proxy.GetActive())
             return super().sendStates()
 
         def stop(self):

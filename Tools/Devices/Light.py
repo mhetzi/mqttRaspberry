@@ -28,7 +28,7 @@ class Light:
             name,
             autodisc.DeviceClass()
             )
-        self._sendDelay = ResettableTimer(0.25, self._pushState, userval=None, autorun=False)
+        self._sendDelay = ResettableTimer(0.25, lambda n: self._pushState(), userval=None, autorun=False)
     
     def enableMireds(self, min, max):
         self._schema["color_temp"] = True

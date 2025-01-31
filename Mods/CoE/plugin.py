@@ -69,7 +69,7 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
         self._numbers = []
         self.sensors: dict[str, Sensor.Sensor | BinarySensor.BinarySensor] = {}
 
-        self._rtimer = rTimer.ResettableTimer(interval=120, function=lambda: self.sendStates)
+        self._rtimer = rTimer.ResettableTimer(interval=120, function=lambda n: self.sendStates())
 
     def set_pluginManager(self, pm: Tools.PluginManager.PluginManager):
         self._pluginManager = pm

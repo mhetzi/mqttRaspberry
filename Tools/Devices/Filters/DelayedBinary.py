@@ -11,7 +11,7 @@ class DelayedBinary(BaseFilter):
         self._delayOn = delayOn
         self._delayOff = delayOff
         self._log = logging.getLogger("Launch") if logger is None else logger.getChild("DelayedOff")
-        self._timer = ResettableTimer(interval=interval, function=self.delaySuccess, autorun=False)
+        self._timer = ResettableTimer(interval=interval, function=lambda n: self.delaySuccess(), autorun=False)
 
     def delaySuccess(self):
         pass
