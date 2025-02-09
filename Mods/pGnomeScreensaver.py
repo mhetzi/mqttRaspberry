@@ -36,7 +36,8 @@ try:
             self._config = conf.PluginConfig(opts, PluginLoader.getConfigKey())
             self._sw = None
 
-            self._timer = ResettableTimer.ResettableTimer(10, lambda n: self.sendStates(), autorun=False)
+            self._timer = ResettableTimer.ResettableTimer(10, lambda n: self._timercall(), autorun=False)
+            self._last = None
 
         
         def _setup_dbus_interfaces(self):
@@ -48,6 +49,14 @@ try:
 
             self._logger.debug("Subscribing to dbus notifications...")
             self._nsess_notiy = self._proxy.ActiveChanged( lambda b: self.activeChanged(b) )
+
+        def _timercall(self):
+            now: bool = self._proxy.GetActive()
+            if self._last != now:
+                self._logger.warning(f"Screensaver value now: {now} != last: {self._last}")
+                self.register(wasConnected=True)
+
+            return self.sendStates()
 
         def activeChanged(self, active:bool):
             if self._sw is not None:
@@ -72,6 +81,11 @@ try:
                 callback=self.sw_call,
                 icon="mdi:monitor"
             )
+                
+            if wasConnected:
+                self._logger.debug("Reconnected! Resetting Stuff...")
+                self.stop()
+
             self._logger.debug("Register dbus interface...")
             self._setup_dbus_interfaces()
 
@@ -79,8 +93,10 @@ try:
             self.sendStates()
 
         def sendStates(self):
+            self._timer.reset()
             if self._sw is not None and self._proxy is not None:
-                return self._sw.turn(state=self._proxy.GetActive())
+                self._last = self._proxy.GetActive()
+                return self._sw.turn(state=self._last)
             return super().sendStates()
 
         def stop(self):
