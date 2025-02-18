@@ -220,8 +220,8 @@ if BUILD_PLGUIN:
                 )
                 self._lock.register()
 
-                self._lock_notify    = self._proxy.Lock.connect  ( self._lock.lock()  )
-                self._unlock_notify  = self._proxy.Unlock.connect( self._lock.unlock() )
+                self._lock_notify    = self._proxy.Lock.connect  ( lambda: self._lock.lock()  )
+                self._unlock_notify  = self._proxy.Unlock.connect( lambda: self._lock.unlock() )
                 self._proxy.PropertiesChanged.connect( self._process_prop_changed )
                 self._process_prop_changed(None, None, None)
         

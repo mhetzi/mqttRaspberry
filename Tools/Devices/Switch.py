@@ -74,10 +74,7 @@ class Switch:
             state = "ON" if state else "OFF"
         payload = state.encode('utf-8')
         self._log.debug(f"Switch \n{self._topics.state =} \n{payload =}")
-        try:
-            return self._pm._client.publish(self._topics.state, payload=payload,qos=qos)
-        except:
-            self._log.exception(f"Error while sending {payload = }!")
+        return self._pm._client.publish(self._topics.state, payload=payload,qos=qos)
 
     def turnOn(self, json=None, qos=0):
         if json is not None and not self._jsattrib:

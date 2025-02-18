@@ -19,6 +19,8 @@ try:
 
     from dasbus.connection import SystemMessageBus
     from dasbus.connection import SessionMessageBus
+    import dasbus.error
+    from dasbus.connection import ObjectProxy
 
     import Mods.linux.dbus_common
 
@@ -45,22 +47,26 @@ try:
 
             self._logger.debug("Getting dbus bus...")
             self._session_bus = SessionMessageBus()
-            self._proxy  = self._session_bus.get_proxy('org.gnome.ScreenSaver', '/org/gnome/ScreenSaver')
+            self._proxy = self._session_bus.get_proxy('org.gnome.ScreenSaver', '/org/gnome/ScreenSaver')
+            if self._proxy is None:
+                raise dasbus.error.DBusError()
 
-            self._logger.debug("Subscribing to dbus notifications...")
             self._nsess_notiy = self._proxy.ActiveChanged( lambda b: self.activeChanged(b) )
+            self._logger.debug(f"Subscribed to ActiveChanged Signal {self._nsess_notiy=}")
 
-        def _timercall(self):
+        def _timercall(self) -> None:
             now: bool = self._proxy.GetActive()
+
             if self._last != now:
-                self._logger.warning(f"Screensaver value now: {now} != last: {self._last}")
+                self._logger.warning(f"Screensaver value now: {now=} != last: {self._last=}")
                 self.register(wasConnected=True)
 
-            return self.sendStates()
+            self.sendStates()
 
         def activeChanged(self, active:bool):
+            self._logger.debug(f"activeChanged({active=})")
             if self._sw is not None:
-                self._sw.turn(state=active)
+                self._sw.turn(state=active).wait_for_publish()
         
         def sw_call(self, message, state_requested:bool):
             if self._proxy is None or self._sw is None:
@@ -90,7 +96,7 @@ try:
             self._setup_dbus_interfaces()
 
             self._sw.register()
-            self.sendStates()
+            return self.sendStates()
 
         def sendStates(self):
             self._timer.reset()
