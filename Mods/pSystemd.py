@@ -115,23 +115,27 @@ try:
                     self._logger.exception("Setting Systemd Unit failed.")
 
         def register(self, plugin_manager: PluginManager.PluginManager):
-            self._button = Button(
-                logger=self._logger,
-                pman=plugin_manager,
-                callback=self.button_press,
-                name=self._unit
-            )
-            self._button.register()
+            if self._button is None:
+                self._button = Button(
+                    logger=self._logger,
+                    pman=plugin_manager,
+                    callback=self.button_press,
+                    name=self._unit
+                )
+            if self._button is not None:
+                self._button.register()
 
-            self._switch = Switch(
-                logger=self._logger,
-                pman=plugin_manager,
-                callback=self.switch_toggle,
-                name=self._unit,
-                json_attributes=True,
-                value_template="{{ value_json.s }}", 
-            )
-            self._switch.register()
+            if self._switch is None:
+                self._switch = Switch(
+                    logger=self._logger,
+                    pman=plugin_manager,
+                    callback=self.switch_toggle,
+                    name=self._unit,
+                    json_attributes=True,
+                    value_template="{{ value_json.s }}", 
+                )
+            if self._switch is not None:
+                self._switch.register()
 
             self._process_prop_changed(None, None, None)
         

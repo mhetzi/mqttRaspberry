@@ -55,30 +55,33 @@ class RaspberryPiCpuTemp(PluginManager.PluginInterface):
     def register(self, wasConnected=False):
         t = ad.Topics.get_std_devInf()
         n = self._config.get("name", "CPU Temp")
-        self._shed_Job = schedule.every(
-            self._config.get("update_secs", 15)
-        ).seconds
-        self._shed_Job.do(self.send_update)
+        if not wasConnected:
+            self._shed_Job = schedule.every(
+                self._config.get("update_secs", 15)
+            ).seconds
+            self._shed_Job.do(self.send_update)
 
-        self._sensor = Sensor(
-            self.__logger,
-            self._plugin_manager,
-            n,
-            SensorDeviceClasses.TEMPERATURE,
-            "°C"
-        )
-        self._sensor.register()
-        self._sensor.addFilter( MinTimeElapsed.MinTimeElapsedFilter(5.0, self.__logger) )
-        self._sensor.addFilter( DeltaFilter.DeltaFilter(2.25, self.__logger) )
-        self._sensor.addFilter( TooHighFilter.TooHighFilter(150.0, self.__logger) )
+            self._sensor = Sensor(
+                self.__logger,
+                self._plugin_manager,
+                n,
+                SensorDeviceClasses.TEMPERATURE,
+                "°C"
+            )
+            self._sensor.register()
+            self._sensor.addFilter( MinTimeElapsed.MinTimeElapsedFilter(5.0, self.__logger) )
+            self._sensor.addFilter( DeltaFilter.DeltaFilter(2.25, self.__logger) )
+            self._sensor.addFilter( TooHighFilter.TooHighFilter(150.0, self.__logger) )
 
 
     def set_pluginManager(self, pm):
         self._plugin_manager = pm
 
     def stop(self):
-        schedule.cancel_job(self._shed_Job)
-        self._file.close()
+        if self._shed_Job is not None:
+            schedule.cancel_job(self._shed_Job)
+        if self._file is not None:
+            self._file.close()
 
     def sendStates(self):
         self.send_update(True)

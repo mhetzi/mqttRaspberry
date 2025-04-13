@@ -129,10 +129,13 @@ try:
             self._pluginManager = pm
 
         def register(self, wasConnected=False):
+            if self._glib_thread is None:
+                self._logger.debug("Was registered. Destroy old stuff...")
+                self.stop()
+
             self._logger.debug("Register dbus interface...")
             self._setup_dbus_interfaces()
-            if not wasConnected:
-                self.sendStates()
+            self.sendStates()
 
         def sendStates(self):
             for dev in self.sessions.values():

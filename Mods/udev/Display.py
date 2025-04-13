@@ -149,7 +149,7 @@ class Displays(UdevDeviceProcessor):
 
     def start(self, context: pyudev.Context):
         super().start(context)
-        if self._observer is None or self._observer.is_alive():
+        if self._observer is None or not self._observer.is_alive():
             self._monitor = pyudev.Monitor.from_netlink(context=context)
             self._monitor.filter_by("drm")
             self._observer = pyudev.MonitorObserver(self._monitor, self.event)

@@ -73,48 +73,51 @@ try:
             self._pm = pm
 
         def register(self, wasConnected: bool):
+            
+            if self._speed_topics is not None:
+                fan_speed = self._config.get_autodiscovery_topic(
+                    Autodiscovery.Component.LIGHT,
+                    "SerialFan",
+                    Autodiscovery.DeviceClass
+                )
+                fan_speed.register_light(
+                    self.__client,
+                    "SerialFan Speed",
+                    brightness_scale=100,
+                    unique_id="fan.speed.pct.{}".format(self._config._main.get_client_config().id)
+                )
+                self._speed_topics = fan_speed
 
-            fan_speed = self._config.get_autodiscovery_topic(
-                Autodiscovery.Component.LIGHT,
-                "SerialFan",
-                Autodiscovery.DeviceClass
-            )
-            fan_speed.register_light(
-                self.__client,
-                "SerialFan Speed",
-                brightness_scale=100,
-                unique_id="fan.speed.pct.{}".format(self._config._main.get_client_config().id)
-            )
-            self._speed_topics = fan_speed
+            if self._rpm_topics is not None:
+                rpm = self._config.get_autodiscovery_topic(
+                    Autodiscovery.Component.SENSOR,
+                    "SerialFan RPM",
+                    Autodiscovery.SensorDeviceClasses.GENERIC_SENSOR
+                )
+                rpm.register(
+                    self.__client,
+                    "SerialFan RPM",
+                    "RPM",
+                    None,
+                    unique_id="fan.speed.rpm.{}".format(self._config._main.get_client_config().id),
+                    icon="mdi:fan"
+                )
+                self._rpm_topics = rpm
 
-            rpm = self._config.get_autodiscovery_topic(
-                Autodiscovery.Component.SENSOR,
-                "SerialFan RPM",
-                Autodiscovery.SensorDeviceClasses.GENERIC_SENSOR
-            )
-            rpm.register(
-                self.__client,
-                "SerialFan RPM",
-                "RPM",
-                None,
-                unique_id="fan.speed.rpm.{}".format(self._config._main.get_client_config().id),
-                icon="mdi:fan"
-            )
-            self._rpm_topics = rpm
-
-            self._err_topics = self._config.get_autodiscovery_topic(
-                Autodiscovery.Component.BINARY_SENROR,
-                "SerialFan Error",
-                Autodiscovery.BinarySensorDeviceClasses.PROBLEM
-            )
-            self._err_topics.register(
-                self.__client,
-                "SerialFan Error",
-                "",
-                value_template="{{value_json.err}}",
-                json_attributes=True,
-                unique_id="fan.speed.error.{}".format(self._config._main.get_client_config().id)
-            )
+            if self._err_topics is not None:
+                self._err_topics = self._config.get_autodiscovery_topic(
+                    Autodiscovery.Component.BINARY_SENROR,
+                    "SerialFan Error",
+                    Autodiscovery.BinarySensorDeviceClasses.PROBLEM
+                )
+                self._err_topics.register(
+                    self.__client,
+                    "SerialFan Error",
+                    "",
+                    value_template="{{value_json.err}}",
+                    json_attributes=True,
+                    unique_id="fan.speed.error.{}".format(self._config._main.get_client_config().id)
+                )
 
             if not wasConnected:
                 cpu = self._pm.get_plguins_by_config_id(self._config["provider"])
@@ -140,6 +143,8 @@ try:
             })
             self.__client.publish(self._err_topics.state, js)
             self._last_err = self._err
+
+            self.sendStates()
             
         def new_temp(self, temp):
             pct = 0

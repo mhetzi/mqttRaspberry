@@ -366,7 +366,6 @@ class PluginManager:
         try:
             if rc == 0:
                 self.is_connected = True
-                self._wasConnected = False
                 self.logger.info("Verbunden, regestriere Plugins...")
                 self.register_mods()
                 self.logger.info("Setze onlinestatus {} auf online".format(self.config.get_client_config().isOnlineTopic))
@@ -375,6 +374,7 @@ class PluginManager:
                 self._client.message_callback_add("broadcast/updateAll", self.reSendStates)
                 time.sleep(1.0)
                 self.reSendStates()
+                self._wasConnected = True
 
             else:
                 self.logger.warning("Nicht verbunden, Plugins werden nicht regestriert. rc: {}, flags: {}".format(rc, flags))
@@ -392,7 +392,9 @@ class PluginManager:
             self._client.disconnect()
         self.logger.info("Beende Scheduler")
         schedule.clear()
-        self.scheduler_event.set()
-        self.shed_thread.join()
+        if self.scheduler_event is not None:
+            self.scheduler_event.set()
+        if self.shed_thread is not None:
+            self.shed_thread.join()
         exit(0)
 

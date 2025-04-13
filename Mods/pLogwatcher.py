@@ -144,6 +144,8 @@ try:
                                    f"logs/{name}"), logger=self._logger
                                    )
                     log.register(self._pluginManager)
+            if wasConnected:
+                self.sendStates()
 
         def stop(self):
             pass

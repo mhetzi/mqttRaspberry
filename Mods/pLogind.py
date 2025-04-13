@@ -323,6 +323,8 @@ if BUILD_PLGUIN:
             self._pluginManager = pm
 
         def register(self, wasConnected=False):
+            if wasConnected:
+                self.stop()
             self._setup_dbus_interfaces()
             netName = autodisc.Topics.get_std_devInf().name if self._config.get("custom_name", None) is None else self._config.get("custom_name", None)
             # Kann ich ausschalten?
