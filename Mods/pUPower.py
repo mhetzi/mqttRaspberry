@@ -129,7 +129,7 @@ try:
             self._pluginManager = pm
 
         def register(self, wasConnected=False):
-            if self._glib_thread is None:
+            if self._glib_thread is not None:
                 self._logger.debug("Was registered. Destroy old stuff...")
                 self.stop()
 
