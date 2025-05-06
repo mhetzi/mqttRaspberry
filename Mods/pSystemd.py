@@ -206,7 +206,8 @@ try:
 
         def stop(self):
             if self._glib_thr is not None:
-                Mods.linux.dbus_common.deinit_dbus()
+                Mods.linux.dbus_common.deinit_dbus(logger=self._logger)
+                self._glib_thread = None
         
         def sendStates(self):
             for unit in self._units.values():

@@ -112,7 +112,8 @@ try:
 
             self._logger.info("[2/2] GLib MainThread stop")
             if self._glib_thread is not None:
-                Mods.linux.dbus_common.deinit_dbus()
+                Mods.linux.dbus_common.deinit_dbus(logger=self._logger)
+                self._glib_thread = None
 
 except ImportError as ie:
     pass            

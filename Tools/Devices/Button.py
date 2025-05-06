@@ -58,19 +58,22 @@ class Button:
         self._pm._client.publish(self._topics.config, zeroc, retain=True)
         self._pm._client.subscribe(self._topics.command)
         self._pm._client.message_callback_add(self._topics.command, lambda client,userdata,message: self._callback(message=message))
+        self._pm.addOfflineHandler(self.offline)
 
 
     def offline(self):
         self.is_online = False
         try:
-            return self._pm._client.publish(self._topics.ava_topic, payload="offline", retain=True)
+            if self._pm._client is not None and self._topics.ava_topic is not None:
+                return self._pm._client.publish(self._topics.ava_topic, payload="offline", retain=True)
         except:
             self._log.exception("offline(): ")
             return None
     def online(self):
         self.is_online = True
         try:
-            return self._pm._client.publish(self._topics.ava_topic, payload="online", retain=True)
+            if self._pm._client is not None and self._topics.ava_topic is not None:
+                return self._pm._client.publish(self._topics.ava_topic, payload="online", retain=True)
         except:
             self._log.exception("online(): ")
             return None

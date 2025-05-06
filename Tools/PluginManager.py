@@ -4,8 +4,7 @@ from pathlib import Path
 
 import threading
 import time
-import pkgutil
-import sys
+import weakref
 from typing import Callable, NoReturn, Union
 import Tools.error as err
 
@@ -90,7 +89,6 @@ class ConfiguratorInterface(ABC):
     def getCurrentConfig(conf: tc.BasicConfig) -> tc.PluginConfig: raise NotImplementedError()
 
 class PluginManager:
-
     needed_list = []
     configured_list = {}
     is_connected = False
@@ -144,6 +142,13 @@ class PluginManager:
         self.shed_thread = None
         self._discovery_topics = self.config.getIndependendFile("discovery_topics", no_watchdog=True, do_load=True)[0]
         self.discovery_topics = tc.PluginConfig(self._discovery_topics, "Registry")
+        self._offline_handlers: list[weakref.WeakMethod[Callable[[], None | mclient.MQTTMessageInfo]]] = []
+        self._offline_handlers_lock = threading.Lock()
+
+    def addOfflineHandler(self, func: Callable[[], None | mclient.MQTTMessageInfo]):
+        with self._offline_handlers_lock:
+            self._offline_handlers.append(weakref.WeakMethod(func))
+    
 
     def get_pip_list(self):
         pip_list: list[str] = []
@@ -172,7 +177,8 @@ class PluginManager:
 
 
     def enable_mods(self):
-        self.scheduler_event, self.shed_thread = self.run_scheduler_continuously()
+        if self.scheduler_event is None:
+            self.scheduler_event, self.shed_thread = self.run_scheduler_continuously()
         self.configured_list = {}
         mep = list(self.config.get_all_plugin_names())
         i = 0
@@ -361,6 +367,12 @@ class PluginManager:
         self.logger.info("Verbindung getrennt")
         self._wasConnected = self.is_connected or self._wasConnected
         self.is_connected = False
+        with self._offline_handlers_lock:
+            self._offline_handlers = [ref for ref in self._offline_handlers if ref() is not None]
+            for f in self._offline_handlers:
+                real_func = f()
+                if real_func is not None:
+                    real_func()
 
     def connect_callback(self, client, userdata, flags, rc):
         try:
@@ -384,7 +396,7 @@ class PluginManager:
     def _shutdown(self):
         pass
     
-    def shutdown(self) -> NoReturn:
+    def _shutdownFromExit(self) -> None:
         self.logger.info("Plugins werden deaktiviert")
         self.disable_mods()
         self.logger.info("MQTT wird getrennt")
@@ -396,5 +408,8 @@ class PluginManager:
             self.scheduler_event.set()
         if self.shed_thread is not None:
             self.shed_thread.join()
+
+    def shutdown(self) -> NoReturn:
+        self._shutdownFromExit()
         exit(0)
 

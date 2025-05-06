@@ -117,10 +117,11 @@ class Launcher:
                     self.mqtt_client.loop_start()
                     thread: propt.PropagatingThread = self.mqtt_client._thread
                     ret, exc = thread.joinNoRaise()
+                    self._log.debug(f"PropagatingThread has {ret=} with {exc}")
                     if isinstance(exc, BaseException):
                         raise exc
                     break
-                except ConnectionRefusedError | ssl.SSLEOFError | OSError:
+                except OSError:
                    self.mqtt_client, deviceID = self.pm.start_mqtt_client()
                    continue
                 except Exception as e:
@@ -261,7 +262,8 @@ class Launcher:
         self.reload = False
         self._log.info("Zeit zum Begraben gehn...\n PluginManager wird heruntergefahren...")
         try:
-            self.pm.shutdown()
+            if self.pm is not None:
+                self.pm._shutdownFromExit()
         except:
             pass
         if not skip_mqtt:

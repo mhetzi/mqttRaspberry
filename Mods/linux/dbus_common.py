@@ -1,6 +1,7 @@
 from dasbus.loop import EventLoop
 from threading import Thread
 import threading
+import logging
 
 global _mutex
 _mutex = threading.Lock()
@@ -21,13 +22,19 @@ class EventLoopThread(Thread):
 global _DBUS_THREAD
 _DBUS_THREAD: EventLoopThread = EventLoopThread()
 
-def deinit_dbus():
+def deinit_dbus(logger:logging.Logger | None = None):
     with _mutex:
         global _COUNT
         _COUNT = _COUNT - 1
-        if _COUNT < 1:
+        if logger is not None:
+            logger.debug(f"Dbus has {_COUNT} remaining consumers.")
+        if _COUNT < 1 and _DBUS_THREAD.loop is not None:
+            if logger is not None:
+                logger.debug(f"Dbus has no consumers. Quitting...")
             _DBUS_THREAD.loop.quit()
-            _DBUS_THREAD.join()
+            _DBUS_THREAD.join(5)
+            if logger is not None:
+                logger.debug(f"Dbus has no consumers. Quitted? {_DBUS_THREAD.is_alive()=}")
 
 def init_dbus():
     with _mutex:

@@ -195,7 +195,10 @@ class Displays(UdevDeviceProcessor):
     def stop(self):
         super().stop()
         if self._observer is not None:
-            self._observer.stop()        
+            try:
+                self._observer.stop()
+            except ValueError:
+                pass    
     
     def makeNewDevice(self, display: Display):
         if not display.edid_valid:

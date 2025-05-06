@@ -74,6 +74,7 @@ class Number:
 
         #Frage Callback nach aktuellen status
         self._callback(state_requested=True, message=None)
+        self._pm.addOfflineHandler(self.offline)
 
     def state(self, state=None, qos=0):
         if not self.is_online:
@@ -94,14 +95,16 @@ class Number:
     def offline(self):
         self.is_online = False
         try:
-            return self._pm._client.publish(self._topics.ava_topic, payload="offline", retain=True)
+            if self._pm._client is not None and self._topics.ava_topic is not None:
+                return self._pm._client.publish(self._topics.ava_topic, payload="offline", retain=True)
         except:
             self._log.exception("offline(): ")
             return None
     def online(self):
         self.is_online = True
         try:
-            return self._pm._client.publish(self._topics.ava_topic, payload="online", retain=True)
+            if self._pm._client is not None and self._topics.ava_topic is not None:
+                return self._pm._client.publish(self._topics.ava_topic, payload="online", retain=True)
         except:
             self._log.exception("online(): ")
             return None

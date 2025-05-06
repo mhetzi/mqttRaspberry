@@ -232,7 +232,8 @@ if BUILD_PLGUIN:
                 self._unlock_notify.remove()
 
             if self._glib_thr is not None:
-                Mods.linux.dbus_common.deinit_dbus()
+                Mods.linux.dbus_common.deinit_dbus(logger=self._log)
+                self._glib_thr = None
 
         def terminate(self):
             self._proxy.Terminate()

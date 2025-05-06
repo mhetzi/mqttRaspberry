@@ -71,6 +71,7 @@ class Sensor:
         self._pm._client.publish(self._topics.config, zeroc, retain=True)
         self._log.debug("Publish configuration: {}".format(zeroc))
         self._pm._client.subscribe(self._topics.command)
+        self._pm.addOfflineHandler(self.offline)
         self.reset()
 
     def reset(self):
@@ -136,15 +137,17 @@ class Sensor:
     def offline(self):
         self._is_offline = True
         try:
-            return self._pm._client.publish(self._topics.ava_topic, payload="offline", retain=True)
+            if self._pm._client is not None and self._topics.ava_topic is not None:
+                return self._pm._client.publish(self._topics.ava_topic, payload="offline", retain=True)
         except Exception as e:
             self._log.exception("Markieren des Sensors als offline fehlgeschlagen!")
-            return None
+        return None
     def online(self):
         self._is_offline = False
         try:
-            return self._pm._client.publish(self._topics.ava_topic, payload="online", retain=True)
+            if self._pm._client is not None and self._topics.ava_topic is not None:
+                return self._pm._client.publish(self._topics.ava_topic, payload="online", retain=True)
         except Exception as e:
             self._log.exception("Markieren des Sensors als online fehlgeschlagen!")
-            return None
+        return None
         
