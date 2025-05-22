@@ -122,8 +122,13 @@ class Launcher:
                         raise exc
                     break
                 except OSError:
-                   self.mqtt_client, deviceID = self.pm.start_mqtt_client()
-                   continue
+                    try:
+                        self.mqtt_client.disconnect()
+                        self.mqtt_client.loop_stop()
+                    except:
+                        pass
+                    self.mqtt_client, deviceID = self.pm.start_mqtt_client()
+                    continue
                 except Exception as e:
                     raise e
             return True

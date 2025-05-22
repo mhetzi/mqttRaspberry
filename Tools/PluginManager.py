@@ -373,6 +373,7 @@ class PluginManager:
                 real_func = f()
                 if real_func is not None:
                     real_func()
+        self.logger.info("Verbindung getrennt, alles aufgeräumt!")
 
     def connect_callback(self, client, userdata, flags, rc):
         try:
@@ -392,6 +393,7 @@ class PluginManager:
                 self.logger.warning("Nicht verbunden, Plugins werden nicht regestriert. rc: {}, flags: {}".format(rc, flags))
         except:
             self.logger.exception("Fehler in on_connect")
+        self.logger.info("Verbunde. Alles OK!")
 
     def _shutdown(self):
         pass

@@ -3,6 +3,7 @@ Könnte sein dass es nur als Benutzerservice (systemctl --user) funktioniert!
 Could be that this Plugin only works when run as user service (systemctl --user)!
 """
 from typing import IO, Union
+import dasbus.error
 import paho.mqtt.client as mclient
 import Tools.Config as conf
 import Tools.Autodiscovery as autodisc
@@ -43,15 +44,20 @@ try:
             self._pman = pm
 
         def _process_prop_changed(self, src, dic, arr, force_send=False):
-            state = {
-                "soc": self._proxy.Get("org.freedesktop.UPower.Device", "Percentage").get_double(),
-                "capaciy": self._proxy.Get("org.freedesktop.UPower.Device", "Capacity").get_double(),
-                "NativePath": self._proxy.Get("org.freedesktop.UPower.Device", "NativePath").get_string(),
-                "Serial": self._proxy.Get("org.freedesktop.UPower.Device", "Serial").get_string()
-            }
-            if self._sensor is None:
-                return None
-            return self._sensor.state(state, force_send, keypath="soc")
+            try:
+                state = {
+                    "soc": self._proxy.Get("org.freedesktop.UPower.Device", "Percentage").get_double(),
+                    "capaciy": self._proxy.Get("org.freedesktop.UPower.Device", "Capacity").get_double(),
+                    "NativePath": self._proxy.Get("org.freedesktop.UPower.Device", "NativePath").get_string(),
+                    "Serial": self._proxy.Get("org.freedesktop.UPower.Device", "Serial").get_string()
+                }
+                if self._sensor is None:
+                    return None
+                return self._sensor.state(state, force_send, keypath="soc")
+            except dasbus.error.DBusError:
+                if self._sensor is None:
+                    return None
+                return self._sensor.offline()
 
         def register(self):
                 self._sensor = Sensor(
