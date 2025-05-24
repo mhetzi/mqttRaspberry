@@ -364,7 +364,7 @@ class PluginManager:
                 self.logger.exception("Modul unterstützt sendStates() nicht!")
 
     def disconnect_callback(self, client, userdata, rc):
-        self.logger.info("Verbindung getrennt")
+        self.logger.info(f"Verbindung getrennt {rc=}")
         self._wasConnected = self.is_connected or self._wasConnected
         self.is_connected = False
         with self._offline_handlers_lock:

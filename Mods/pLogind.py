@@ -260,7 +260,7 @@ if BUILD_PLGUIN:
                 self._log.warning("LockState Requested, but it´s invalid.")
 
     class logindDbus:
-        _sleep_delay_lock: Union[IO, None] = None
+        _sleep_delay_lock: Union[int, None] = None
 
         def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
             self._bus    = None
@@ -372,8 +372,6 @@ if BUILD_PLGUIN:
                     name="Nicht schlafen", icon="mdi:sleep-off"
                 )
                 self._switches["inhibit"].register()
-            
-            sleep(5.0)
 
             self.inhibit_delay(True)
 
@@ -389,10 +387,10 @@ if BUILD_PLGUIN:
                     'Publish Powerstatus (Standby) to Network',
                     'delay'
                     )
-                self._sleep_delay_lock = os.fdopen(delay_lock, "r", -1)
-                self._logger.debug("Sleep delayed")
+                self._sleep_delay_lock = delay_lock if delay_lock > -1 else None
+                self._logger.debug("Sleep delayed" if delay_lock > -1 else "Sleep delay failed!")
             elif not sleep and self._sleep_delay_lock is not None:
-                self._sleep_delay_lock.close()
+                os.close(self._sleep_delay_lock)
                 self._sleep_delay_lock = None
                 self._logger.debug("Sleep lock destroyed")
 
@@ -466,11 +464,10 @@ if BUILD_PLGUIN:
                     except:
                         self._idle_monitor = None
                 self.sleeping = True
-                self._switches["suspend"].turnOn(qos=2).wait_for_publish()
+                self._switches["suspend"].turnOn().wait_for_publish(timeout=2)
             else:
                 self.sleeping = False
-                self._switches["suspend"].turnOff().wait_for_publish()
-            sleep(0.25)
+                self._switches["suspend"].turnOff().wait_for_publish(timeout=2)
             self._logger.debug("Send done!")
             self.inhibit_delay(sleep=not sig)
 
@@ -478,14 +475,14 @@ if BUILD_PLGUIN:
             self._logger.debug(f"Shutdown: {sig = }")
             if sig == True:
                 self.shutdown = True
-                self._switches["isOn"].turnOff(qos=1).wait_for_publish()
+                self._switches["isOn"].turnOff().wait_for_publish(timeout=2)
                 try:
                     self._idle_monitor.stop()
                 except:
                     self._idle_monitor = None
             else:
                 self.shutdown = False
-                self._switches["isOn"].turnOn().wait_for_publish()
+                self._switches["isOn"].turnOn().wait_for_publish(timeout=2)
             self.inhibit_delay(sleep=not sig)
 
         def sw_call(self, userdata=None, state_requested=False, message=None):
