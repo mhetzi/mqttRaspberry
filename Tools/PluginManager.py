@@ -10,6 +10,7 @@ import Tools.error as err
 
 try:
     import paho.mqtt.client as mclient
+    import paho.mqtt.enums as mqttEnums
 except (ImportError, ModuleNotFoundError) as ie:
     try:
         err.try_install_package('paho.mqtt', throw=ie, ask=False)
@@ -363,7 +364,7 @@ class PluginManager:
             except Exception as x:
                 self.logger.exception("Modul unterstützt sendStates() nicht!")
 
-    def disconnect_callback(self, client, userdata, rc):
+    def disconnect_callback(self, client:mclient.Client, userdata, rc:mqttEnums.MQTTErrorCode):
         self.logger.info(f"Verbindung getrennt {rc=}")
         self._wasConnected = self.is_connected or self._wasConnected
         self.is_connected = False
@@ -373,7 +374,9 @@ class PluginManager:
                 real_func = f()
                 if real_func is not None:
                     real_func()
-        self.logger.info("Verbindung getrennt, alles aufgeräumt!")
+        self.logger.info(f"Verbindung getrennt, alles aufgeräumt! {client=}")
+        if rc == mqttEnums.MQTTErrorCode.MQTT_ERR_KEEPALIVE:
+            client.disconnect()
 
     def connect_callback(self, client, userdata, flags, rc):
         try:

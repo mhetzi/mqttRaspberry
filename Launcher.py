@@ -114,6 +114,7 @@ class Launcher:
             self.pm.enable_mods()
             while True:
                 try:
+                    self._log.info("Running MQTT Main Loop")
                     self.mqtt_client.loop_start()
                     thread: propt.PropagatingThread = self.mqtt_client._thread
                     ret, exc = thread.joinNoRaise()

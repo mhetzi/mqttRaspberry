@@ -35,19 +35,25 @@ def deinit_dbus(logger:logging.Logger | None = None):
             _DBUS_THREAD.join(5)
             if logger is not None:
                 logger.debug(f"Dbus has no consumers. Quitted? {_DBUS_THREAD.is_alive()=}")
+            global DBUS_INITED
+            DBUS_INITED = False
 
-def init_dbus():
+def init_dbus(logger:logging.Logger | None = None):
     with _mutex:
         global _COUNT
-        global __DBUS_INITED
+        global DBUS_INITED
         global _DBUS_THREAD
         
         _COUNT = _COUNT + 1
 
         if DBUS_INITED:
+            if logger is not None:
+                logger.debug(f"Have dasbus event loop: {DBUS_INITED=} {_COUNT=}")
             return _DBUS_THREAD
         
-        __DBUS_INITED = True
+        if logger is not None:
+            logger.debug(f"Start new dasbus event loop: {DBUS_INITED=} {_COUNT=}")
+        DBUS_INITED = True
 
         _DBUS_THREAD = EventLoopThread()
         _DBUS_THREAD.setName("dasbus Event Loop")
