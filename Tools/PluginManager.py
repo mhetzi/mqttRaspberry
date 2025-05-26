@@ -25,6 +25,7 @@ except ImportError as ie:
         import schedule
 
 import Tools.Config as tc
+from Tools import PropagetingThread
 
 import dataclasses
 from abc import ABC, abstractmethod
@@ -95,6 +96,7 @@ class PluginManager:
     is_connected = False
     scheduler_event = None
     _client: Union[mclient.Client, None]
+    _connected_callback_thread: Union[PropagetingThread.PropagatingThread, None] = None
 
     def run_scheduler_continuously(self, interval=1):
         """Continuously run, while executing pending jobs at each elapsed
@@ -145,6 +147,8 @@ class PluginManager:
         self.discovery_topics = tc.PluginConfig(self._discovery_topics, "Registry")
         self._offline_handlers: list[weakref.WeakMethod[Callable[[], None | mclient.MQTTMessageInfo]]] = []
         self._offline_handlers_lock = threading.Lock()
+        self._mqttEvent = threading.Event()
+        self._mqttShutdown = threading.Event()
 
     def addOfflineHandler(self, func: Callable[[], None | mclient.MQTTMessageInfo]):
         with self._offline_handlers_lock:
@@ -364,7 +368,21 @@ class PluginManager:
             except Exception as x:
                 self.logger.exception("Modul unterstützt sendStates() nicht!")
 
+    def disconnect(self, skip_callbacks=False) -> mqttEnums.MQTTErrorCode:
+        self._mqttEvent.clear()
+        err = mqttEnums.MQTTErrorCode.MQTT_ERR_UNKNOWN
+        if self._client is not None:
+            self._client.reconnect_delay_set(min_delay=5, max_delay=300)
+            err = self._client.disconnect()
+            if skip_callbacks:
+                self.disconnect_callback(self._client, self, err)
+        return err
+
+    def reconnect(self):
+        self._mqttEvent.set()
+
     def disconnect_callback(self, client:mclient.Client, userdata, rc:mqttEnums.MQTTErrorCode):
+        self.is_connected = False
         self.logger.info(f"Verbindung getrennt {rc=}")
         self._wasConnected = self.is_connected or self._wasConnected
         self.is_connected = False
@@ -375,19 +393,44 @@ class PluginManager:
                 if real_func is not None:
                     real_func()
         self.logger.info(f"Verbindung getrennt, alles aufgeräumt! {client=}")
-        if rc == mqttEnums.MQTTErrorCode.MQTT_ERR_KEEPALIVE:
-            client.disconnect()
+        try:
+            if rc == mqttEnums.MQTTErrorCode.MQTT_ERR_KEEPALIVE:
+                self.logger.info("KeepAlive Error. Disconnect!")
+                client.disconnect()
+                client.loop_stop()
+        except Exception as e:
+            self.logger.exception("Fehler beim Trennen der Verbindung!")
 
-    def connect_callback(self, client, userdata, flags, rc):
+    def connect_callback(self, client:mclient.Client, userdata, flags, rc):
+        self.logger.info(f"Verbunden ({client}), regestriere Plugins...")
+        if self._connected_callback_thread is None or not self._connected_callback_thread.is_alive():
+            self._connected_callback_thread = PropagetingThread.PropagatingThread(name="mqttConnected", target=lambda: self._connect_callback(client,userdata,flags,rc))
+            self._connected_callback_thread.start()
+
+    def _connect_callback(self, client:mclient.Client, userdata, flags, rc):
+        if self.is_connected:
+            self.logger.error(f"Bin Verbunden ({client=}). Trenne verbindung...")
+            self.disconnect()
+            self.reconnect()
+            return
         try:
             if rc == 0:
                 self.is_connected = True
-                self.logger.info("Verbunden, regestriere Plugins...")
+                self.logger.info(f"Verbunden ({client}), regestriere Plugins...")
                 self.register_mods()
-                self.logger.info("Setze onlinestatus {} auf online".format(self.config.get_client_config().isOnlineTopic))
-                self._client.publish(self.config.get_client_config().isOnlineTopic, "online", 0, True)
-                self._client.subscribe("broadcast/updateAll")
-                self._client.message_callback_add("broadcast/updateAll", self.reSendStates)
+                self._client.message_callback_remove(self.config.get_client_config().isOnlineTopic)
+                
+                def setOnlineState(msg:mclient.MQTTMessage|None):
+                    if msg is not None and msg.payload.decode() == "online":
+                        return
+                    self.logger.info("Setze onlinestatus {} auf online".format(self.config.get_client_config().isOnlineTopic))
+                    self._client.publish(self.config.get_client_config().isOnlineTopic, "online", 0, True)
+                    self._client.subscribe("broadcast/updateAll")
+                    self._client.message_callback_add("broadcast/updateAll", self.reSendStates)
+
+                setOnlineState(None)
+                self._client.subscribe(self.config.get_client_config().isOnlineTopic)
+                self._client.message_callback_add(self.config.get_client_config().isOnlineTopic, lambda x,y,z: setOnlineState(z))
                 time.sleep(1.0)
                 self.reSendStates()
                 self._wasConnected = True
@@ -396,7 +439,13 @@ class PluginManager:
                 self.logger.warning("Nicht verbunden, Plugins werden nicht regestriert. rc: {}, flags: {}".format(rc, flags))
         except:
             self.logger.exception("Fehler in on_connect")
-        self.logger.info("Verbunde. Alles OK!")
+        
+        if not self.is_connected:
+            self.logger.debug("Connection Lost while setup")
+            self.disconnect()
+            self.reconnect()
+            return
+        self.logger.info("Verbunden. Alles OK!")
 
     def _shutdown(self):
         pass
@@ -405,6 +454,8 @@ class PluginManager:
         self.logger.info("Plugins werden deaktiviert")
         self.disable_mods()
         self.logger.info("MQTT wird getrennt")
+        self._mqttEvent.set()
+        self._mqttShutdown.set()
         if self._client is not None:
             self._client.disconnect()
         self.logger.info("Beende Scheduler")
@@ -417,4 +468,26 @@ class PluginManager:
     def shutdown(self) -> NoReturn:
         self._shutdownFromExit()
         exit(0)
+    
+    def mqtt_loopforever(self):
+        from Tools.PropagetingThread import PropagatingThread
+        from Tools.Config import NoClientConfigured
+        from time import sleep
+        self._mqttEvent.set()
+        self._mqttShutdown.clear()
+        try:
+            while not self._mqttShutdown.is_set():
+                mqtt_client, deviceID = self.start_mqtt_client()
+                self.logger.info("Running MQTT Main Loop")
+                mqtt_client.loop_start()
+                thread: PropagatingThread = mqtt_client._thread
+                ret, exc = thread.joinNoRaise()
+                self.logger.debug(f"PropagatingThread has {ret=} with {exc=}")
+                if isinstance(exc, (ConnectionRefusedError, KeyboardInterrupt, NoClientConfigured)):
+                    raise exc
+                if not self._mqttEvent.is_set():
+                    self._mqttEvent.wait()
+                    sleep(5)
+        except:
+            self.logger.exception("MQTT Exception")
 

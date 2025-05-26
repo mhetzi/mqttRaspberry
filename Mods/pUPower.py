@@ -103,7 +103,7 @@ try:
 
         
         def _setup_dbus_interfaces(self):
-            self._glib_thread = Mods.linux.dbus_common.init_dbus()
+            self._glib_thread = Mods.linux.dbus_common.init_dbus(logger=self._logger)
 
             self._logger.debug("Getting dbus busses...")
             self._bus    = SystemMessageBus()
@@ -135,14 +135,15 @@ try:
             self._pluginManager = pm
 
         def register(self, wasConnected=False):
-            if self._glib_thread is not None:
-                self._logger.debug("Was registered. Destroy old stuff...")
-                self.stop()
+            #if self._glib_thread is not None:
+            #    self._logger.debug("Was registered. Destroy old stuff...")
+            #    self.stop()
 
-            self._logger.debug("Register dbus interface...")
-            self._setup_dbus_interfaces()
+            if self._glib_thread is None:
+                self._logger.debug("Register dbus interface...")
+                self._setup_dbus_interfaces()
             self.sendStates()
-
+            
         def sendStates(self):
             for dev in self.sessions.values():
                 dev.resend()

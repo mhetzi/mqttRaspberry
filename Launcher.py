@@ -97,42 +97,28 @@ class Launcher:
         self.pm = pman.PluginManager(self._log, self.config)
         self.config.pre_reload = self.pm.shutdown
         self.config.post_reload = self.pm_reload
-        self.mqtt_client = None
 
         threading.current_thread().name = "Main/MQTT"
 
         try:
             try:
                 if self.config.get("ptvsd/enabled", False):
-                    import ptvsd
-                    ptvsd.enable_attach(address=("0.0.0.0", 3000)) 
+                    try:
+                        import debugpy
+                    except:
+                        try:
+                            import Tools.error as err
+                            err.try_install_package("debugpy", ask=False)
+                        except:
+                            pass
+                    import debugpy
+                    debugpy.listen(5678)
             except:
-                self._log.info("Remote Debugging (ptvsd) nicht verfügbar")
+                self._log.info("Remote Debugging (debugpy) nicht verfügbar")
             self.pm.needed_plugins()
             self.pm.get_pip_list()
-            self.mqtt_client, deviceID = self.pm.start_mqtt_client()
             self.pm.enable_mods()
-            while True:
-                try:
-                    self._log.info("Running MQTT Main Loop")
-                    self.mqtt_client.loop_start()
-                    thread: propt.PropagatingThread = self.mqtt_client._thread
-                    ret, exc = thread.joinNoRaise()
-                    self._log.debug(f"PropagatingThread has {ret=} with {exc}")
-                    if isinstance(exc, BaseException):
-                        raise exc
-                    break
-                except OSError:
-                    try:
-                        self.mqtt_client.disconnect()
-                        self.mqtt_client.loop_stop()
-                    except:
-                        pass
-                    self.mqtt_client, deviceID = self.pm.start_mqtt_client()
-                    continue
-                except Exception as e:
-                    raise e
-            return True
+            return self.pm.mqtt_loopforever()
         except ConnectionRefusedError:
             self._log.info("Server hat die Verbindung nicht angenommen. Läuft die Server Anwendung?")
             self.reload_event.set()
@@ -243,8 +229,6 @@ class Launcher:
             i = input("Beenden= [N/y]")
             if i == "y" or i == "Y":
                 return
-
-        
 
         configFolder = Path(configPath).parent
         failFile = configFolder.joinpath("fails")

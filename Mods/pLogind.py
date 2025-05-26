@@ -200,7 +200,7 @@ if BUILD_PLGUIN:
 
             self._lock_notify   = None
             self._unlock_notify = None
-            self._glib_thr      = Mods.linux.dbus_common.init_dbus()
+            self._glib_thr      = Mods.linux.dbus_common.init_dbus(self._log)
 
         def _process_prop_changed(self, src, dic, arr):
             self.lockedHint = self._proxy.Get("org.freedesktop.login1.Session", "LockedHint")
@@ -325,53 +325,53 @@ if BUILD_PLGUIN:
 
         def register(self, wasConnected=False):
             if wasConnected:
-                self.stop()
-            self._setup_dbus_interfaces()
-            netName = autodisc.Topics.get_std_devInf().name if self._config.get("custom_name", None) is None else self._config.get("custom_name", None)
-            # Kann ich ausschalten?
+                pass # self.stop()
+            if not wasConnected:
+                self._setup_dbus_interfaces()
+                netName = autodisc.Topics.get_std_devInf().name if self._config.get("custom_name", None) is None else self._config.get("custom_name", None)
+                # Kann ich ausschalten?
 
-            if self._proxy.CanPowerOff() == "yes" and self._config.get("allow_power_off", True):
-                self._switches["isOn"] = Switch(
-                    self._logger,
-                    self._pluginManager,
-                    lambda state_requested, message: self.sw_call(userdata="isOn",state_requested=state_requested, message=message),
-                    name="Eingeschaltet",
-                    ava_topic=POWER_SWITCHE_ONLINE_TOPIC.format(self._pluginManager._client_name)
-                )
-                self._proxy.PrepareForShutdown.connect(self.sendShutdown)
-                self._switches["isOn"].register()
-            # Kann ich suspend?
+                if self._proxy.CanPowerOff() == "yes" and self._config.get("allow_power_off", True):
+                    self._switches["isOn"] = Switch(
+                        self._logger,
+                        self._pluginManager,
+                        lambda state_requested, message: self.sw_call(userdata="isOn",state_requested=state_requested, message=message),
+                        name="Eingeschaltet",
+                        ava_topic=POWER_SWITCHE_ONLINE_TOPIC.format(self._pluginManager._client_name)
+                    )
+                    self._proxy.PrepareForShutdown.connect(self.sendShutdown)
+                # Kann ich suspend?
 
-            if self._proxy.CanSuspend() == "yes" and self._config.get("allow_suspend", True):
-                self._switches["suspend"] = Switch(
-                    self._logger,
-                    self._pluginManager,
-                    lambda state_requested, message: self.sw_call(userdata="suspend",state_requested=state_requested, message=message),
-                    name="Schlafen", icon="mdi:sleep",
-                    ava_topic=SLEEP_SWITCHE_ONLINE_TOPIC.format(self._pluginManager._client_name)
-                )
-                self._proxy.PrepareForSleep.connect(self.sendSuspend)
-                self._switches["suspend"].register()
-            # Kann ich neustarten?
+                if self._proxy.CanSuspend() == "yes" and self._config.get("allow_suspend", True):
+                    self._switches["suspend"] = Switch(
+                        self._logger,
+                        self._pluginManager,
+                        lambda state_requested, message: self.sw_call(userdata="suspend",state_requested=state_requested, message=message),
+                        name="Schlafen", icon="mdi:sleep",
+                        ava_topic=SLEEP_SWITCHE_ONLINE_TOPIC.format(self._pluginManager._client_name)
+                    )
+                    self._sleep_notiy = self._proxy.PrepareForSleep.connect(self.sendSuspend)
+                # Kann ich neustarten?
 
-            if self._proxy.CanReboot() == "yes" and self._config.get("allow_reboot", True):
-                self._switches["reboot"] = Switch(
-                    self._logger,
-                    self._pluginManager,
-                    lambda state_requested, message: self.sw_call(userdata="reboot",state_requested=state_requested, message=message),
-                    name="Neustarten", icon="mdi:restart"
-                )
-                self._switches["reboot"].register()
-            # Kann ich inhibit
-            if self.inhibit( ) > 0 and self._config.get("allow_inhibit", True):
-                self.uninhibit( )
-                self._switches["inhibit"] = Switch(
-                    self._logger,
-                    self._pluginManager,
-                    lambda state_requested, message: self.sw_call(userdata="inhibit",state_requested=state_requested, message=message),
-                    name="Nicht schlafen", icon="mdi:sleep-off"
-                )
-                self._switches["inhibit"].register()
+                if self._proxy.CanReboot() == "yes" and self._config.get("allow_reboot", True):
+                    self._switches["reboot"] = Switch(
+                        self._logger,
+                        self._pluginManager,
+                        lambda state_requested, message: self.sw_call(userdata="reboot",state_requested=state_requested, message=message),
+                        name="Neustarten", icon="mdi:restart"
+                    )
+                # Kann ich inhibit
+                if self.inhibit( ) > 0 and self._config.get("allow_inhibit", True):
+                    self.uninhibit( )
+                    self._switches["inhibit"] = Switch(
+                        self._logger,
+                        self._pluginManager,
+                        lambda state_requested, message: self.sw_call(userdata="inhibit",state_requested=state_requested, message=message),
+                        name="Nicht schlafen", icon="mdi:sleep-off"
+                    )
+
+            for v in self._switches.values():
+                v.register()
 
             self.inhibit_delay(True)
 
@@ -381,6 +381,11 @@ if BUILD_PLGUIN:
 
         def inhibit_delay(self, sleep=False):
             if sleep:
+                if self._sleep_delay_lock is not None:
+                    try:
+                        self.inhibit_delay(False)
+                    except:
+                        pass
                 delay_lock = self._proxy.Inhibit(
                     'sleep:shutdown',
                     'mqttScript',
@@ -390,7 +395,10 @@ if BUILD_PLGUIN:
                 self._sleep_delay_lock = delay_lock if delay_lock > -1 else None
                 self._logger.debug("Sleep delayed" if delay_lock > -1 else "Sleep delay failed!")
             elif not sleep and self._sleep_delay_lock is not None:
-                os.close(self._sleep_delay_lock)
+                try:
+                    os.close(self._sleep_delay_lock)
+                except:
+                    pass
                 self._sleep_delay_lock = None
                 self._logger.debug("Sleep lock destroyed")
 
@@ -411,7 +419,7 @@ if BUILD_PLGUIN:
             self._logger.info("[3/6] Signale werden entfernt")
             if self._poff_notiy is not None:
                 self._poff_notiy.remove()
-            if self._sleep_notiy is not None:
+            if self._sleep_notiy is not None and not self.sleeping:
                 self._sleep_notiy.remove()
             for k in self.sessions.keys():
                 session= self.sessions[k]
@@ -464,10 +472,19 @@ if BUILD_PLGUIN:
                     except:
                         self._idle_monitor = None
                 self.sleeping = True
-                self._switches["suspend"].turnOn().wait_for_publish(timeout=2)
+                try:
+                    self._switches["suspend"].turnOn().wait_for_publish(timeout=2)
+                    #self._pluginManager.disconnect()
+                except:
+                    self._logger.exception("MQTT Stuff")
             else:
                 self.sleeping = False
-                self._switches["suspend"].turnOff().wait_for_publish(timeout=2)
+                #self._pluginManager.reconnect()
+                try:
+                    self._switches["suspend"].turnOff().wait_for_publish(timeout=2)
+                except:
+                    self._logger.exception("Probably not fully back from standby!")
+                    
             self._logger.debug("Send done!")
             self.inhibit_delay(sleep=not sig)
 

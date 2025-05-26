@@ -151,7 +151,7 @@ try:
             self._logger = logger
             self._mainloop = None
             
-            self._glib_thr = Mods.linux.dbus_common.init_dbus()
+            self._glib_thr = Mods.linux.dbus_common.init_dbus(logger=logger)
 
             self._units: dict[str, SystemdUnit] = {}
             self._config = conf.PluginConfig(opts, PluginLoader.getConfigKey())
