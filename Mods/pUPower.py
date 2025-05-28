@@ -19,6 +19,38 @@ import threading
 
 from time import sleep
 
+UPOWER_DEVICE_TYPES = {
+    0:  "Unknown",
+    1:  "Line Power",
+    2:  "Battery",
+    3:  "Ups",
+    4:  "Monitor",
+    5:  "Mouse",
+    6:  "Keyboard",
+    7:  "Pda",
+    8:  "Phone",
+    9:  "Media Player",
+    10: "Tablet",
+    11: "Computer",
+    12: "Gaming Input",
+    13: "Pen",
+    14: "Touchpad",
+    15: "Modem",
+    16: "Network",
+    17: "Headset",
+    18: "Speakers",
+    19: "Headphones",
+    20: "Video",
+    21: "Other Audio",
+    22: "Remote Control",
+    23: "Printer",
+    24: "Scanner",
+    25: "Camera",
+    26: "Wearable",
+    27: "Toy",
+    28: "Bluetooth Generic"
+}
+
 try:
     import dasbus
 
@@ -45,11 +77,18 @@ try:
 
         def _process_prop_changed(self, src, dic, arr, force_send=False):
             try:
+                device_type = 0
+                try:
+                    device_type = self._proxy.Get("org.freedesktop.UPower.Device", "Type").get_uint32()
+                except:
+                    self._log.exception("Device type err")
                 state = {
                     "soc": self._proxy.Get("org.freedesktop.UPower.Device", "Percentage").get_double(),
                     "capaciy": self._proxy.Get("org.freedesktop.UPower.Device", "Capacity").get_double(),
                     "NativePath": self._proxy.Get("org.freedesktop.UPower.Device", "NativePath").get_string(),
-                    "Serial": self._proxy.Get("org.freedesktop.UPower.Device", "Serial").get_string()
+                    "Serial": self._proxy.Get("org.freedesktop.UPower.Device", "Serial").get_string(),
+                    "Type Nr.:": device_type,
+                    "Type": UPOWER_DEVICE_TYPES.get(device_type)
                 }
                 if self._sensor is None:
                     return None
