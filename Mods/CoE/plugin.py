@@ -44,6 +44,7 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
     _upd_senders: dict[str, UDP_Sender]
     _last_online: dict[str, datetime.datetime]
     _numbers: list[CoeOutNumber]
+    _pluginManager: Tools.PluginManager.PluginManager | None
 
     @staticmethod
     def get_device_online_topic(addr: str):
@@ -55,7 +56,7 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
         self._config = PluginConfig(opts, getConfigKey())
         self._logger = logger.getChild(getConfigKey())
         self._device_id = device_id
-        self._timer = schedule.every(5).minutes.do(self.check_online_status)
+        self._timer = schedule.every(5).minutes.do(lambda: self.check_online_status())
         self._udp = None
         self._upd_senders = {}
         self._last_online = {}
@@ -68,6 +69,7 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
         self._switches = []
         self._numbers = []
         self.sensors: dict[str, Sensor.Sensor | BinarySensor.BinarySensor] = {}
+        self._pluginManager = None
 
         self._rtimer = rTimer.ResettableTimer(interval=120, function=lambda n: self.sendStates())
 
@@ -136,7 +138,8 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
             sw.register()
             self._numbers.append(sw)
 
-    def register(self, wasConnected=False):
+    def register(self, newClient:mclient.Client, wasConnected=False):
+        self._client = newClient
         if self._udp is None:
             self._udp = PacketReader(listen_addr="0.0.0.0", listen_port=5441, logger=self._logger, looper=None)
             self._udp.on_message = self.on_coe_message
@@ -232,30 +235,33 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
     def _on_coe_analog_change_submitted(self, addr: str, channel: ANALOG_CHANNEL_TYPE):
         sens_id = f"{addr}:A_{channel[0]}_{channel[1]}"
         sens = self.sensors.get(sens_id, None)
-        if sens is None or not isinstance(sens, Sensor.Sensor):
+        if sens is None or not isinstance(sens, Sensor.Sensor) and self._pluginManager is not None:
             sens = self.new_analog_sensor(addr, channel)
             self.sensors[sens_id] = sens
             sens.register()
-        sens.state( {
-                "value": channel[2],
-                "node": channel[0],
-                "chan": channel[1]+1,
-                "attribution": "TA RT GmbH, Amaliendorf"
-            } )
+
+        if sens is not None and isinstance(sens, Sensor.Sensor):
+            sens.state( {
+                    "value": channel[2],
+                    "node": channel[0],
+                    "chan": channel[1]+1,
+                    "attribution": "TA RT GmbH, Amaliendorf"
+                } )
 
     def _on_coe_digital_change_submitted(self, addr: str, channel: DIGITAL_CHANNEL_TYPE):
         sens_id = f"{addr}:D_{channel[0]}_{channel[1]}"
         sens = self.sensors.get(sens_id, None)
-        if sens is None or not isinstance(sens, BinarySensor.BinarySensor):
+        if sens is None or not isinstance(sens, BinarySensor.BinarySensor) and self._pluginManager is not None:
             sens = self.new_binary_sensor(addr, channel)
             self.sensors[sens_id] = sens
             sens.register()
-        sens.turn( {
-                "value": 1 if channel[2] else 0,
-                "node": channel[0],
-                "chan": channel[1]+1,
-                "attribution": "TA RT GmbH, Amaliendorf"
-            } )
+        if sens is not None and isinstance(sens, BinarySensor.BinarySensor):
+            sens.turn( {
+                    "value": 1 if channel[2] else 0,
+                    "node": channel[0],
+                    "chan": channel[1]+1,
+                    "attribution": "TA RT GmbH, Amaliendorf"
+                } )
 
     def on_coe_message(self, msg: Message.AnalogMessage | Message.DigitalMessage):
         self._last_online[msg.ip] = datetime.datetime.now()
@@ -287,5 +293,8 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
             if tim is None or tim < (datetime.datetime.now() - datetime.timedelta(minutes=10)):
                 online = "online"
             topic = TaCoePlugin.get_device_online_topic(addr)
-            self._client.publish(topic, payload=online, retain=True)
+            if self._client is not None:
+                self._client.publish(topic, payload=online, retain=True)
+            else:
+                self._logger.error(f"self._client is None, cannot publish {topic} with payload {online}")
 

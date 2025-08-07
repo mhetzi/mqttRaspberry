@@ -42,6 +42,9 @@ class PluginInterface(ABC):
     @abstractmethod
     def register(self, wasConnected=False): pass
 
+    @abstractmethod
+    def register(self, new_client: mclient.Client, wasConnected=False): pass
+
     # Shutdown plugin
     @abstractmethod
     def stop(self): pass
@@ -261,12 +264,13 @@ class PluginManager:
                 x.set_pluginManager(self)
             except:
                 pass
+            
             try:
-                x.register(self._wasConnected)
-            except:
-                self.logger.exception("Fehler beim Regestrieren des Plugins, Retry")
+                x.register(new_client=self._client, wasConnected=self._wasConnected)
+            except AttributeError:
+                self.logger.info(f"Plugin {key} hat keine neue register(new_client, wasConnected) Methode, verwende alte Methode.")
                 try:
-                    x.register()
+                    x.register(self._wasConnected)
                 except:
                     self.logger.exception("Fehler beim Regestrieren des Plugins")
 
