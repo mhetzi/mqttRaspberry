@@ -293,8 +293,8 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
             if tim is None or tim < (datetime.datetime.now() - datetime.timedelta(minutes=10)):
                 online = "online"
             topic = TaCoePlugin.get_device_online_topic(addr)
-            if self._client is not None:
+            if isinstance(self._client, mclient.Client):
                 self._client.publish(topic, payload=online, retain=True)
             else:
-                self._logger.error(f"self._client is None, cannot publish {topic} with payload {online}")
+                self._logger.error(f"self._client ({str(self._client)}) is no mqtt client, cannot publish {topic} with payload {online}")
 

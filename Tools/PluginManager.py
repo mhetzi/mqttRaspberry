@@ -40,10 +40,7 @@ class PluginInterface(ABC):
     
     # Do necessary registrations, this gets called on (re)connect with the mqtt broker 
     @abstractmethod
-    def register(self, wasConnected=False): pass
-
-    @abstractmethod
-    def register(self, new_client: mclient.Client, wasConnected=False): pass
+    def register(self, newClient: mclient.Client | None = None, wasConnected=False): pass
 
     # Shutdown plugin
     @abstractmethod
@@ -94,8 +91,8 @@ class ConfiguratorInterface(ABC):
     def getCurrentConfig(conf: tc.BasicConfig) -> tc.PluginConfig: raise NotImplementedError()
 
 class PluginManager:
-    needed_list = []
-    configured_list = {}
+    needed_list: list[PluginLoader] = []
+    configured_list: dict[str, PluginInterface] = {}
     is_connected = False
     scheduler_event = None
     _client: Union[mclient.Client, None]
@@ -214,7 +211,7 @@ class PluginManager:
     def needed_plugins(self, get_config=False) -> list[PluginLoader]:
         import Mods
         import importlib.util
-        self.needed_list: list[PluginLoader] = []
+        self.needed_list = []
 
         p = Path(Mods.__path__[0])
         lp = [str(x) for x in list(p.glob('*.py')) if str(x.name).startswith("p", 0)]
@@ -257,7 +254,7 @@ class PluginManager:
 
         while i < len(sett):
             key = sett[i][0]
-            self.logger.info("[{}/{}] Regestriere Plugin {}.".format(1+i, len(sett), key))
+            self.logger.info(f"[{1+i}/{len(sett)}] Regestriere Plugin {key}.")
             x = sett[i][1]
             i += 1
             try:
@@ -266,13 +263,15 @@ class PluginManager:
                 pass
             
             try:
-                x.register(new_client=self._client, wasConnected=self._wasConnected)
-            except AttributeError:
-                self.logger.info(f"Plugin {key} hat keine neue register(new_client, wasConnected) Methode, verwende alte Methode.")
+                x.register(newClient=self._client, wasConnected=self._wasConnected)
+            except TypeError:
                 try:
-                    x.register(self._wasConnected)
+                    x.register(wasConnected=self._wasConnected)
                 except:
-                    self.logger.exception("Fehler beim Regestrieren des Plugins")
+                    try:
+                        x.register()
+                    except Exception as e:
+                        self.logger.exception(f"Fehler beim Registrieren des Plugins {key}: {e=} ")
 
     def send_disconnected_to_mods(self):
         self.logger.info("Verbindung getrennt!")

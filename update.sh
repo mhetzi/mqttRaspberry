@@ -19,6 +19,12 @@ install_user() {
     then
         systemctl start --user mqttScript
     fi
+    read -p "PolKit rules installieren? " -n 1 -r
+    if [[ $REPLY =~ ^[YyJj]$ ]]
+    then
+        sudo bash -c "cp /opt/mqttScripts/data/resources/mqttScripts_smart.rules /etc/polkit-1/rules.d/mqttScripts_smart.rules"
+        echo "PolKit rules installiert"
+    fi
 }
 
 install_system() {
