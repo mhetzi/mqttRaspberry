@@ -153,7 +153,6 @@ class PluginManager:
     def addOfflineHandler(self, func: Callable[[], None | mclient.MQTTMessageInfo]):
         with self._offline_handlers_lock:
             self._offline_handlers.append(weakref.WeakMethod(func))
-    
 
     def get_pip_list(self):
         pip_list: list[str] = []
@@ -410,12 +409,23 @@ class PluginManager:
             self._connected_callback_thread = PropagetingThread.PropagatingThread(name="mqttConnected", target=lambda: self._connect_callback(client,userdata,flags,rc))
             self._connected_callback_thread.start()
 
+    def hass_online_call(self, client:mclient.Client, userdata, message):
+        msg = message.payload.decode('utf-8')
+        if msg == "online":
+            self.logger.info("HomeAssistant ist online. Alle sensoren neu senden!")
+            self.reSendStates()
+
+
     def _connect_callback(self, client:mclient.Client, userdata, flags, rc):
         if self.is_connected:
             self.logger.error(f"Bin Verbunden ({client=}). Trenne verbindung...")
             self.disconnect()
             self.reconnect()
             return
+        self._client = client
+        
+        self._client.subscribe("homeassistant/status")
+        self._client.message_callback_add("homeassistant/status", self.hass_online_call)
         try:
             if rc == 0:
                 self.is_connected = True
