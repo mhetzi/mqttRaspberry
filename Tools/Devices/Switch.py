@@ -65,14 +65,21 @@ class Switch:
         self._callback(state_requested=True, message=None)
         self._pm.addOfflineHandler(self.offline)
 
+        if self._last_state is not None:
+            self.turn()
+
     def turn(self, state=None, qos=0):
-        self._last_state = state
+        if state is None and self._last_state is None:
+            return
+        if state is None:
+            state = self._last_state
         if not self.is_online:
             self.online()
         if isinstance(state, dict):
             state = json.dumps(state)
         elif isinstance(state, bool):
             state = "ON" if state else "OFF"
+        self._last_state = state
         payload = state.encode('utf-8')
         self._log.debug(f"Switch \n{self._topics.state =} \n{payload =}")
         return self._pm._client.publish(self._topics.state, payload=payload,qos=qos)

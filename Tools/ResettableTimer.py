@@ -3,9 +3,12 @@ import threading
 import schedule
 import typing
 
+user_func = typing.Callable[[object|None], None]
+empty_func = typing.Callable[[], None]
+
 class ResettableTimer:
 
-    def __init__(self, interval:int, function:typing.Callable[[object|None], None], userval=None, autorun=True):
+    def __init__(self, interval:int, function:user_func | empty_func, userval=None, autorun=True):
         self._userval = userval
         self._func = function
         self._interval = interval

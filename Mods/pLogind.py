@@ -43,11 +43,11 @@ class PluginLoader(PluginMan.PluginLoader):
         except ImportError as ie:
             import Tools.error as err
             err.try_install_package('dasbus', throw=ie, ask=False)
-        return logindDbus(client, opts, logger.getChild("logind"), device_id)
+        return logindDbus(client, opts, logger.getChild(PluginLoader.getConfigKey()), device_id)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
-        logindConfig().configure(conf, logger.getChild("logind"))
+        logindConfig().configure(conf, logger.getChild(PluginLoader.getConfigKey()))
 
     @staticmethod
     def getNeededPipModules() -> list[str]:
@@ -259,7 +259,7 @@ if BUILD_PLGUIN:
             else:
                 self._log.warning("LockState Requested, but it´s invalid.")
 
-    class logindDbus:
+    class logindDbus(PluginMan.PluginInterface):
         _sleep_delay_lock: Union[int, None] = None
 
         def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
@@ -323,9 +323,10 @@ if BUILD_PLGUIN:
         def set_pluginManager(self, pm:PluginMan.PluginManager):
             self._pluginManager = pm
 
-        def register(self, wasConnected=False):
+        def register(self, newClient: mclient.Client, wasConnected=False):
             if wasConnected:
-                pass # self.stop()
+                for v in self._switches.values():
+                    v.register()
             if not wasConnected:
                 self._setup_dbus_interfaces()
                 netName = autodisc.Topics.get_std_devInf().name if self._config.get("custom_name", None) is None else self._config.get("custom_name", None)
@@ -464,6 +465,7 @@ if BUILD_PLGUIN:
             self._proxy.UnlockSession(session_id)
 
         def sendSuspend(self, sig):
+            sendOK: bool = False
             self._logger.debug(f"Suspend: {sig = }")
             if sig == True:
                 if self._idle_monitor is not None:
@@ -482,11 +484,23 @@ if BUILD_PLGUIN:
                 #self._pluginManager.reconnect()
                 try:
                     self._switches["suspend"].turnOff().wait_for_publish(timeout=2)
+                    sendOK = True
                 except:
                     self._logger.exception("Probably not fully back from standby!")
                     
             self._logger.debug("Send done!")
             self.inhibit_delay(sleep=not sig)
+            if not sendOK:
+                MAX_TRYS=10
+                for i in range(0, MAX_TRYS):
+                    try:
+                        self._logger.info(f"Try [{i} / {MAX_TRYS}] Sleep Send state failed! ")
+                        self._switches["suspend"].turnOff().wait_for_publish(timeout=10)
+                        self._logger.info("Retry Sleep send state success.")
+                        break
+                    except RuntimeError:
+                        sleep(i)
+
 
         def sendShutdown(self, sig):
             self._logger.debug(f"Shutdown: {sig = }")
@@ -543,7 +557,10 @@ if BUILD_PLGUIN:
                     self.uninhibit()
                 if self.inhibit_lock < 1:
                     self._switches["inhibit"].turnOff()
-            
+
+        def sendStates(self):
+            for v in self._switches.values():
+                v.turn()
 
 class logindConfig:
     def __init__(self):

@@ -14,8 +14,8 @@ class Light:
     def __init__(self, logger:logging.Logger, pman: PluginManager, callback, name: str, ava_topic=None, device=None, unique_id=None, icon=None):
         if not callable(callback):
             raise AttributeError("callback not callable")
-        self._log = logger.getChild("Switch")
-        self._log.debug("Switch Object für {} mit custom uid {} erstellt.".format(name, unique_id))
+        self._log = logger.getChild("Light")
+        self._log.debug("Light Object für {} mit custom uid {} erstellt.".format(name, unique_id))
         self._pm = pman
         self._callback = callback
         self._name = name
@@ -28,7 +28,7 @@ class Light:
             name,
             autodisc.DeviceClass()
             )
-        self._sendDelay = ResettableTimer(0.25, lambda n: self._pushState(), userval=None, autorun=False)
+        self._sendDelay = ResettableTimer(1, self._pushState, userval=None, autorun=False)
     
     def enableMireds(self, min, max):
         self._schema["color_temp"] = True
@@ -40,7 +40,7 @@ class Light:
         self._schema["rgb"] = True
         return self
 
-    def enableEffects(self, effectList: list):
+    def enableEffects(self, effectList: list[str]):
         self._schema["effect"] = True
         self._schema["effect_list"] = effectList
         return self
