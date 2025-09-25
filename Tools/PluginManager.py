@@ -444,20 +444,11 @@ class PluginManager:
                 self.is_connected = True
                 self.logger.info(f"Verbunden ({client}), regestriere Plugins...")
                 self.register_mods()
-                self._client.message_callback_remove(self.config.get_client_config().isOnlineTopic)
-                
-                def setOnlineState(msg:mclient.MQTTMessage|None):
-                    if msg is not None and msg.payload.decode() == "online":
-                        return
-                    self.logger.info("Setze onlinestatus {} auf online".format(self.config.get_client_config().isOnlineTopic))
-                    self._client.publish(self.config.get_client_config().isOnlineTopic, "online", 0, True)
-                    self._client.subscribe("broadcast/updateAll")
-                    self._client.message_callback_add("broadcast/updateAll", self.reSendStates)
 
-                setOnlineState(None)
-                self._client.subscribe(self.config.get_client_config().isOnlineTopic)
-                self._client.message_callback_add(self.config.get_client_config().isOnlineTopic, lambda x,y,z: setOnlineState(z))
-                time.sleep(1.0)
+                self.logger.info("Setze onlinestatus {} auf online".format(self.config.get_client_config().isOnlineTopic))
+                self._client.publish(self.config.get_client_config().isOnlineTopic, "online", 0, True)
+                self._client.subscribe("broadcast/updateAll")
+                self._client.message_callback_add("broadcast/updateAll", self.reSendStates)
                 self.reSendStates()
                 self._wasConnected = True
 

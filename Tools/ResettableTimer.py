@@ -30,17 +30,17 @@ class ResettableTimer:
             pass
         self.cancel()
 
-    def start(self):
-        self._shed_task = schedule.every(interval=int(self._interval)).seconds
+    def start(self, interval: int | None = None):
+        self._shed_task = schedule.every(interval=int(self._interval if interval is None else interval)).seconds
         self._shed_task.do(self._bootstrap)
 
     def cancel(self):
         if self._shed_task is not None:
             schedule.cancel_job(self._shed_task)
 
-    def reset(self):
+    def reset(self, interval: int | None = None):
         self.cancel()
-        self.start()
+        self.start(interval=interval)
 
     def countdown(self):
         if self._shed_task is None:

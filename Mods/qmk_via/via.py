@@ -55,11 +55,13 @@ def _GetKeyboardDefinitionFromDict(d: dict) -> KeyboardParsedJson:
     eff_data    = getDictWithContaining(d, value="id_qmk_rgb_matrix_effect", value_search_list=True)
     efs_data    = getDictWithContaining(d, value="id_qmk_rgb_matrix_effect_speed", value_search_list=True)
     matrix      = getDictWithContaining(d, key="matrix")
+    color_data  = getDictWithContaining(d, value="id_qmk_rgb_matrix_color", value_search_list=True)
 
     Brightness: tuple[int, int, Via_Attribute_t] = (0, 255, Via_Attribute_t(CONSTANTS.RGB_MATRIX_VALUE_BRIGHTNESS))
     Effects: tuple[dict[str, int], Via_Attribute_t] = ({}, Via_Attribute_t(CONSTANTS.RGB_MATRIX_VALUE_EFFECT))
     EffectSpeed: tuple[int, int, Via_Attribute_t] = (0, 255, Via_Attribute_t(CONSTANTS.RGB_MATRIX_VALUE_EFFECT_SPEED))
     Matrix: tuple[int, int, Via_Attribute_t] = (1, 1, Via_Attribute_t(CONSTANTS.CHANNEL_RGB_MATRIX))
+    Color: Via_Attribute_t = Via_Attribute_t(0)
 
     if bright_data is not None:
         tup = bright_data.get("options", [0, 255])
@@ -79,13 +81,15 @@ def _GetKeyboardDefinitionFromDict(d: dict) -> KeyboardParsedJson:
     if matrix is not None:
         m: dict = matrix.get("matrix", {})
         Matrix = (m.get("rows", 1), m.get("cols", 1), Via_Attribute_t(CONSTANTS.CHANNEL_RGB_MATRIX))
+    if color_data is not None:
+        Color = Via_Attribute_t(CONSTANTS.RGB_MATRIX_VALUE_COLOR)
 
     return KeyboardParsedJson(
         Brightness=Brightness,
         Effects=Effects,
         EffectSpeed=EffectSpeed,
         Matrix=Matrix,
-        Color=Via_Attribute_t(CONSTANTS.RGB_MATRIX_VALUE_COLOR)
+        Color=Color
     )
 
 
@@ -104,7 +108,7 @@ class ViaHid:
         self._definition = definition
         self._logger = logger.getChild(f"ViaHid:{device.friendly_name}")
     
-    def send(self, command: Via_Command_t, channel: Via_Channels_t, attribute: Via_Attribute_t, value: int, value2:int=0) -> ctypes.Array[ctypes.c_char] | None:
+    def send(self, command: Via_Command_t, channel: Via_Channels_t|Via_Attribute_t, attribute: Via_Attribute_t, value: int, value2:int=0) -> ctypes.Array[ctypes.c_char] | None:
         p = self._device.get_device_path(self._logger)
         dev = hid.device()
         if dev is None:
@@ -130,6 +134,14 @@ class ViaHid:
         finally:
             dev.close()
         return None
+    
+    def get(self, command: Via_Command_t, attribute: Via_Attribute_t) -> ctypes.Array[ctypes.c_char] | None:
+        return self.send(
+            command=command,
+            channel=attribute,
+            attribute=Via_Attribute_t(0),
+            value=0
+        )
 
     def get_brightness(self) -> int | None:
         if self._definition.Brightness is None or self._definition.Brightness[1] <= 1:
@@ -142,10 +154,12 @@ class ViaHid:
         )
         if res is not None and len(res) >= 5:
             self._logger.debug(f"Got brightness response: {res}")
-            return res[3]
+            return res[3]+1
         return None
 
-    def set_brightness(self, brightness: int) -> bool:
+    def set_brightness(self, brightness: int|None) -> bool:
+        if brightness is None:
+            return False
         if not (self._definition.Brightness[0] <= brightness <= self._definition.Brightness[1]):
             return False
         res = self.send(
@@ -216,6 +230,8 @@ class ViaHid:
             value2=int(sat/100*255)
         )
         self._logger.debug(f"Set color to H:{hue} S:{sat}, response: {res}")
+        if res is not None and len(res) >= 4:
+            self._logger.debug(f"Response: hue: {int(res[3]/255*360)} sat: {int(res[4]/255*100)}")
         return res is not None
     
     def getColor(self) -> tuple[int, int] | None:
@@ -231,5 +247,24 @@ class ViaHid:
             hue = int(res[3]/255*360)
             sat = int(res[4]/255*100)
             self._logger.debug(f"Got color response: {res}, H:{hue} S:{sat}")
-            return (hue, sat)
+            return (int(hue)+1, int(sat)+1)
         return None
+    
+@dataclasses.dataclass(slots=True, frozen=True, unsafe_hash=True)
+class KeyboardInfo:
+    uptime: int # in ms
+    layout_options: int
+    switch_matrix_state: ctypes.Array[ctypes.c_char] | None
+    firmware_version: int
+    @staticmethod
+    def fromViaHid(via: ViaHid):
+        u = via.get(Via_Command_t(CONSTANTS.GET_KEYBOARD_VALUES), Via_Attribute_t(CONSTANTS.id_uptime))
+        l = via.get(Via_Command_t(CONSTANTS.GET_KEYBOARD_VALUES), Via_Attribute_t(CONSTANTS.id_layout_options))
+        s = via.get(Via_Command_t(CONSTANTS.GET_KEYBOARD_VALUES), Via_Attribute_t(CONSTANTS.id_switch_matrix_state))
+        f = via.get(Via_Command_t(CONSTANTS.GET_KEYBOARD_VALUES), Via_Attribute_t(CONSTANTS.id_firmware_version))
+        return KeyboardInfo(
+            uptime=int.from_bytes(u[2:6], byteorder='big', signed=False) if u is not None and len(u) >= 6 else -1,
+            layout_options=int.from_bytes(l[2:6], byteorder='big', signed=False) if l is not None and len(l) >= 6 else -1,
+            switch_matrix_state=s,
+            firmware_version=int.from_bytes(f[2:6], byteorder='big', signed=False) if f is not None and len(f) >= 6 else -1
+        )

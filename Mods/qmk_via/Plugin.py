@@ -8,7 +8,7 @@ import json
 from paho.mqtt.client import Client as MqttClient
 from paho.mqtt.client import MQTTMessage
 
-from Mods.qmk_via.via import DeviceConfigEntry, KeyboardParsedJson, GetKeyboardDefinition, ViaHid, Via_Command_t, Via_Channels_t, Via_Attribute_t
+from Mods.qmk_via.via import DeviceConfigEntry, KeyboardParsedJson, GetKeyboardDefinition, ViaHid, KeyboardInfo
 from Mods.qmk_via import CONSTANTS
 
 class ViaPlugin(PluginManager.PluginInterface):
@@ -52,30 +52,40 @@ class ViaPlugin(PluginManager.PluginInterface):
         js = json.loads(dec_msg)
         if js is None:
             return
-        bright = js.get("brightness", None)
-        if js.get("state", None) is not None:
-            state = js.get("state", "OFF")
-            if state == "ON":
-                state = 1
-                bright = 255 if bright is None else bright
-            else:
-                state = 0
-                bright = 0
-        self._logger.debug(f"Set keyboard {keyboard.friendly_name} to state {state} with brightness {bright}")
         via = self._vias.get(keyboard, None)
         if via is None:
             self._logger.warning(f"Kann ViaHid für {keyboard.friendly_name} nicht finden!")
             return
-        via.set_brightness(bright)
         light = self._lights.get(keyboard, None)
-        effect = js.get("effect", None)
-        if effect is not None:
-            if light is not None:
-                light.effect(effect)
-                via.set_effect(effect)
-        elif light is not None:
-            light.onOff(state==1)
+        if light is None:
+            self._logger.warning(f"Kann Light für {keyboard.friendly_name} nicht finden!")
+            return
+        
+        effect: str | None = js.get("effect", None)
+        state: str | None = js.get("state", None)
+        bright: int | None = js.get("brightness", None)
+        color: dict | None = js.get("color", None)
+
+        if state is not None:
+            light.onOff(state == "ON")
+            if effect is None and state == "OFF":
+                via.set_effect("None")
+
+        if bright is not None:
+            via.set_brightness(bright)
             light.brightness(bright)
+
+        if effect is not None:
+            light.effect(effect)
+            via.set_effect(effect)
+
+        if color is not None:
+            if "h" in color and "s" in color:
+                h = color.get("h", 0)
+                s = color.get("s", 0)
+                light.hs(h, s)
+                via.setColor(h, s)
+
         pass
 
     def register(self, newClient: MqttClient, wasConnected=False):
@@ -85,7 +95,7 @@ class ViaPlugin(PluginManager.PluginInterface):
                 licht = Light.Light(
                     logger=self._logger,
                     pman=self._pluginManager,
-                    callback=lambda message, state_requested: self.light_call(message=message, keyboard=keyboard, state_requested=state_requested),
+                    callback=lambda state_requested, message: self.light_call(message=message, keyboard=keyboard, state_requested=state_requested),
                     name=keyboard.friendly_name
                 )
                 d = GetKeyboardDefinition(keyboard)
@@ -112,6 +122,8 @@ class ViaPlugin(PluginManager.PluginInterface):
                 self._lights[keyboard] = licht
                 proto = self._vias[keyboard].getProtocolVersion()
 
+                ki = KeyboardInfo.fromViaHid(self._vias[keyboard])
+                self._logger.info(f"Keyboard {keyboard.friendly_name} info: {ki=}")
                 
                 self._logger.info(f"Keyboard {keyboard.friendly_name} protocol: {proto}")
         

@@ -371,9 +371,9 @@ class BasicConfig(AbstractConfig):
             import uuid
             uid = uuid.uuid4()
             name = str(uid)
-            self._logger.info("Name {} wurde generiert.".format(name))
-        self._logger.debug("Generiere Configpath von {} + {}".format(self._conf_path.parent, "{}.config".format(name)))
-        return self._conf_path.parent.joinpath("{}.config".format(name))
+            self._logger.info(f"Name {name} wurde generiert.")
+        self._logger.debug(f"Generiere Configpath von {self._conf_path.parent} + {name}.config")
+        return self._conf_path.parent.joinpath(f"{name}.config")
 
     def stop(self):
         pass

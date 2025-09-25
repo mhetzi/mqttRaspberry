@@ -10,6 +10,13 @@ CUSTOM_SET_VALUE = 7
 CUSTOM_GET_VALUE = 8
 CUSTOM_SAVE = 9
 
+""" KEYBOARD_VALUE_ID """
+id_uptime              = 1
+id_layout_options      = 2
+id_switch_matrix_state = 3
+id_firmware_version    = 4
+id_device_indication   = 5
+
 """VIA channels"""
 CHANNEL_RGB_MATRIX = 3
 
