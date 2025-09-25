@@ -15,12 +15,13 @@ class Light:
 
     __slot__ = (
         "_log", "_pm", "_callback", "_name", "_ava_topic", "_dev", "_unique_id", "_icon", "_topics", "_sendDelay",
-        "_schema", "_state", "is_online"
+        "_schema", "_state", "is_online", "_last_state"
     )
     _schema = {}
     _state = {}
     is_online = True
     _callback: callback_type | None = None
+    _last_state = None
 
     def __init__(self, logger:logging.Logger, pman: PluginManager, callback: callback_type, name: str, ava_topic=None, device=None, unique_id=None, icon=None):
         if not callable(callback):
@@ -39,6 +40,8 @@ class Light:
             name,
             autodisc.DeviceClass()
             )
+        if ava_topic is not None:
+            self._topics.ava_topic = ava_topic
         self._sendDelay = ResettableTimer(1, self._pushState, userval=None, autorun=False)
     
     def enableMireds(self, min, max):
@@ -124,9 +127,15 @@ class Light:
         if self._pm._client is None:
             self._log.warning("MQTT Client ist None, kann Status nicht senden")
             return
-        if not self.is_online:
+        was_online = self.is_online
+        if not was_online:
             self.online()
-        self._pm._client.publish( self._topics.state, payload=json.dumps(self._state) )
+        if self._state != self._last_state and self.is_online:
+            self._pm._client.publish( self._topics.state, payload=json.dumps(self._state) )
+            self._last_state = self._state.copy()
+            self._sendDelay.cancel()
+        if not self.is_online:
+            self.pushState(5)
 
     def pushState(self, delayed: int | None=None):
         self._sendDelay.reset(delayed)
@@ -186,9 +195,9 @@ class Light:
             self._log.exception("offline(): ")
             return None
     def online(self):
-        self.is_online = True
         try:
             if self._pm._client is not None and self._topics.ava_topic is not None:
+                self.is_online = True
                 return self._pm._client.publish(self._topics.ava_topic, payload="online", retain=True)
         except:
             self._log.exception("online(): ")

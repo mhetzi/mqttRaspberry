@@ -8,6 +8,10 @@ import enum
 
 class Number:
     _pm: PluginManager
+    _last_val: str | None = None
+    step: float = 1.0
+    min: float = 0.0
+    max: float = 100.0
 
     def __init__(self, logger:logging.Logger, pman: PluginManager, callback, name: str, device_class: autodisc.SensorDeviceClasses, measurement_unit: str='', ava_topic=None, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None):
         self._log = logger.getChild("Number")
@@ -30,11 +34,7 @@ class Number:
         if ava_topic is not None:
             self._topics.ava_topic = ava_topic
         self.is_online = ava_topic is None
-        self.step = 1.0
-        self.min = 0.0
-        self.max = 100.0
-        self._last_val = None
-    
+
     def __del__(self):
         if self._pm is not None and self._pm._client is not None:
             self._pm._client.message_callback_remove(self._topics.command)
@@ -77,10 +77,16 @@ class Number:
         self._pm.addOfflineHandler(self.offline)
 
     def state(self, state=None, qos=0):
+        if state == self._last_val and not self.is_online:
+            return None
+        if state is None:
+            state = self._last_val if self._last_val is not None else 0
         if not self.is_online:
             self.online()
         if isinstance(state, dict):
             state = json.dumps(state)
+        if isinstance(state, (int, float)):
+            state = str(state)
         payload = state.encode('utf-8')
         self._log.debug(f"number \n{self._topics.state =} \n{payload =}")
         self._last_val = state
@@ -101,9 +107,9 @@ class Number:
             self._log.exception("offline(): ")
             return None
     def online(self):
-        self.is_online = True
         try:
             if self._pm._client is not None and self._topics.ava_topic is not None:
+                self.is_online = True
                 return self._pm._client.publish(self._topics.ava_topic, payload="online", retain=True)
         except:
             self._log.exception("online(): ")

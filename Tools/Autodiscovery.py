@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import enum
-from typing import Union
+from typing import Union, Self
 try:
     import json
 except ImportError:
@@ -16,6 +16,8 @@ except ImportError as ie:
         err.try_install_package('paho.mqtt', throw=ie, ask=False)
     except err.RestartError:
         import paho.mqtt.client as mclient
+
+import dataclasses
 
 class Component(enum.Enum):
     BINARY_SENROR = "binary_sensor"
@@ -123,16 +125,17 @@ class LightOnCommandType(enum.Enum):
     LAST = "last"
     FIRTS = "first"
 
+@dataclasses.dataclass(slots=True, unsafe_hash=True, frozen=False)
 class DeviceInfo:
-    IDs = []
-    pi_serial = ""
-    mfr = ""
-    model = ""
-    name  = ""
-    sw_version = ""
-    via_device = None
+    IDs: list[str] = dataclasses.field(default_factory=list)
+    pi_serial: str | None = ""
+    mfr: str = ""
+    model: str = ""
+    name: str  = ""
+    sw_version: str = ""
+    via_device: str | None = None
 
-__global_device_info = None
+__global_device_info = DeviceInfo()
 
 class Topics:
     state = ""

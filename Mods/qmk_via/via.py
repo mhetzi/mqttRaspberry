@@ -29,16 +29,23 @@ class DeviceConfigEntry:
     pid: int
     ext_via_json: str | None
     embedded_via_json: dict | None
+    uid: str | None = None
 
-    def get_device_path(self, log:logging.Logger=None) -> str | None:
+    def get_hid_info(self, log:logging.Logger=None) -> dict | None:
         for d in hid.enumerate():
             if d.get("vendor_id", 0) == self.vid and d.get("product_id", 0) == self.pid:
-                     if log is not None:
-                         log.debug(f"Found device for {self.friendly_name}: {d}")
-                     if d.get('interface_number', 0) == 1:
-                        if log is not None:
-                            log.debug(f"Using interface 1 for {self.friendly_name}")
-                        return d.get("path", None)
+                if log is not None:
+                    log.debug(f"Found device for {self.friendly_name}: {d}")
+                if d.get('interface_number', 0) == 1:
+                    if log is not None:
+                        log.debug(f"Using interface 1 for {self.friendly_name}")
+                    return d
+        return None
+
+    def get_device_path(self, log:logging.Logger=None) -> str | None:
+        hi = self.get_hid_info(log=log)
+        if hi is not None:
+            return hi.get("path", None)
         return None
 
 @dataclasses.dataclass(slots=True, frozen=True)
@@ -107,14 +114,16 @@ class ViaHid:
         self._device = device
         self._definition = definition
         self._logger = logger.getChild(f"ViaHid:{device.friendly_name}")
+        self._dev_path = device.get_device_path(self._logger)
     
-    def send(self, command: Via_Command_t, channel: Via_Channels_t|Via_Attribute_t, attribute: Via_Attribute_t, value: int, value2:int=0) -> ctypes.Array[ctypes.c_char] | None:
-        p = self._device.get_device_path(self._logger)
-        dev = hid.device()
-        if dev is None:
-            return None
+    def send(self, command: Via_Command_t, channel: Via_Channels_t|Via_Attribute_t, attribute: Via_Attribute_t, value: int, value2:int=0) -> bytes | None:
+        if self._dev_path is None:
+            self._dev_path = self._device.get_device_path(self._logger)
+        p = self._dev_path
         try:
-            dev.open_path(p)
+            dev = hid.Device(path=p)
+            if dev is None:
+                return None
             self._logger.debug(f"Opened device {self._device.friendly_name} at {p}")
             if dev is not None:
                 buf = bytearray(32)
@@ -123,7 +132,8 @@ class ViaHid:
                 buf[2] = attribute
                 buf[3] = value & 0xFF
                 buf[4] = value2 & 0xFF
-                dev.write(buf)
+                arr = ctypes.create_string_buffer(bytes(buf))
+                dev.write(arr)
                 try:
                     return dev.read(32, 500)
                 except TypeError:
@@ -135,7 +145,7 @@ class ViaHid:
             dev.close()
         return None
     
-    def get(self, command: Via_Command_t, attribute: Via_Attribute_t) -> ctypes.Array[ctypes.c_char] | None:
+    def get(self, command: Via_Command_t, attribute: Via_Attribute_t) -> bytes | None:
         return self.send(
             command=command,
             channel=attribute,
@@ -203,7 +213,35 @@ class ViaHid:
         )
         self._logger.debug(f"Set effect to {effect_name} ({effect_value}), response: {res}")
         return res is not None
-
+    
+    def set_effect_speed(self, speed: int|None) -> bool:
+        if speed is None:
+            return False
+        if not (self._definition.EffectSpeed[0] < speed <= self._definition.EffectSpeed[1]):
+            return False
+        res = self.send(
+            command=Via_Command_t(CONSTANTS.CUSTOM_SET_VALUE),
+            channel=Via_Channels_t(CONSTANTS.CHANNEL_RGB_MATRIX),
+            attribute=self._definition.EffectSpeed[2],
+            value=speed
+        )
+        self._logger.debug(f"Set effect speed to {speed}, response: {res}")
+        return res is not None
+    
+    def get_effect_speed(self) -> int | None:
+        if self._definition.EffectSpeed is None or self._definition.EffectSpeed[1] <= 1:
+            return None
+        res = self.send(
+            command=Via_Command_t(CONSTANTS.CUSTOM_GET_VALUE),
+            channel=Via_Channels_t(CONSTANTS.CHANNEL_RGB_MATRIX),
+            attribute=self._definition.EffectSpeed[2],
+            value=0
+        )
+        if res is not None and len(res) >= 5:
+            self._logger.debug(f"Got effect speed response: {res}")
+            return res[3]+1
+        return None
+    
     def getProtocolVersion(self) -> int | None:
         res = self.send(
             command=Via_Command_t(CONSTANTS.GET_PROTOCOL_VERSION),
@@ -249,6 +287,12 @@ class ViaHid:
             self._logger.debug(f"Got color response: {res}, H:{hue} S:{sat}")
             return (int(hue)+1, int(sat)+1)
         return None
+
+    def isConnected(self) -> bool:
+        self._dev_path = self._device.get_device_path(self._logger)
+        if self._dev_path is None:
+            return False
+        return True
     
 @dataclasses.dataclass(slots=True, frozen=True, unsafe_hash=True)
 class KeyboardInfo:

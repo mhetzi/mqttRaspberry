@@ -24,7 +24,7 @@ class PluginLoader(PluginMan.PluginLoader):
             import hid
         except ImportError as ie:
             import Tools.error as err
-            err.try_install_package('hidapi', throw=ie, ask=False)
+            err.try_install_package('hid', throw=ie, ask=False)
         import Mods.qmk_via.Plugin as Plugin
         return Plugin.ViaPlugin(client, conf.PluginConfig(opts, PluginLoader.getConfigKey()), logger.getChild(PluginLoader.getConfigKey()), device_id)
 
@@ -37,7 +37,7 @@ class PluginLoader(PluginMan.PluginLoader):
         try:
             import hid
         except ImportError as ie:
-            return ["hidapi"]
+            return ["hid"]
         return []
 
 
