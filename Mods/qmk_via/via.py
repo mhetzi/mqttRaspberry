@@ -32,15 +32,18 @@ class DeviceConfigEntry:
     uid: str | None = None
 
     def get_hid_info(self, log:logging.Logger=None) -> dict | None:
+        bluetooth = None
         for d in hid.enumerate():
             if d.get("vendor_id", 0) == self.vid and d.get("product_id", 0) == self.pid:
                 if log is not None:
                     log.debug(f"Found device for {self.friendly_name}: {d}")
+                if d.get("bus_type", None) == hid.BusType.BLUETOOTH:
+                    bluetooth = d
                 if d.get('interface_number', 0) == 1:
                     if log is not None:
                         log.debug(f"Using interface 1 for {self.friendly_name}")
                     return d
-        return None
+        return bluetooth
 
     def get_device_path(self, log:logging.Logger=None) -> str | None:
         hi = self.get_hid_info(log=log)

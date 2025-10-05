@@ -120,7 +120,8 @@ try:
                     logger=self._logger,
                     pman=plugin_manager,
                     callback=self.button_press,
-                    name=self._unit
+                    name=self._unit,
+                    icon="mdi:restart"
                 )
             if self._button is not None:
                 self._button.register()
