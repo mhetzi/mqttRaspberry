@@ -30,24 +30,36 @@ except ImportError:
         FILEWATCHING = True
     except:
         FILEWATCHING = False
-from typing import Dict, Tuple, Sequence, Union
+from typing import Dict, Tuple, Sequence, Union, TypeVar, overload
 
+ValidItems = int | float | bool | str | None
+ValidDict = dict[ValidItems, ValidItems]
+ValidList = list[ValidDict | ValidItems]
+ValidDictReal = dict[ValidItems, ValidList | ValidDict]
+
+T = TypeVar("T")
 
 class DictBrowser:
     def __init__(self, backing_dict: dict, logger: logging.Logger = None) -> None:
         self._dict = backing_dict
         #self._log = logger if logger is not None else logging.getLogger("Launch.DictBrowser")
     
-    def get(self, key: str, default=None):
-        t = self[key]
+    @overload
+    def get(self, key: str, default: T) -> T:
+        pass
+    @overload
+    def get(self, key: str, default: None) -> None:
+        pass
+    def get(self, key: str, default=None) -> object:
+        t = self[key] # pyright: ignore[reportAssignmentType]
         if t is None and default is not None:
             self[key] = default
-        return self[key]
+        return self[key] # pyright: ignore[reportReturnType]
 
     def sett(self, key: str, value):
         self[key] = value
 
-    def __getitem__(self, item: str) -> Union[dict, list, int, float, bool, str, None]:
+    def __getitem__(self, item: str) -> ValidItems | ValidDictReal | ValidList:
         path = item.split("/")
         d: Union[dict, list] = self._dict
         i = 0
@@ -377,10 +389,15 @@ class BasicConfig(AbstractConfig):
 
     def stop(self):
         pass
-
-    def get(self, key: str, default=None):
-        key = "PLUGINS/{}".format(key)
-        return self._dict_browser.get(key, default=default)
+    
+    @overload
+    def get(self, key: str, default: T) -> T:
+        pass
+    @overload
+    def get(self, key: str, default: None) -> None:
+        pass
+    def get(self, key: str, default=None) -> object:
+        return self._dict_browser.get(key, default)
 
     def sett(self, key: str, value):
         key = "PLUGINS/{}".format(key)
@@ -466,7 +483,13 @@ class PluginConfig(AbstractConfig):
     def save(self):
         self._main.save()
 
-    def get(self, key: str, default=None):
+    @overload
+    def get(self, key: str, default: T) -> T:
+        pass
+    @overload
+    def get(self, key: str, default: None) -> None:
+        pass
+    def get(self, key: str, default=None) -> object:
         t = self[key]
         if t is None and default is not None:
             self[key] = default

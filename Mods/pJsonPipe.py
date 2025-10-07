@@ -18,8 +18,8 @@ class PluginLoader(PluginManager.PluginLoader):
         return "JsonPipe"
 
     @staticmethod
-    def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        return JsonPipe(client, opts, logger, device_id)
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        return JsonPipe(opts, logger, device_id)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
@@ -33,9 +33,8 @@ class PluginLoader(PluginManager.PluginLoader):
 
 class JsonPipe(threading.Thread, PluginManager.PluginInterface):
 
-    def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         threading.Thread.__init__(self)
-        self.__client = client
         self.__logger = logger.getChild("JsonPipeReader")
         self._config = opts
         self._pins = []
@@ -83,7 +82,7 @@ class JsonPipe(threading.Thread, PluginManager.PluginInterface):
                         return
                     try:
                         d = json.loads(data)
-                        self.__client.publish(d["t"], d["p"], d.get("r", False))
+                        self._pluginManager._client.publish(d["t"], d["p"], d.get("r", False))
                     except json.decoder.JSONDecodeError:
                         self.__logger.error("Json konnte nicht dekodiert werden.")
         os.remove(self._config.get("JsonPipe/Path", None))
@@ -92,9 +91,6 @@ class JsonPipe(threading.Thread, PluginManager.PluginInterface):
     def sendStates(self):
         try:
             d = json.loads(self._lastData)
-            self.__client.publish(d["t"], d["p"], d.get("r", False))
+            self._pluginManager._client.publish(d["t"], d["p"], d.get("r", False))
         except json.decoder.JSONDecodeError:
             self.__logger.error("Json konnte nicht dekodiert werden.")
-
-    def set_pluginManager(self, pm):
-        pass

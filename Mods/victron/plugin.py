@@ -28,7 +28,7 @@ class VeDirectPlugin:
     _plugin_manager = None
     _do_register = False
     _do_register_was_connected = False
-    _veDevice: CONST.VEDirectDevice
+    _veDevice: CONST.VEDirectDevice | None
 
     def _device_ready(self):
         self.__logger.debug("Gerät bereit.")
@@ -38,10 +38,9 @@ class VeDirectPlugin:
             self.__logger.debug("Gerät bereit. Do register_real()...")
             self.register_real(self._do_register_was_connected)
 
-    def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         self._subdevice_ready = False
         self._config = conf.PluginConfig(opts, CONST.CONFIG_NAME)
-        self.__client = client
         self.__logger = logger.getChild(CONST.CONFIG_NAME)
         self._prev_deg = None
         self.__lastTemp = 0.0
@@ -72,7 +71,7 @@ class VeDirectPlugin:
             self._shed_Job = schedule.every( self._config.get("checks", 1) ).seconds
             self._shed_Job.do(self.send_update)
 
-        if "MPPT" in self._veDirCon._device.model:
+        if "MPPT" in self._veDirCon._device.model and self._plugin_manager is not None:
             self.__logger.info("MPPT gefunden!")
             self._veDevice = MPPT(self.__logger, self._plugin_manager, self._veDirCon)
             self._veDevice.register_entities()
@@ -80,7 +79,8 @@ class VeDirectPlugin:
             self.__logger.warning("Geräte PID {} nicht erkannt.".format(self._veDirCon._device.model))
 
     def stop(self):
-        schedule.cancel_job(self._shed_Job)
+        if self._shed_Job is not None:
+            schedule.cancel_job(self._shed_Job)
         self._veDirCon.stop()
 
     def sendStates(self):

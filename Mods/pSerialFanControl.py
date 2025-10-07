@@ -14,13 +14,13 @@ class PluginLoader(PluginManager.PluginLoader):
         return "SerialFan"
 
     @staticmethod
-    def getPlugin(client: mclient.Client, opts: Config.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: Config.BasicConfig, logger: logging.Logger, device_id: str):
         try:
             import serial
         except ImportError as ie:
             import Tools.error as err
             err.try_install_package('pyserial', throw=ie, ask=False)
-        return SerialFan(client, opts, logger, device_id)
+        return SerialFan(opts, logger, device_id)
 
     @staticmethod
     def runConfig(conf: Config.BasicConfig, logger:logging.Logger):
@@ -48,9 +48,8 @@ try:
     import serial
     from Tools import Pin
 
-    class SerialFan:
-        def __init__(self, client: mclient.Client, opts: Config.BasicConfig, logger: logging.Logger, device_id: str):
-            self.__client = client
+    class SerialFan(PluginManager.PluginInterface):
+        def __init__(self, opts: Config.BasicConfig, logger: logging.Logger, device_id: str):
             self.__logger = logger.getChild("SerialFan")
             self._config = Config.PluginConfig(opts, "SerialFan")
             self._registered_callback_topics = []
@@ -68,6 +67,9 @@ try:
             self._speed_topics = None
             self._rpm_topics = None
             self._err_topics = None
+        
+        def disconnected(self):
+            pass
 
         def set_pluginManager(self, pm: PluginManager.PluginManager):
             self._pm = pm
@@ -81,7 +83,7 @@ try:
                     Autodiscovery.DeviceClass
                 )
                 fan_speed.register_light(
-                    self.__client,
+                    self._pluginManager._client,
                     "SerialFan Speed",
                     brightness_scale=100,
                     unique_id="fan.speed.pct.{}".format(self._config._main.get_client_config().id)
@@ -95,7 +97,7 @@ try:
                     Autodiscovery.SensorDeviceClasses.GENERIC_SENSOR
                 )
                 rpm.register(
-                    self.__client,
+                    self._pluginManager._client,
                     "SerialFan RPM",
                     "RPM",
                     None,
@@ -111,7 +113,7 @@ try:
                     Autodiscovery.BinarySensorDeviceClasses.PROBLEM
                 )
                 self._err_topics.register(
-                    self.__client,
+                    self._pluginManager._client,
                     "SerialFan Error",
                     "",
                     value_template="{{value_json.err}}",
@@ -130,18 +132,18 @@ try:
                 self._serial_thr = threading.Thread(target=self.serial_read, name="SerialFanRead")
                 self._serial_thr.start()
 
-            self.__client.subscribe(self._speed_topics.command)
-            self.__client.message_callback_add(self._speed_topics.command, self.on_message)
+            self._pluginManager._client.subscribe(self._speed_topics.command)
+            self._pluginManager._client.message_callback_add(self._speed_topics.command, self.on_message)
             self._registered_callback_topics.append(self._speed_topics.command)
 
-            self.__client.subscribe(self._speed_topics.brightness_cmd)
-            self.__client.message_callback_add(self._speed_topics.brightness_cmd, self.on_message)
+            self._pluginManager._client.subscribe(self._speed_topics.brightness_cmd)
+            self._pluginManager._client.message_callback_add(self._speed_topics.brightness_cmd, self.on_message)
             self._registered_callback_topics.append(self._speed_topics.brightness_cmd)
             js = json.dumps({
                         "err":  0,
                         "Grund": "OK"
             })
-            self.__client.publish(self._err_topics.state, js)
+            self._pluginManager._client.publish(self._err_topics.state, js)
             self._last_err = self._err
 
             self.sendStates()
@@ -208,7 +210,7 @@ try:
             self._serial.close()
             self._serial_thr.join()
             for reg in self._registered_callback_topics:
-                self.__client.message_callback_remove(reg)
+                self._pluginManager._client.message_callback_remove(reg)
 
         @staticmethod
         def convert_input_to_string(to_convert: int) -> str:
@@ -221,18 +223,18 @@ try:
             if self._last_pct != self._pct:
                 self._last_pct = self._pct
                 #self.__logger.debug("Sende Pct")
-                self.__client.publish(
+                self._pluginManager._client.publish(
                     self._speed_topics.state,
                     "ON" if self._pct > 10 else "OFF"
                 )
-                self.__client.publish(
+                self._pluginManager._client.publish(
                     self._speed_topics.brightness_state,
                     self._pct
                 )
             if self._last_rpm != self._rpm:
                 self._last_rpm = self._rpm
                 #self.__logger.debug("Sende RPM")
-                self.__client.publish(
+                self._pluginManager._client.publish(
                     self._rpm_topics.state,
                     self._rpm
                 )
@@ -242,7 +244,7 @@ try:
                         "Grund": "OK" if self._err is None else self._err
                 })
                 self.__logger.debug("Sende Error: {}".format(js))
-                self.__client.publish(self._err_topics.state, js)
+                self._pluginManager._client.publish(self._err_topics.state, js)
                 self._last_err = self._err
 
 except ImportError as ie:

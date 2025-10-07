@@ -19,13 +19,13 @@ class PluginLoader(PluginManager.PluginLoader):
         return "soundmeter"
 
     @staticmethod
-    def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         try:
             from soundmeter import meter
         except ImportError as ie:
             import Tools.error as err
             err.try_install_package('soundmeter', throw=ie, ask=False)
-        return SoundMeterWrapper(client, opts, logger, device_id)
+        return SoundMeterWrapper(opts, logger, device_id)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
@@ -42,13 +42,13 @@ class PluginLoader(PluginManager.PluginLoader):
 try:
     from soundmeter import meter
     class SoundMeterWrapper(PluginManager.PluginInterface):
+        _pluginManager: PluginManager.PluginManager | None = None
 
         def _reset_daily(self):
             pass
 
         def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
             self._config = conf.PluginConfig(config=opts, plugin_name="soundmeter")
-            self.__client = client
             self.__logger = logger.getChild("SoundMeter")
             self.__ava_topic = device_id
             self._topic = None
@@ -58,6 +58,9 @@ try:
             self._match_filter = self._config.get("filter/needs_positive_matches", 0)
             self._neg_match_filter = self._config.get("filter/needs_negativ_matches", 0)
             self._timeout_shed = None
+
+        def disconnected(self):
+            return super().disconnected()
 
         def register(self, was_connected):
             name = "Soundmeter"
@@ -77,7 +80,7 @@ try:
             topics = self._config.get_autodiscovery_topic(ty, name, ety)
             if topics.config is not None:
                 self.__logger.info("Werde AutodiscoveryTopic senden mit der Payload: {}".format(topics.get_config_payload(name, mv, unique_id=unique_id, value_template=vt, json_attributes=True)))
-                self.__client.publish(
+                self._pluginManager._client.publish(
                     topics.config,
                     topics.get_config_payload(name, mv, unique_id=unique_id, value_template=vt, json_attributes=True),
                     retain=True
@@ -158,7 +161,8 @@ try:
         def stop(self):
             self.meter.graceful()
             self.__logger.info("Warte auf soundmeter")
-            self._thread.join()
+            if self._thread is not None:
+                self._thread.join()
 
         def sendStates(self):
             self.send_update(False, 0)
@@ -169,11 +173,12 @@ try:
                 "triggered": 1 if triggered else 0,
                 "pRMS": self._lastRMS
             }
-            self.__client.publish(self._topic.state, json.dumps(js))
+            if self._pluginManager is not None and self._pluginManager._client is not None:
+                self._pluginManager._client.publish(self._topic.state, json.dumps(js))
             self._wasTriggered = triggered
 
         def set_pluginManager(self, pm):
-            pass
+            self._pluginManager = pm
 
 except ImportError as ie:
     pass

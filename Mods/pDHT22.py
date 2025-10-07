@@ -19,13 +19,13 @@ class PluginLoader(PluginManager.PluginLoader):
         return "DHT"
 
     @staticmethod
-    def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         try:
             import Adafruit_DHT
         except ImportError as ie:
             import Tools.error as err
             err.try_install_package('Adafruit_DHT', throw=ie, ask=False)
-        return DHT22(client, opts, logger, device_id)
+        return DHT22(opts, logger, device_id)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
@@ -87,9 +87,8 @@ if BUILD_CLASS:
                 self._config[path_min] = "RESET"
                 self._config[path_max] = "RESET"
 
-        def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
             self._config   = opts
-            self.__client  = client
             self.__logger  = logger.getChild("w1Temp")
             self._prev_deg = [None,None]
             self.dht = None
@@ -108,6 +107,9 @@ if BUILD_CLASS:
             
             self.__lastTemp = 0.0
             self.__ava_topic = device_id
+
+        def disconnected(self):
+            return super().disconnected()
 
         def register(self):
 
@@ -197,12 +199,12 @@ if BUILD_CLASS:
                     "Gestern tiefster Wert": self._config.get(path_lmin, "n/A")
                 }
                 if new_temp != -1000 and self._prev_deg == -1000:
-                    self.__client.publish(self._temp_topic.ava_topic, "online", retain=True)
+                    self._pluginManager._client.publish(self._temp_topic.ava_topic, "online", retain=True)
                     self._sensor_celsius(js, keypath="now")
                 elif new_temp != -1000:
                     self._sensor_celsius(js, keypath="now")
                 else:
-                    self.__client.publish(self._temp_topic.ava_topic, "offline", retain=True)
+                    self._pluginManager._client.publish(self._temp_topic.ava_topic, "offline", retain=True)
                 self._prev_deg[0] = new_temp
 
         def sendHumidity(self, rel_hum, force):
@@ -239,12 +241,12 @@ if BUILD_CLASS:
                     "Gestern tiefster Wert": self._config.get(path_lmin, "n/A")
                 }
                 if new_temp != -1000 and self._prev_deg == -1000:
-                    self.__client.publish(self._rh_topic.ava_topic, "online", retain=True)
+                    self._pluginManager._client.publish(self._rh_topic.ava_topic, "online", retain=True)
                     self._sensor_humidity(js, keypath="now")
                 elif new_temp != -1000:
                     self._sensor_humidity(js, keypath="now")
                 else:
-                    self.__client.publish(self._rh_topic.ava_topic, "offline", retain=True)
+                    self._pluginManager._client.publish(self._rh_topic.ava_topic, "offline", retain=True)
                 self._prev_deg[1] = new_temp
 
 

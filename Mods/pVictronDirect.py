@@ -18,10 +18,10 @@ class PluginLoader(PLuginLoadeInterface):
         return CONFIG_NAME
 
     @staticmethod
-    def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         try:
             from Mods.victron.plugin import VeDirectPlugin
-            return VeDirectPlugin(client, opts, logger, device_id)
+            return VeDirectPlugin(opts, logger, device_id)
         except ModuleNotFoundError:
             logger.warning("Please update the git submodules.")
             return None

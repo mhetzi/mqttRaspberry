@@ -34,15 +34,15 @@ from abc import ABC, abstractmethod
 
 @dataclasses.dataclass(slots=True)
 class PluginInterface(ABC):
-    _client: MqttClient
+    from Tools.PluginManager import PluginManager
     _config: tc.BasicConfig | tc.PluginConfig
     _logger: logging.Logger
     _device_id: str
-    _pluginManager = None
+    _pluginManager: PluginManager | None = None
     
     # Do necessary registrations, this gets called on (re)connect with the mqtt broker 
     @abstractmethod
-    def register(self, newClient: MqttClient | None = None, wasConnected=False): pass
+    def register(self, wasConnected=False): pass
 
     # Shutdown plugin
     @abstractmethod
@@ -54,8 +54,12 @@ class PluginInterface(ABC):
     def sendStates(self): pass
 
     # Give the PluginManager instance to the Plugin
+    def set_pluginManager(self, pm: PluginManager):
+        self._pluginManager = pm
+
+    #Inform Plugin about disconnect
     @abstractmethod
-    def set_pluginManager(self, pm): pass
+    def disconnected(self): pass
 
 
 @dataclasses.dataclass(slots=True)
@@ -275,29 +279,22 @@ class PluginManager:
                 pass
             
             try:
-                x.register(newClient=self._client, wasConnected=self._wasConnected)
+                x.register(wasConnected=self._wasConnected)
             except TypeError:
                 try:
-                    x.register(wasConnected=self._wasConnected)
-                except:
-                    try:
-                        x.register()
-                    except Exception as e:
-                        self.logger.exception(f"Fehler beim Registrieren des Plugins {key}: {e=} ")
+                    x.register()
+                except Exception as e:
+                    self.logger.exception(f"Fehler beim Registrieren des Plugins {key}: {e=} ")
 
     def send_disconnected_to_mods(self):
         self.logger.info("Verbindung getrennt!")
+        clen = len(self.configured_list)
 
-        i=0
-        sett = list(self.configured_list.items())
-
-        while i < len(sett):
-            key = sett[i][0]
-            self.logger.info("[{}/{}] Informiere Plugin {}.".format(1+i, len(sett), key))
-            x = sett[i][1]
+        for pname, pobject in self.configured_list.items():
+            self.logger.info("[{}/{}] Informiere Plugin {}.".format(1+i, clen, pname))
             i += 1
             try:
-                x.disconnected()
+                pobject.disconnected()
             except:
                 self.logger.debug("Fehler beim Informieren des Plugins")
 
@@ -415,6 +412,11 @@ class PluginManager:
                 client.loop_stop()
         except Exception as e:
             self.logger.exception("Fehler beim Trennen der Verbindung!")
+        
+        try:
+            self.send_disconnected_to_mods()
+        except:
+            self.logger.exception("self.send_disconnected_to_mods() exception")
 
     def connect_callback(self, client:MqttClient, userdata, flags, rc):
         self.logger.info(f"Verbunden ({client}), regestriere Plugins...")
@@ -433,6 +435,10 @@ class PluginManager:
         if self.is_connected:
             self.logger.error(f"Bin Verbunden ({client=}). Trenne verbindung...")
             self.disconnect()
+            try:
+                client.disconnect()
+            except:
+                pass
             self.reconnect()
             return
         self._client = client
@@ -499,7 +505,7 @@ class PluginManager:
                 mqtt_client.loop_start()
                 thread: PropagatingThread = mqtt_client._thread
                 ret, exc = thread.joinNoRaise()
-                self.logger.debug(f"PropagatingThread has {ret=} with {exc=}")
+                self.logger.warning(f"PropagatingThread has {ret=} with {exc=}", exc_info=exc)
                 if isinstance(exc, (ConnectionRefusedError, KeyboardInterrupt, NoClientConfigured)):
                     raise exc
                 if not self._mqttEvent.is_set():

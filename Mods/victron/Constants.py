@@ -102,8 +102,8 @@ ERR = {
 
 class VEDirectDevice:
 
-    def register_entities():
+    def register_entities(self):
         pass
 
-    def resend_entities():
+    def resend_entities(self):
         pass

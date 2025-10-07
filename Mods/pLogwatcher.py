@@ -15,8 +15,8 @@ class PluginLoader(PluginManager.PluginLoader):
         return "logwatcher"
 
     @staticmethod
-    def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        return LogWatcher(client, opts, logger.getChild(PluginLoader.getConfigKey()), device_id)
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        return LogWatcher(opts, logger.getChild(PluginLoader.getConfigKey()), device_id)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
@@ -123,9 +123,9 @@ try:
             self.proc.terminate()
 
 
-    class LogWatcher:
+    class LogWatcher(PluginManager.PluginInterface):
 
-        def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
             self._logger = logger
             self._watchdog = watchdog.observers.Observer()
             self._watchdog.name = "Logwatcher"
@@ -152,8 +152,9 @@ try:
         
         def sendStates(self):
             pass
-
-
+        
+        def disconnected(self):
+            return super().disconnected()
 
 except ImportError as ie:
     pass

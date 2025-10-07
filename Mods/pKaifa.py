@@ -14,9 +14,9 @@ class PluginLoader(PluginManager.PluginLoader):
         return "kaifa_smart_meter"
 
     @staticmethod
-    def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         from Mods.kaifa.Main import KaifaPlugin as pl
-        return pl(client, PluginConfig(opts, PluginLoader.getConfigKey()), logger, device_id)
+        return pl(PluginConfig(opts, PluginLoader.getConfigKey()), logger, device_id)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):

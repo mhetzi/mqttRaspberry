@@ -23,9 +23,9 @@ class PluginLoader(PluginManager.PluginLoader):
         return "udev_dbus"
 
     @staticmethod
-    def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         from Mods.udev.Main import UdevPlugin as pl
-        return pl(client, PluginConfig(opts, PluginLoader.getConfigKey()), logger, device_id)
+        return pl(PluginConfig(opts, PluginLoader.getConfigKey()), logger, device_id)
 
     @staticmethod
     def runConfig(bc: conf.BasicConfig, logger:logging.Logger):

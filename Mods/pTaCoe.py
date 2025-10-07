@@ -14,9 +14,9 @@ class PluginLoader(PluginManager.PluginLoader):
         return getConfigKey()
 
     @staticmethod
-    def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         from Mods.CoE.plugin import TaCoePlugin
-        return TaCoePlugin(client, opts, logger, device_id)
+        return TaCoePlugin(opts, logger, device_id)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):

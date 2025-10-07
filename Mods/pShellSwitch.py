@@ -16,8 +16,8 @@ class PluginLoader(PluginManager.PluginLoader):
         return "ShellSwitch"
 
     @staticmethod
-    def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        return ShellSwitch(client, opts, logger, device_id)
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        return ShellSwitch(opts, logger, device_id)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
@@ -30,13 +30,15 @@ class PluginLoader(PluginManager.PluginLoader):
 
 class ShellSwitch(PluginManager.PluginInterface):
 
-    def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         self._config = conf.PluginConfig(opts, "ShellSwitch")
-        self.__client = client
         self.__logger = logger.getChild("ShellSwitch")
         self._registered_callback_topics = []
         self._name_topic_map = {}
         self._state_name_map = {}
+
+    def disconnected(self):
+        return super().disconnected()
 
     def exec_switch(self, name:str, on:bool, initKill=None, simulate=False):
         switch = self._config["entrys/{}".format(name)]
@@ -74,7 +76,7 @@ class ShellSwitch(PluginManager.PluginInterface):
             self.__logger.error("ShellSwitch Rückgabewert der Shell ist nicht 0. Ausgabe der Shell: {}".format(e.output))
             switch["wasOn"] = not on if switch.get("onOff", True) else False
             state_js["state"] = state_js["state"] if switch.get("onOff", True) else "OFF"
-        self.__client.publish(self._state_name_map[name], json.dumps(state_js))
+        self._pluginManager._client.publish(self._state_name_map[name], json.dumps(state_js))
 
     def handle_switch(self, client, userdata, message: mclient.MQTTMessage):
         for topics in self._name_topic_map.keys():
@@ -96,7 +98,7 @@ class ShellSwitch(PluginManager.PluginInterface):
         self._config.get("reg_config_topics", [])
         if self._config.get("dereg", False):
             for command_topic in self._config.get("reg_config_topics", []):
-                self.__client.publish(command_topic, "", retain=False)
+                self._pluginManager._client.publish(command_topic, "", retain=False)
             self._config["reg_config_topics"] = []
             self._config["dereg"] = False
 
@@ -107,9 +109,9 @@ class ShellSwitch(PluginManager.PluginInterface):
             topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SWITCH, name, conf.autodisc.SensorDeviceClasses.GENERIC_SENSOR)
             conf_payload = topics.get_config_payload(friendly_name, "", None, value_template="{{ value_json.state }}", json_attributes=["on", "off", "error_code"], unique_id=uid)
             self.__logger.debug("Veröffentliche Config Payload {} in Topic {}".format(topics.config, conf_payload))
-            self.__client.publish(topics.config, conf_payload, retain=True)
-            self.__client.subscribe(topics.command)
-            self.__client.message_callback_add(topics.command, self.handle_switch)
+            self._pluginManager._client.publish(topics.config, conf_payload, retain=True)
+            self._pluginManager._client.subscribe(topics.command)
+            self._pluginManager._client.message_callback_add(topics.command, self.handle_switch)
             if topics.config not in self._config["reg_config_topics"]:
                 self._config["reg_config_topics"].append(topics.config)
             self._registered_callback_topics.append(topics.command)
@@ -126,7 +128,7 @@ class ShellSwitch(PluginManager.PluginInterface):
             self.exec_switch(name, False, False)
 
         for reg in self._registered_callback_topics:
-            self.__client.message_callback_remove(reg)
+            self._pluginManager._client.message_callback_remove(reg)
 
     def sendStates(self):
         for name in self._config.get("entrys", {}).keys():

@@ -12,7 +12,7 @@ import schedule
 
 import Mods.Weatherflow.UDP as wudp
 import Tools.Autodiscovery as autodisc
-import Tools.PluginManager
+from Tools.PluginManager import PluginManager
 import Tools.ResettableTimer as rTimer
 from Mods.Weatherflow.UpdateTypes import (DeviceStatus, HubStatus,
                                           LightningStrikeEvent, Obs_Sky,
@@ -21,39 +21,40 @@ from Mods.Weatherflow.UpdateTypes import (DeviceStatus, HubStatus,
 from Tools.Config import BasicConfig
 
 class WeatherflowPlugin:
+    _pluginManager: PluginManager | None
 
     @staticmethod
     def percentageMinMax(input, min, max):
         return ((input - min) * 100) / (max - min)
 
     @staticmethod
-    def reset_daily_rain(self):
-        self._logger.debug("Setze Täglichen Regenzähler & Temperatur Stats zurück...")
-        self._config["Weatherflow/yesterday_daily_rain"] = self._config["Weatherflow/daily_rain"]
-        self._config["Weatherflow/daily_rain"] = 0
-        self._config["Weatherflow/temp_stats/lmin"] = self._config.get("Weatherflow/temp_stats/min", "n/A")
-        self._config["Weatherflow/temp_stats/lmax"] = self._config.get("Weatherflow/temp_stats/max", "n/A")
+    def reset_daily_rain(this):
+        this._logger.debug("Setze Täglichen Regenzähler & Temperatur Stats zurück...")
+        this._config["Weatherflow/yesterday_daily_rain"] = this._config["Weatherflow/daily_rain"]
+        this._config["Weatherflow/daily_rain"] = 0
+        this._config["Weatherflow/temp_stats/lmin"] = this._config.get("Weatherflow/temp_stats/min", "n/A")
+        this._config["Weatherflow/temp_stats/lmax"] = this._config.get("Weatherflow/temp_stats/max", "n/A")
 
-        self._config["Weatherflow/temp_stats/min"] = "RESET"
-        self._config["Weatherflow/temp_stats/max"] = "RESET"
+        this._config["Weatherflow/temp_stats/min"] = "RESET"
+        this._config["Weatherflow/temp_stats/max"] = "RESET"
 
     @staticmethod
     def get_device_online_topic(serial_number: str):
         return "device_online/weatherflow/{}/online".format(serial_number)
 
     @staticmethod
-    def reset_hourly_rain(self):
-        self._logger.debug("Setze Stündlichen Regenzähler zurück...")
-        self._config["Weatherflow/hourly_rain"] = 0
+    def reset_hourly_rain(this):
+        this._logger.debug("Setze Stündlichen Regenzähler zurück...")
+        this._config["Weatherflow/hourly_rain"] = 0
         delta = datetime.timedelta(hours=1)
-        if self._lightning_counter["lastTime"] < datetime.datetime.now() - delta:
-            self._logger.debug("Prüfe Blitzmelder")
-            if self._lightning_counter["serial"] is None:
-                self._lightning_counter["init"] = 100
-                self.count_lightnings_per_minute()
+        if this._lightning_counter["lastTime"] < datetime.datetime.now() - delta:
+            this._logger.debug("Prüfe Blitzmelder")
+            if this._lightning_counter["serial"] is None:
+                this._lightning_counter["init"] = 100
+                this.count_lightnings_per_minute()
 
-    def __init__(self, client: mclient.Client, opts: BasicConfig, logger: logging.Logger, device_id: str):
-        self._client = client
+    def __init__(self, opts: BasicConfig, logger: logging.Logger, device_id: str):
+        self._pluginManager
         self._config = opts
         self._logger = logger.getChild("Weatherflow")
         self._device_id = device_id
@@ -78,7 +79,7 @@ class WeatherflowPlugin:
             self._config["Weatherflow/temp_diff"] = 0.2
 
 
-    def set_pluginManager(self, pm):
+    def set_pluginManager(self, pm: PluginManager):
         self._pluginManager = pm
 
     def sendStates(self):
@@ -90,10 +91,10 @@ class WeatherflowPlugin:
         if self._config.get("Weatherflow/deregister", False):
             self._config["Weatherflow/deregister"] = False
             for sens in self._config.get("Weatherflow/reg_sensor", []):
-                self._client.publish(sens, "", retain=True)
+                self._pluginManager._client.publish(sens, "", retain=True)
             for ser in self._config.get("Weatherflow/serial_reg", []):
                 online_topic = WeatherflowPlugin.get_device_online_topic(ser)
-                self._client.publish(online_topic, "", retain=True)
+                self._pluginManager._client.publish(online_topic, "", retain=True)
             self._config["Weatherflow/reg_sensor"] = []
             self._config["Weatherflow/serial_reg"] = []
             self._config["Weatherflow/seen_devices"] = []
@@ -115,7 +116,7 @@ class WeatherflowPlugin:
 
     def register_new_serial(self, serial):
         online_topic = WeatherflowPlugin.get_device_online_topic(serial)
-        self._client.publish(online_topic, "online", retain=True)
+        self._pluginManager._client.publish(online_topic, "online", retain=True)
         if serial not in self._config.get("Weatherflow/serial_reg", []):
             self._config["Weatherflow/serial_reg"].append(serial)
 
@@ -221,7 +222,7 @@ class WeatherflowPlugin:
         payload = topic.get_config_payload(visible_name, messurement_value, online_topic, value_template=value_template, json_attributes=json_attributes, device=devInf, unique_id=uID)
         self._logger.info(
             "Neuen Sensor ({}) regestriert. Folgendes ist die Config Payload: {}".format(visible_name, payload))
-        self._client.publish(topic.config, payload, retain=True)
+        self._pluginManager._client.publish(topic.config, payload, retain=True)
         self._logger.info("Neuen Sensor ({}) regestriert. Folgendes ist die Config Payload: {}".format(visible_name, payload))
         if topic.config not in self._config.get("Weatherflow/reg_sensor", []):
             self._config["Weatherflow/reg_sensor"].append(topic.config)
@@ -230,7 +231,7 @@ class WeatherflowPlugin:
         topic = self._config.get_autodiscovery_topic(autodisc.Component.SENSOR, name, device_class, node_id=serial_number)
         if isinstance(value, dict):
             value = json.dumps(value)
-        self._client.publish(topic.state, value)
+        self._pluginManager._client.publish(topic.state, value)
 
     def update_is_raining(self, serial, is_raining=False, is_hail=False):
         rain_json = {
@@ -622,12 +623,12 @@ class WeatherflowPlugin:
             if timespan.seconds > (self._online_states[serial]["intervall"] * 4) and self._online_states[serial]["wasOnline"]:
                 self._logger.info("Weatherflow Device {} ist jetzt offline".format(serial))
                 online_topic = WeatherflowPlugin.get_device_online_topic(serial)
-                self._client.publish(online_topic, "offline", retain=True)
+                self._pluginManager._client.publish(online_topic, "offline", retain=True)
                 self._online_states[serial]["wasOnline"] = False
             elif not self._online_states[serial]["wasOnline"]:
                 self._logger.info("Weatherflow Device {} ist jetzt online".format(serial))
                 online_topic = WeatherflowPlugin.get_device_online_topic(serial)
-                self._client.publish(online_topic, "online", retain=True)
+                self._pluginManager._client.publish(online_topic, "online", retain=True)
                 self._online_states[serial]["wasOnline"] = True
 
         if self._timer is not None:

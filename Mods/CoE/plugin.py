@@ -51,8 +51,7 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
         return f"device_online/TA_CMI_{addr}/online"
 
 
-    def __init__(self, client: mclient.Client, opts: BasicConfig, logger: logging.Logger, device_id: str):
-        self._client = client
+    def __init__(self, opts: BasicConfig, logger: logging.Logger, device_id: str):
         self._config = PluginConfig(opts, getConfigKey())
         self._logger = logger.getChild(getConfigKey())
         self._device_id = device_id
@@ -138,8 +137,7 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
             sw.register()
             self._numbers.append(sw)
 
-    def register(self, newClient:mclient.Client, wasConnected=False):
-        self._client = newClient
+    def register(self, wasConnected=False):
         if self._udp is None:
             self._udp = PacketReader(listen_addr="0.0.0.0", listen_port=5441, logger=self._logger, looper=None)
             self._udp.on_message = self.on_coe_message
@@ -184,6 +182,9 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
             self._udp.stop()
         for sender in self._upd_senders.values():
             sender.stop()
+
+    def disconnected(self):
+        return super().disconnected()
 
     def new_binary_sensor(self, addr: str, channel: DIGITAL_CHANNEL_TYPE) -> BinarySensor.BinarySensor:
         dev = autodisc.DeviceInfo()
@@ -288,13 +289,15 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
         # !!!!!!!!
         #TODO CAN Timeout implementieren
         # !!!!!!!!!
+        if self._pluginManager is None:
+            return
         for addr, tim in self._last_online.items():
             online = "offline"
             if tim is None or tim < (datetime.datetime.now() - datetime.timedelta(minutes=10)):
                 online = "online"
             topic = TaCoePlugin.get_device_online_topic(addr)
-            if isinstance(self._client, mclient.Client):
-                self._client.publish(topic, payload=online, retain=True)
+            if isinstance(self._pluginManager._client, mclient.Client):
+                self._pluginManager._client.publish(topic, payload=online, retain=True)
             else:
-                self._logger.error(f"self._client ({str(self._client)}) is no mqtt client, cannot publish {topic} with payload {online}")
+                self._logger.error(f"self._pluginManager._client ({str(self._pluginManager._client)}) is no mqtt client, cannot publish {topic} with payload {online}")
 

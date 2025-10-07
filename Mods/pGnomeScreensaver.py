@@ -27,7 +27,7 @@ try:
     class gnomeScreensaver(PluginManager.PluginInterface):
         _sleep_delay_lock: Union[IO, None] = None
 
-        def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
             self._session_bus    = None
             self._proxy  = None
             self._upower = None
@@ -75,8 +75,8 @@ try:
                 self._proxy.SetActive(bool(message))
             self._timer.reset()
 
-        def set_pluginManager(self, pm:PluginManager.PluginManager):
-            self._pluginManager = pm
+        def disconnected(self):
+            return super().disconnected()
 
         def register(self, wasConnected=False):
             if self._sw is None:
@@ -136,8 +136,8 @@ class PluginLoader(PluginManager.PluginLoader):
         return "gnome-shell-screensaver"
 
     @staticmethod
-    def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        return gnomeScreensaver(client, opts, logger.getChild(PluginLoader.getConfigKey()), device_id)
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        return gnomeScreensaver(opts, logger.getChild(PluginLoader.getConfigKey()), device_id)
 
     @staticmethod
     def runConfig(bc: conf.BasicConfig, logger:logging.Logger):

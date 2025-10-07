@@ -29,14 +29,14 @@ class PluginLoader(PluginManager.PluginLoader):
         return "RaspberryPiGPIO"
 
     @staticmethod
-    def getPlugin(client: mclient.Client, opts: Config.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: Config.BasicConfig, logger: logging.Logger, device_id: str):
         try:
             import gpiozero
             from Tools import Pin
         except ImportError as ie:
             import Tools.error as err
             err.try_install_package('gpiozero', throw=ie, ask=False)
-        return RaspberryPiGpio(client, opts, logger, device_id)
+        return RaspberryPiGpio(opts, logger, device_id)
 
     @staticmethod
     def runConfig(conf: Config.BasicConfig, logger:logging.Logger):
@@ -75,10 +75,9 @@ class PluginLoader(PluginManager.PluginLoader):
                     break
 
 if DEPENDENCIES_LOADED:
-    class RaspberryPiGpio:
+    class RaspberryPiGpio(PluginManager.PluginInterface):
 
-        def __init__(self, client: mclient.Client, opts: Config.BasicConfig, logger: logging.Logger, device_id: str):
-            self.__client = client
+        def __init__(self, opts: Config.BasicConfig, logger: logging.Logger, device_id: str):
             self.__logger = logger.getChild("rPiGPIO")
             self._config = opts
             self._pins = []
@@ -133,19 +132,19 @@ if DEPENDENCIES_LOADED:
                 uid = "switch.rPiGPIO-{}.{}".format(Autodiscovery.Topics.get_std_devInf().pi_serial, name.replace(" ", "_"))
                 self.__logger.debug("Pushe Config")
                 if topic.config is not None:
-                    self.__client.publish(topic.config, topic.get_config_payload(name, meas_val, None, unique_id=uid), retain=True)
+                    self._pluginManager._client.publish(topic.config, topic.get_config_payload(name, meas_val, None, unique_id=uid), retain=True)
                 self.__logger.debug("SUB")
-                self.__client.subscribe(topic.command)
+                self._pluginManager._client.subscribe(topic.command)
                 time.sleep(2)
                 self.__logger.debug("Bin switch. Regestriere msqtt callback unter {}".format(topic.command))
-                self.__client.message_callback_add(topic.command, self.on_message)
+                self._pluginManager._client.message_callback_add(topic.command, self.on_message)
                 self._registered_callback_topics.append(topic.command)
 
             else:
                 self.__logger.debug("Bin kein switch. Brauche kein callback.")
                 uid = "binary_sensor.rPiGPIO-{}.{}".format(Autodiscovery.Topics.get_std_devInf().pi_serial,  name.replace(" ", "_"))
                 if topic.config is not None:
-                    self.__client.publish(topic.config, topic.get_config_payload(name, meas_val, None, unique_id=uid), retain=True)
+                    self._pluginManager._client.publish(topic.config, topic.get_config_payload(name, meas_val, None, unique_id=uid), retain=True)
                 pin.set_detect(self.send_updates, Pin.PinEventEdge.BOTH)
             self.send_updates()
 
@@ -172,7 +171,10 @@ if DEPENDENCIES_LOADED:
 
         def stop(self):
             for reg in self._registered_callback_topics:
-                self.__client.message_callback_remove(reg)
+                self._pluginManager._client.message_callback_remove(reg)
+
+        def disconnected(self):
+            return super().disconnected()
 
         @staticmethod
         def convert_input_to_string(to_convert: int) -> str:
@@ -185,4 +187,4 @@ if DEPENDENCIES_LOADED:
             for d in self._pins:
                 pin = d["p"]
                 topic = d["t"]
-                self.__client.publish(topic.state, self.convert_input_to_string(pin.input()))
+                self._pluginManager._client.publish(topic.state, self.convert_input_to_string(pin.input()))

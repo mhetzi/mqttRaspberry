@@ -10,17 +10,15 @@ from Mods.kaifa.kaifadevice import Reader
 
 
 class KaifaPlugin(PluginInterface):
-    __slots__ = ("_plugin_manager", "_devices", "_config", "__client", "__logger")
+    __slots__ = ("_plugin_manager", "_devices", "_config", "__logger")
 
     _plugin_manager: Union[PluginManager, None]
     _devices: list[Reader]
     __logger: logging.Logger
-    __client: mclient.Client
     _config: conf.PluginConfig
 
-    def __init__(self, client: mclient.Client, opts: conf.PluginConfig, logger: logging.Logger, device_id: str):
+    def __init__(self, opts: conf.PluginConfig, logger: logging.Logger, device_id: str):
         self._config = opts
-        self.__client = client
         self.__logger = logger.getChild("kaifa")
         self._devices = []
 
@@ -51,6 +49,9 @@ class KaifaPlugin(PluginInterface):
     def stop(self):
         for dev in self._devices:
             dev.stop()
+
+    def disconnected(self):
+        return super().disconnected()
 
     def sendStates(self):
         self.send_update(True)

@@ -23,7 +23,6 @@ class UdevPlugin(PluginInterface):
 
     def __init__(self, client: mclient.Client, opts: conf.PluginConfig, logger: logging.Logger, device_id: str):
         self._config = opts
-        self.__client = client
         self.__logger = logger.getChild("udev")
 
         self._context = pyudev.Context()
@@ -56,3 +55,6 @@ class UdevPlugin(PluginInterface):
     def send_update(self, force=False):
         for sp in self._sub_plugins:
             sp.sendUpdate()
+
+    def disconnected(self):
+        return super().disconnected()

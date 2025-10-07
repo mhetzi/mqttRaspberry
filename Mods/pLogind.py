@@ -37,13 +37,13 @@ class PluginLoader(PluginMan.PluginLoader):
         return "logind"
 
     @staticmethod
-    def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         try:
             import dasbus
         except ImportError as ie:
             import Tools.error as err
             err.try_install_package('dasbus', throw=ie, ask=False)
-        return logindDbus(client, opts, logger.getChild(PluginLoader.getConfigKey()), device_id)
+        return logindDbus(opts, logger.getChild(PluginLoader.getConfigKey()), device_id)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
@@ -262,7 +262,7 @@ if BUILD_PLGUIN:
     class logindDbus(PluginMan.PluginInterface):
         _sleep_delay_lock: Union[int, None] = None
 
-        def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
             self._bus    = None
             self._proxy  = None
             self._login1 = None
@@ -323,7 +323,10 @@ if BUILD_PLGUIN:
         def set_pluginManager(self, pm:PluginMan.PluginManager):
             self._pluginManager = pm
 
-        def register(self, newClient: mclient.Client, wasConnected=False):
+        def disconnected(self):
+            return super().disconnected()
+
+        def register(self, wasConnected=False):
             if wasConnected:
                 for v in self._switches.values():
                     v.register()

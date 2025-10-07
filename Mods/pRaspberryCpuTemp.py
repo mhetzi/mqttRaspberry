@@ -17,8 +17,8 @@ class PluginLoader(PluginManager.PluginLoader):
         return "rpiCPUtemp"
 
     @staticmethod
-    def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        return RaspberryPiCpuTemp(client, opts, logger, device_id)
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        return RaspberryPiCpuTemp(opts, logger, device_id)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
@@ -35,9 +35,8 @@ class RaspberryPiCpuTemp(PluginManager.PluginInterface):
     _plugin_manager: PluginManager.PluginManager
     _file = None
 
-    def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         self._config = conf.PluginConfig(opts, "rpiCPUtemp")
-        self.__client = client
         self.__logger = logger.getChild("PiCpuTemp")
         self._prev_deg = 0
         if self._config.get("diff", None) is None:
@@ -82,6 +81,9 @@ class RaspberryPiCpuTemp(PluginManager.PluginInterface):
             schedule.cancel_job(self._shed_Job)
         if self._file is not None:
             self._file.close()
+
+    def disconnected(self):
+        return super().disconnected()
 
     def sendStates(self):
         self.send_update(True)

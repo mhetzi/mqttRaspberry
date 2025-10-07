@@ -18,11 +18,10 @@ class NetworkManagerPlugin(PluginManager.PluginInterface):
     _dbus_system: SystemMessageBus
     _nm_devices: dict[str, NetworkManagerDevice] = {}
 
-    def __init__(self, client: MqttClient, opts: BasicConfig, logger: logging.Logger, device_id: str):
+    def __init__(self, opts: BasicConfig, logger: logging.Logger, device_id: str):
         import NetworkManager
         self._config = PluginConfig(opts, NetworkManager.PluginLoader.getConfigKey())
         self._logger = logger.getChild(NetworkManager.PluginLoader.getConfigKey())
-        self._client = client
         self._device_id = device_id
 
         self._dbus_system = SystemMessageBus()
@@ -41,8 +40,7 @@ class NetworkManagerPlugin(PluginManager.PluginInterface):
     def set_pluginManager(self, pm:PluginManager.PluginManager):
         self._pluginManager = pm
 
-    def register(self, newClient: MqttClient, wasConnected=False):
-        self._client = newClient
+    def register(self, wasConnected=False):
         if not wasConnected:
             for d in self._proxy.GetAllDevices():
                 self._logger.debug(f"{d=}: Creating Device...")
@@ -54,3 +52,6 @@ class NetworkManagerPlugin(PluginManager.PluginInterface):
 
     def sendStates(self):
         pass
+
+    def disconnected(self):
+        return super().disconnected()

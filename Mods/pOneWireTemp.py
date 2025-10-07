@@ -26,8 +26,8 @@ class PluginLoader(PluginManager.PluginLoader):
         return "w1t"
 
     @staticmethod
-    def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        return OneWireTemp(client, opts, logger, device_id)
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        return OneWireTemp(opts, logger, device_id)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
@@ -36,6 +36,7 @@ class PluginLoader(PluginManager.PluginLoader):
 
 class OneWireTemp(PluginManager.PluginInterface):
     _plugin_manager: PluginManager.PluginManager | None = None
+    _config: conf.PluginConfig
 
     def _reset_daily(self):
         for d in self._paths:
@@ -63,25 +64,24 @@ class OneWireTemp(PluginManager.PluginInterface):
             self._config[path_min] = "RESET"
             self._config[path_max] = "RESET"
 
-    def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        self._config = opts
-        self.__client = client
+    def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         self.__logger = logger.getChild("w1Temp")
         self._paths = []
         self._prev_deg = []
         
-
-        if isinstance(self._config.get("w1t", None), list):
+        if not isinstance(self._config.get("w1t", None), list):
             self.__logger.warning("w1t entry is not a list entry. Resetting...")
-            devices = self._config["w1t"]
-            self._config["w1t"] = {}
-            self._config["w1t/dev"] = devices
-            self._build_paths()
+            devices = opts["w1t"]
+            opts["w1t"] = {}
+            opts["w1t/dev"] = devices
+        self._config = conf.PluginConfig(opts, "w1t")
+        self._build_paths()
 
     def _build_paths(self):
         self._prev_deg = []
         self._paths = []
-        for temp in self._config.get("w1t/dev", []):
+        devices = self._config.get("w1t/dev", [])
+        for temp in devices:
             path = pathlib.Path("/sys/bus/w1/devices").joinpath(temp.get("id", "")).joinpath("w1_slave")
             try:
                 f = path.open("r")
@@ -101,7 +101,13 @@ class OneWireTemp(PluginManager.PluginInterface):
     def set_pluginManager(self, pm):
         self._plugin_manager = pm
 
+    def disconnected(self):
+        return super().disconnected()
+
     def register(self):
+        if self._plugin_manager is None:
+            self._logger.error("PluginManager is none!")
+            return
         self.__logger.debug("Sensoren für {} werden erstellt...".format(self._paths))
         for d in self._paths:
             unique_id = "sensor.w1-{}.{}".format(d["i"], d["n"])

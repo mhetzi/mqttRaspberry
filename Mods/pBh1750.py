@@ -16,13 +16,13 @@ class PluginLoader(PluginManager.PluginLoader):
         return "BH1750"
 
     @staticmethod
-    def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         try:
             import smbus
         except ImportError as ie:
             import Tools.error as err
             err.try_install_package('smbus', throw=ie, ask=False)
-        return bh1750(client, opts, logger, device_id)
+        return bh1750(opts, logger, device_id)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
@@ -47,7 +47,7 @@ except ImportError as ie:
 if not SKIP_CLASS_BUILDING:
 
     import Mods.referenz.bh1750 as bhref
-    class bh1750:
+    class bh1750(PluginManager.PluginInterface):
         topic = None
         topic_alt = None
 
@@ -60,8 +60,7 @@ if not SKIP_CLASS_BUILDING:
         _threasholds = [0,0]
         __broken = False
 
-        def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-            self._client = client
+        def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
             self._logger = logger.getChild("BH1750")
             self._devID = device_id
             
@@ -88,7 +87,7 @@ if not SKIP_CLASS_BUILDING:
                 self.topic = self._conf.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, "Licht", conf.autodisc.SensorDeviceClasses.ILLUMINANCE)
                 payload = self.topic.get_config_payload("Licht", "lux", unique_id=unique_id)
                 if (self.topic.config is not None):
-                    self._client.publish(self.topic.config, payload=payload, qos=0, retain=True)
+                    self._pluginManager._client.publish(self.topic.config, payload=payload, qos=0, retain=True)
 
             if self._conf["device_alt"]:
                 self._logger.info("Erzeuge Autodiscovery Config für Addresse 2")
@@ -96,7 +95,7 @@ if not SKIP_CLASS_BUILDING:
                 self.topic_alt = self._conf.get_autodiscovery_topic(conf.autodisc.Component.SENSOR, "Licht a", conf.autodisc.SensorDeviceClasses.ILLUMINANCE)
                 payload = self.topic_alt.get_config_payload("Licht", "lux", unique_id=unique_id)
                 if (self.topic_alt.config is not None):
-                    self._client.publish(self.topic_alt.config, payload=payload, qos=0, retain=True)
+                    self._pluginManager._client.publish(self.topic_alt.config, payload=payload, qos=0, retain=True)
 
             self._job_inst.append(schedule.every().second.do(bh1750.send_update, self))
             self._job_inst.append(schedule.every(5).minutes.do(bh1750.update_threshhold, self))
@@ -104,7 +103,7 @@ if not SKIP_CLASS_BUILDING:
         def stop(self):
             for job in self._job_inst:
                 schedule.cancel_job(job)
-            self._client.publish(self.topic.ava_topic, "offline", retain=True)
+            self._pluginManager._client.publish(self.topic.ava_topic, "offline", retain=True)
 
         def update_threshhold(self):
             if self._conf["device"]:
@@ -149,13 +148,13 @@ if not SKIP_CLASS_BUILDING:
                     lux = round(lux, 1)
                     if bh1750.inbetween(lux, self._dev_last, self._threasholds[0]):
                         self._dev_last = lux
-                        self._client.publish(self.topic.state, lux)
+                        self._pluginManager._client.publish(self.topic.state, lux)
                         if self._device_offline:
-                            self._client.publish(self.topic.ava_topic, "online", retain=True)
+                            self._pluginManager._client.publish(self.topic.ava_topic, "online", retain=True)
                             self._device_offline = False
                             self.update_threshhold()
                 except OSError:
-                    self._client.publish(self.topic.ava_topic, "offline", retain=True)
+                    self._pluginManager._client.publish(self.topic.ava_topic, "offline", retain=True)
                     self._device_offline = True
                     self._logger.exception("Kann kein update senden!")
 
@@ -165,14 +164,17 @@ if not SKIP_CLASS_BUILDING:
                     lux = round(lux, 1)
                     if bh1750.inbetween(lux, self._dev_alt_last, self._threasholds[1]):
                         self._dev_alt_last = lux
-                        self._client.publish(self.topic_alt.state, lux)
+                        self._pluginManager._client.publish(self.topic_alt.state, lux)
                         if (self._devAlt_offline):
-                            self._client.publish(self.topic_alt.ava_topic, "online", retain=True)
+                            self._pluginManager._client.publish(self.topic_alt.ava_topic, "online", retain=True)
                             self._devAlt_offline = False
                             self.update_threshhold()
                 except OSError:
-                    self._client.publish(self.topic.ava_topic, "offline", retain=True)
+                    self._pluginManager._client.publish(self.topic.ava_topic, "offline", retain=True)
                     self._devAlt_offline = True
+
+        def disconnected(self):
+            return super().disconnected()
 
         @staticmethod
         def inbetween(toTest, oldVal, upDown):

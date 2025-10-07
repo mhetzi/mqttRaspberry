@@ -48,13 +48,13 @@ class PluginLoader(PluginManager.PluginLoader):
         return "ModemManager"
 
     @staticmethod
-    def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         try:
             from pydbus import SystemBus
         except ImportError as ie:
             import Tools.error as err
             err.try_install_package('pydbus', throw=ie, ask=False)
-        return ModemManagerClient(client, opts, logger.getChild("ModemManager"), device_id)
+        return ModemManagerClient(opts, logger.getChild("ModemManager"), device_id)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
@@ -246,7 +246,6 @@ if DEPENDENCIES_LOADED:
             self.__dbus.signal_refresh_seconds = opts["ModemManager/SigSecs"]
             
             self._config = opts
-            self.__client = client
             self.__logger = logger
 
             self._raw_last = ""
@@ -281,7 +280,7 @@ if DEPENDENCIES_LOADED:
                 self.__logger.info("Werde AutodiscoveryTopic senden mit der Payload: {}".format(
                     self._raw_topic.get_config_payload("{}r".format(self._config.get("ModemManager/name", "ModemManager")), "dBm", unique_id=unique_id, value_template="{{ value_json.RSSI }}", json_attributes=True))
                     )
-                self.__client.publish(
+                self._pluginManager._client.publish(
                     self._raw_topic.config,
                     self._raw_topic.get_config_payload(
                         "{}r".format(self._config.get("ModemManager/name", "ModemManager")),
@@ -305,7 +304,7 @@ if DEPENDENCIES_LOADED:
                 self.__logger.info("Werde AutodiscoveryTopic senden mit der Payload: {}".format(
                     self._named_topic.get_config_payload("{}n".format(self._config.get("ModemManager/name", "ModemManager")), "", unique_id=unique_id, value_template="{{ value_json.RSSI }}", json_attributes=True))
                     )
-                self.__client.publish(
+                self._pluginManager._client.publish(
                     self._named_topic.config,
                     self._named_topic.get_config_payload(
                         "{}n".format(self._config.get("ModemManager/name", "ModemManager")),
@@ -329,7 +328,7 @@ if DEPENDENCIES_LOADED:
                 self.__logger.info("Werde AutodiscoveryTopic senden mit der Payload: {}".format(
                     self._quality_topic.get_config_payload("{}q".format(self._config.get("ModemManager/name", "ModemManager")), "%", unique_id=unique_id, value_template="{{ value_json.precentage }}", json_attributes=True))
                     )
-                self.__client.publish(
+                self._pluginManager._client.publish(
                     self._quality_topic.config,
                     self._quality_topic.get_config_payload(
                         "{}q".format(self._config.get("ModemManager/name", "ModemManager")),
@@ -348,11 +347,11 @@ if DEPENDENCIES_LOADED:
             raw_new = json.dumps(signal_raw)
 
             if new_quality != self._state_last:
-                self.__client.publish(self._quality_topic.state, new_quality)
+                self._pluginManager._client.publish(self._quality_topic.state, new_quality)
             if new_named != self._named_last:
-                self.__client.publish(self._named_topic.state, new_named)
+                self._pluginManager._client.publish(self._named_topic.state, new_named)
             if raw_new != self._raw_last:
-                self.__client.publish(self._raw_topic.state, raw_new)
+                self._pluginManager._client.publish(self._raw_topic.state, raw_new)
 
             self._state_last = new_quality
             self._named_last = new_named

@@ -19,14 +19,14 @@ class PluginLoader(PluginMan.PluginLoader):
         return "QMK_VIA"
 
     @staticmethod
-    def getPlugin(client: MqttClient, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         try:
             import hid
         except ImportError as ie:
             import Tools.error as err
             err.try_install_package('hid', throw=ie, ask=False)
         import Mods.qmk_via.Plugin as Plugin
-        return Plugin.ViaPlugin(client, conf.PluginConfig(opts, PluginLoader.getConfigKey()), logger.getChild(PluginLoader.getConfigKey()), device_id)
+        return Plugin.ViaPlugin(conf.PluginConfig(opts, PluginLoader.getConfigKey()), logger.getChild(PluginLoader.getConfigKey()), device_id)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):

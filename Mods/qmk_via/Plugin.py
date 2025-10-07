@@ -22,9 +22,8 @@ class ViaPlugin(PluginManager.PluginInterface):
     _vias: dict[DeviceConfigEntry, ViaHid] = {}
     _sched_job: schedule.Job | None = None
 
-    def __init__(self, client: MqttClient, opts: PluginConfig, logger: logging.Logger, device_id: str):
+    def __init__(self, opts: PluginConfig, logger: logging.Logger, device_id: str):
         self._config = opts
-        self._client = client
         self._logger = logger
         self._device_id = device_id
         keyboards: list[dict] = self._config.get("keyboards", []) # pyright: ignore[reportAssignmentType]
@@ -47,6 +46,9 @@ class ViaPlugin(PluginManager.PluginInterface):
                 uid=uid
             ))
     
+    def disconnected(self):
+        return super().disconnected()
+
     def set_pluginManager(self, pm: PluginManager.PluginManager):
         self._pluginManager = pm
 

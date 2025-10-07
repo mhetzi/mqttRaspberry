@@ -42,6 +42,7 @@ class Light:
             )
         if ava_topic is not None:
             self._topics.ava_topic = ava_topic
+            self._pm.addOfflineHandler(self.offline)
         self._sendDelay = ResettableTimer(1, self._pushState, userval=None, autorun=False)
     
     def enableMireds(self, min, max):
@@ -112,7 +113,6 @@ class Light:
         self._pm._client.publish(self._topics.config, payload=payload, retain=True)
         self._pm._client.subscribe(self._topics.command)
         self._pm._client.message_callback_add(self._topics.command, self.__call_bootstrap__)
-        self._pm.addOfflineHandler(self.offline)
 
         #Frage Callback nach aktuellen status
         if self._callback is not None:

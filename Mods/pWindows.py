@@ -17,13 +17,13 @@ class PluginLoader(PluginManager.PluginLoader):
         return "MS_Windows_Sensors"
 
     @staticmethod
-    def getPlugin(client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
         try:
             import wmi
         except ImportError as ie:
                 import Tools.error as err
                 err.try_install_package('wmi', throw=ie, ask=False)
-        return MsWindowsMain(client, opts, logger, device_id)
+        return MsWindowsMain(opts, logger, device_id)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
@@ -53,9 +53,8 @@ try:
 
         _wmi_devices: Union[WMI_PnP, None] = None
 
-        def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
             self._config = conf.PluginConfig(opts, PluginLoader.getConfigKey())
-            self.__client = client
             self.__logger = logger.getChild(PluginLoader.getConfigKey())
             self._prev_deg = True
             self.__lastTemp = 0.0
