@@ -69,7 +69,7 @@ class PluginLoader(ABC):
 
     @staticmethod
     @abstractmethod 
-    def getPlugin(client: MqttClient, opts: tc.BasicConfig, logger: logging.Logger, device_id: str) -> PluginInterface: raise NotImplementedError()
+    def getPlugin(opts: tc.BasicConfig, logger: logging.Logger, device_id: str) -> PluginInterface: raise NotImplementedError()
 
     @staticmethod
     @abstractmethod 
@@ -201,7 +201,7 @@ class PluginManager:
                 if x.getConfigKey() == key:
                     try:
                         self.logger.info("Konfiguriere Plugin...")
-                        plugin = x.getPlugin(client=self._client, opts=self.config, logger=self.logger,
+                        plugin = x.getPlugin(opts=self.config, logger=self.logger,
                                         device_id=self._client_name)
                         self.logger.info("Plugin konfiguriert")
                         break
