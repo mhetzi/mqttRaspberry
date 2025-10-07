@@ -135,7 +135,7 @@ class ViaPlugin(PluginManager.PluginInterface):
 
         pass
 
-    def register(self, newClient: MqttClient, wasConnected=False):
+    def register(self, wasConnected=False):
         if not wasConnected:
             self._lights.clear()
             for keyboard in self._keyboards:
