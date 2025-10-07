@@ -21,7 +21,7 @@ class UdevPlugin(PluginInterface):
     _plugin_manager: Union[PluginManager, None] = None
     _sub_plugins: list[udevp.UdevDeviceProcessor] = []
 
-    def __init__(self, client: mclient.Client, opts: conf.PluginConfig, logger: logging.Logger, device_id: str):
+    def __init__(self, opts: conf.PluginConfig, logger: logging.Logger, device_id: str):
         self._config = opts
         self.__logger = logger.getChild("udev")
 
