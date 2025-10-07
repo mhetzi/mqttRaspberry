@@ -34,11 +34,10 @@ from abc import ABC, abstractmethod
 
 @dataclasses.dataclass(slots=True)
 class PluginInterface(ABC):
-    from Tools.PluginManager import PluginManager
     _config: tc.BasicConfig | tc.PluginConfig
     _logger: logging.Logger
     _device_id: str
-    _pluginManager: PluginManager | None = None
+    _pluginManager: "PluginManager | None" = None
     
     # Do necessary registrations, this gets called on (re)connect with the mqtt broker 
     @abstractmethod
@@ -54,7 +53,7 @@ class PluginInterface(ABC):
     def sendStates(self): pass
 
     # Give the PluginManager instance to the Plugin
-    def set_pluginManager(self, pm: PluginManager):
+    def set_pluginManager(self, pm: "PluginManager"):
         self._pluginManager = pm
 
     #Inform Plugin about disconnect
