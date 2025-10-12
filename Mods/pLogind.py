@@ -501,7 +501,7 @@ if BUILD_PLGUIN:
                 for i in range(0, MAX_TRYS):
                     try:
                         self._logger.info(f"Try [{i} / {MAX_TRYS}] Sleep Send state failed! ")
-                        self._switches["suspend"].turnOff().wait_for_publish(timeout=10)
+                        self._switches["suspend"].turnOnOff(sig).wait_for_publish(timeout=10)
                         self._logger.info("Retry Sleep send state success.")
                         break
                     except RuntimeError:

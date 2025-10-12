@@ -99,6 +99,11 @@ class Switch:
         if json is None:
             return self.turn("OFF")
         return self.turn(json, qos=qos)
+    
+    def turnOnOff(self, state:bool, qos=0):
+        if state:
+            return self.turnOn(qos=qos)
+        self.turnOff(qos=qos)
 
     def offline(self):
         self.is_online = False
