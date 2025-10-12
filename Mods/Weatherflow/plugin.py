@@ -53,11 +53,10 @@ class WeatherflowPlugin:
                 this._lightning_counter["init"] = 100
                 this.count_lightnings_per_minute()
 
-    def __init__(self, opts: BasicConfig, logger: logging.Logger, device_id: str):
+    def __init__(self, opts: BasicConfig, logger: logging.Logger):
         self._pluginManager
         self._config = opts
         self._logger = logger.getChild("Weatherflow")
-        self._device_id = device_id
         self._udp = None
         self._timer = threading.Timer(2, self.check_online_status)
         self._lightning_counter = {"count": 0, "timer": None, "serial": None, "init": 0, "lastTime": datetime.datetime.now()}
@@ -88,6 +87,8 @@ class WeatherflowPlugin:
         }
 
     def register(self, wasConnected=False):
+        if self._pluginManager is None or self._pluginManager._client is None:
+            return
         if self._config.get("Weatherflow/deregister", False):
             self._config["Weatherflow/deregister"] = False
             for sens in self._config.get("Weatherflow/reg_sensor", []):
@@ -108,17 +109,21 @@ class WeatherflowPlugin:
             self._udp.on_message = self.process_update
 
             self._udp.start()
-            self._timer.start()
+            if self._timer is not None:
+                self._timer.start()
 
             self._logger.debug("Regestriere Schedule Jobs für Tägliche und Stündliche Reset Aufgaben...")
             schedule.every().day.at("00:00").do(WeatherflowPlugin.reset_daily_rain, self)
             schedule.every().hours.do(WeatherflowPlugin.reset_hourly_rain, self)
 
-    def register_new_serial(self, serial):
+    def register_new_serial(self, serial:str):
+        if self._pluginManager is None or self._pluginManager._client is None:
+            return
         online_topic = WeatherflowPlugin.get_device_online_topic(serial)
         self._pluginManager._client.publish(online_topic, "online", retain=True)
-        if serial not in self._config.get("Weatherflow/serial_reg", []):
-            self._config["Weatherflow/serial_reg"].append(serial)
+        serial_reg = self._config.get("Weatherflow/serial_reg", [])
+        if serial not in serial_reg:
+            serial_reg.append(serial)
 
     def register_new_air(self, serial_number, update: Union[ObsAir.ObsAir, ObsTempest.ObsTempest], tempest_device=None):
         deviceInfo = autodisc.DeviceInfo()
@@ -214,6 +219,8 @@ class WeatherflowPlugin:
             self.update_sensor(serial_number, "windy", 0, autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR)
 
     def register_new_sensor(self, serial_number, visible_name, name, messurement_value, device_class: autodisc.DeviceClass, devInf: autodisc.DeviceInfo, value_template=None, json_attributes=None):
+        if self._pluginManager is None or self._pluginManager._client is None:
+            return
         topic = self._config.get_autodiscovery_topic(autodisc.Component.SENSOR, name, device_class, node_id=serial_number)
         online_topic = WeatherflowPlugin.get_device_online_topic(serial_number)
 
@@ -224,8 +231,9 @@ class WeatherflowPlugin:
             "Neuen Sensor ({}) regestriert. Folgendes ist die Config Payload: {}".format(visible_name, payload))
         self._pluginManager._client.publish(topic.config, payload, retain=True)
         self._logger.info("Neuen Sensor ({}) regestriert. Folgendes ist die Config Payload: {}".format(visible_name, payload))
-        if topic.config not in self._config.get("Weatherflow/reg_sensor", []):
-            self._config["Weatherflow/reg_sensor"].append(topic.config)
+        reg = self._config.get("Weatherflow/serial_reg", [])
+        if topic.config not in reg:
+            reg.append(topic.config)
 
     def update_sensor(self, serial_number, name, value, device_class: autodisc.DeviceClass):
         topic = self._config.get_autodiscovery_topic(autodisc.Component.SENSOR, name, device_class, node_id=serial_number)

@@ -9,6 +9,10 @@ import logging
 
 import Mods.Weatherflow.UpdateTypes as ut
 
+import typing
+
+on_message_t = typing.Callable[[dict], None]
+
 class UdpServer(threading.Thread):
     def __init__(self, broad_addr="255.255.255.255", port=50222, logger=logging.getLogger("UdpServer")):
         super().__init__()
@@ -18,7 +22,7 @@ class UdpServer(threading.Thread):
         self._sock = sock
         self._shutdown = False
         self.name = "Weatherflow UDP Receiver"
-        self.on_message = self.__on_message
+        self.on_message: on_message_t = self.__on_message
 
     def run(self):
         super().run()

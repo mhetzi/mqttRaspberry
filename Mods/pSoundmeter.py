@@ -19,13 +19,13 @@ class PluginLoader(PluginManager.PluginLoader):
         return "soundmeter"
 
     @staticmethod
-    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger):
         try:
             from soundmeter import meter
         except ImportError as ie:
             import Tools.error as err
             err.try_install_package('soundmeter', throw=ie, ask=False)
-        return SoundMeterWrapper(opts, logger, device_id)
+        return SoundMeterWrapper(opts, logger)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
@@ -47,10 +47,9 @@ try:
         def _reset_daily(self):
             pass
 
-        def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        def __init__(self, opts: conf.BasicConfig, logger: logging.Logger):
             self._config = conf.PluginConfig(config=opts, plugin_name="soundmeter")
             self.__logger = logger.getChild("SoundMeter")
-            self.__ava_topic = device_id
             self._topic = None
             self._wasTriggered = False
             self._lastRMS = -1000
@@ -63,8 +62,10 @@ try:
             return super().disconnected()
 
         def register(self, was_connected):
+            if self._pluginManager is None or self._pluginManager._client is None:
+                return
             name = "Soundmeter"
-            unique_id = "sensor.soundmeter-{}".format(self.__ava_topic)
+            unique_id = "sensor.soundmeter-{}".format(self._pluginManager._client_name)
 
             if self._config.get("minimum", None) is None:
                 mv = "RMS"

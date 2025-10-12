@@ -38,13 +38,12 @@ class VeDirectPlugin:
             self.__logger.debug("Gerät bereit. Do register_real()...")
             self.register_real(self._do_register_was_connected)
 
-    def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def __init__(self, opts: conf.BasicConfig, logger: logging.Logger):
         self._subdevice_ready = False
         self._config = conf.PluginConfig(opts, CONST.CONFIG_NAME)
         self.__logger = logger.getChild(CONST.CONFIG_NAME)
         self._prev_deg = None
         self.__lastTemp = 0.0
-        self.__ava_topic = device_id
         self._veDevice = None
 
         self.__logger.debug("Erstelle verbindung...")

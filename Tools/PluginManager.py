@@ -69,7 +69,7 @@ class PluginLoader(ABC):
 
     @staticmethod
     @abstractmethod 
-    def getPlugin(opts: tc.BasicConfig, logger: logging.Logger, device_id: str) -> PluginInterface: raise NotImplementedError()
+    def getPlugin(opts: tc.BasicConfig, logger: logging.Logger) -> PluginInterface: raise NotImplementedError()
 
     @staticmethod
     @abstractmethod 
@@ -264,33 +264,32 @@ class PluginManager:
     def register_mods(self):
         self.logger.info("Regestriere Plugins in MQTT")
 
-        i=0
-        sett = list(self.configured_list.items())
+        clen = len(self.configured_list)
+        i: int = 1
 
-        while i < len(sett):
-            key = sett[i][0]
-            self.logger.info(f"[{1+i}/{len(sett)}] Regestriere Plugin {key}.")
-            x = sett[i][1]
+        for pname, pobject in self.configured_list.items():
+            self.logger.info(f"[{i}/{clen}] Tell Plugin about MQTT {pname}.")
             i += 1
             try:
-                x.set_pluginManager(self)
+                pobject.set_pluginManager(self)
             except:
                 pass
             
             try:
-                x.register(wasConnected=self._wasConnected)
+                pobject.register(wasConnected=self._wasConnected)
             except TypeError:
                 try:
-                    x.register()
+                    pobject.register()
                 except Exception as e:
-                    self.logger.exception(f"Fehler beim Registrieren des Plugins {key}: {e=} ")
+                    self.logger.exception(f"Fehler beim Registrieren des Plugins {pname}: {e=} ")
 
     def send_disconnected_to_mods(self):
         self.logger.info("Verbindung getrennt!")
         clen = len(self.configured_list)
+        i: int = 1
 
         for pname, pobject in self.configured_list.items():
-            self.logger.info("[{}/{}] Informiere Plugin {}.".format(1+i, clen, pname))
+            self.logger.info(f"[{i}/{clen}] Informiere Plugin {pname}.")
             i += 1
             try:
                 pobject.disconnected()

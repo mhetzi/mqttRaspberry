@@ -51,10 +51,9 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
         return f"device_online/TA_CMI_{addr}/online"
 
 
-    def __init__(self, opts: BasicConfig, logger: logging.Logger, device_id: str):
+    def __init__(self, opts: BasicConfig, logger: logging.Logger):
         self._config = PluginConfig(opts, getConfigKey())
         self._logger = logger.getChild(getConfigKey())
-        self._device_id = device_id
         self._timer = schedule.every(5).minutes.do(lambda: self.check_online_status())
         self._udp = None
         self._upd_senders = {}

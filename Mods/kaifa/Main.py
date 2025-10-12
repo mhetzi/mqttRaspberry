@@ -17,7 +17,7 @@ class KaifaPlugin(PluginInterface):
     __logger: logging.Logger
     _config: conf.PluginConfig
 
-    def __init__(self, opts: conf.PluginConfig, logger: logging.Logger, device_id: str):
+    def __init__(self, opts: conf.PluginConfig, logger: logging.Logger):
         self._config = opts
         self.__logger = logger.getChild("kaifa")
         self._devices = []

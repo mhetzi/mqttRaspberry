@@ -17,8 +17,8 @@ class PluginLoader(PluginManager.PluginLoader):
         return "rpiCPUtemp"
 
     @staticmethod
-    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        return RaspberryPiCpuTemp(opts, logger, device_id)
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger):
+        return RaspberryPiCpuTemp(opts, logger)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
@@ -35,7 +35,7 @@ class RaspberryPiCpuTemp(PluginManager.PluginInterface):
     _plugin_manager: PluginManager.PluginManager
     _file = None
 
-    def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def __init__(self, opts: conf.BasicConfig, logger: logging.Logger):
         self._config = conf.PluginConfig(opts, "rpiCPUtemp")
         self.__logger = logger.getChild("PiCpuTemp")
         self._prev_deg = 0

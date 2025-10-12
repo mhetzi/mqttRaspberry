@@ -21,14 +21,14 @@ class PluginLoader(PluginMan.PluginLoader):
         return "NetworkManager"
 
     @staticmethod
-    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger):
         try:
             import dasbus
             from main import NetworkManagerPlugin
         except ImportError as ie:
             import Tools.error as err
             err.try_install_package('dasbus', throw=ie, ask=False)
-        return NetworkManagerPlugin(opts, logger.getChild(PluginLoader.getConfigKey()), device_id)
+        return NetworkManagerPlugin(opts, logger.getChild(PluginLoader.getConfigKey()))
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):

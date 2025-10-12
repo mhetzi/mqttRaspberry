@@ -59,10 +59,10 @@ if not SKIP_CLASS_BUILDING:
 
         _threasholds = [0,0]
         __broken = False
+        _devID = "unset_dev_id"
 
-        def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        def __init__(self, opts: conf.BasicConfig, logger: logging.Logger):
             self._logger = logger.getChild("BH1750")
-            self._devID = device_id
             
             self._job_inst = []
 
@@ -81,6 +81,7 @@ if not SKIP_CLASS_BUILDING:
         def register(self):
             if self.__broken:
                 return
+            self._devID = self._pluginManager._client_name
             if self._conf["device"]:
                 self._logger.info("Erzeuge Autodiscovery Config für Addresse 1")
                 unique_id = "sensor.bht1750-{}.{}".format(self._devID, "addr")

@@ -18,8 +18,8 @@ class PluginLoader(PluginManager.PluginLoader):
         return "JsonPipe"
 
     @staticmethod
-    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        return JsonPipe(opts, logger, device_id)
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger):
+        return JsonPipe(opts, logger)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
@@ -33,12 +33,11 @@ class PluginLoader(PluginManager.PluginLoader):
 
 class JsonPipe(threading.Thread, PluginManager.PluginInterface):
 
-    def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def __init__(self, opts: conf.BasicConfig, logger: logging.Logger):
         threading.Thread.__init__(self)
         self.__logger = logger.getChild("JsonPipeReader")
         self._config = opts
         self._pins = []
-        self._device_id = device_id
         self.name = "JsonPipeReader"
         self._doExit = False
         self._lastData = None

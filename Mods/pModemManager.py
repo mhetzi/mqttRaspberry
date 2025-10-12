@@ -48,13 +48,13 @@ class PluginLoader(PluginManager.PluginLoader):
         return "ModemManager"
 
     @staticmethod
-    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger):
         try:
             from pydbus import SystemBus
         except ImportError as ie:
             import Tools.error as err
             err.try_install_package('pydbus', throw=ie, ask=False)
-        return ModemManagerClient(opts, logger.getChild("ModemManager"), device_id)
+        return ModemManagerClient(opts, logger.getChild("ModemManager"))
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
@@ -238,7 +238,7 @@ if DEPENDENCIES_LOADED:
 
     class ModemManagerClient(PluginManager.PluginInterface):
         
-        def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        def __init__(self, client: mclient.Client, opts: conf.BasicConfig, logger: logging.Logger):
             self.__dbus = ModemManagerDbus(logger.getChild("DBUS"))
             self.__dbus.on_removed = self.on_removed
             self.__dbus.on_added   = self.on_added

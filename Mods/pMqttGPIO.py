@@ -29,14 +29,14 @@ class PluginLoader(PluginManager.PluginLoader):
         return "RaspberryPiGPIO"
 
     @staticmethod
-    def getPlugin(opts: Config.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: Config.BasicConfig, logger: logging.Logger):
         try:
             import gpiozero
             from Tools import Pin
         except ImportError as ie:
             import Tools.error as err
             err.try_install_package('gpiozero', throw=ie, ask=False)
-        return RaspberryPiGpio(opts, logger, device_id)
+        return RaspberryPiGpio(opts, logger)
 
     @staticmethod
     def runConfig(conf: Config.BasicConfig, logger:logging.Logger):
@@ -77,11 +77,10 @@ class PluginLoader(PluginManager.PluginLoader):
 if DEPENDENCIES_LOADED:
     class RaspberryPiGpio(PluginManager.PluginInterface):
 
-        def __init__(self, opts: Config.BasicConfig, logger: logging.Logger, device_id: str):
+        def __init__(self, opts: Config.BasicConfig, logger: logging.Logger):
             self.__logger = logger.getChild("rPiGPIO")
             self._config = opts
             self._pins = []
-            self._device_id = device_id
             self._registered_callback_topics = []
 
         def register(self):

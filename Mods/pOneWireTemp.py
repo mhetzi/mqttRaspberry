@@ -26,8 +26,8 @@ class PluginLoader(PluginManager.PluginLoader):
         return "w1t"
 
     @staticmethod
-    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        return OneWireTemp(opts, logger, device_id)
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger):
+        return OneWireTemp(opts, logger)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
@@ -64,7 +64,7 @@ class OneWireTemp(PluginManager.PluginInterface):
             self._config[path_min] = "RESET"
             self._config[path_max] = "RESET"
 
-    def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def __init__(self, opts: conf.BasicConfig, logger: logging.Logger):
         self.__logger = logger.getChild("w1Temp")
         self._paths = []
         self._prev_deg = []

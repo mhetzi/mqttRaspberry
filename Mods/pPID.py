@@ -44,7 +44,7 @@ class PluginLoader(PluginManager.PluginLoader):
         return "PID"
 
     @staticmethod
-    def getPlugin(opts: BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: BasicConfig, logger: logging.Logger):
         try:
             import gpiozero
             from Tools import Pin
@@ -57,7 +57,7 @@ class PluginLoader(PluginManager.PluginLoader):
         except ImportError as ie:
             import Tools.error as err
             err.try_install_package('simple-pid', throw=ie, ask=False)
-        return PID_Plugin(opts, logger, device_id)
+        return PID_Plugin(opts, logger)
 
     @staticmethod
     def runConfig(conf: BasicConfig, logger:logging.Logger):
@@ -174,10 +174,9 @@ if DEPENDENCIES_LOADED:
 
     class PID_Plugin(PluginManager.PluginInterface):
 
-        def __init__(self, opts: BasicConfig, logger: logging.Logger, device_id: str):
+        def __init__(self, opts: BasicConfig, logger: logging.Logger):
             self.__logger = logger.getChild("PID")
             self._config = PluginConfig(opts, "PID")
-            self._device_id = device_id
             self._hvac_call = PID_Controller(self._config, logger)
             self._device = None
 

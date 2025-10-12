@@ -19,13 +19,13 @@ class PluginLoader(PluginManager.PluginLoader):
         return "DHT"
 
     @staticmethod
-    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger):
         try:
             import Adafruit_DHT
         except ImportError as ie:
             import Tools.error as err
             err.try_install_package('Adafruit_DHT', throw=ie, ask=False)
-        return DHT22(opts, logger, device_id)
+        return DHT22(opts, logger)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
@@ -87,7 +87,7 @@ if BUILD_CLASS:
                 self._config[path_min] = "RESET"
                 self._config[path_max] = "RESET"
 
-        def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        def __init__(self, opts: conf.BasicConfig, logger: logging.Logger):
             self._config   = opts
             self.__logger  = logger.getChild("w1Temp")
             self._prev_deg = [None,None]
@@ -106,7 +106,6 @@ if BUILD_CLASS:
             self.dht = sensor_map.get(self._config.get("DHT/dev/type", "22"), Adafruit_DHT.DHT22)
             
             self.__lastTemp = 0.0
-            self.__ava_topic = device_id
 
         def disconnected(self):
             return super().disconnected()

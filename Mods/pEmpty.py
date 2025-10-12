@@ -19,13 +19,13 @@ class PluginLoader(PluginMan.PluginLoader):
         return "Empty"
 
     @staticmethod
-    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger):
         try:
             import example
         except ImportError as ie:
             import Tools.error as err
             err.try_install_package('example', throw=ie, ask=False)
-        return EmptyPlugin(opts, logger.getChild("Empty"), device_id)
+        return EmptyPlugin(opts, logger.getChild("Empty"))
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
@@ -41,7 +41,7 @@ class PluginLoader(PluginMan.PluginLoader):
 
 
 class EmptyPlugin(PluginMan.PluginInterface):
-    def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def __init__(self, opts: conf.BasicConfig, logger: logging.Logger):
         pass
     
     def set_pluginManager(self, pm:PluginMan.PluginManager):

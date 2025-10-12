@@ -14,13 +14,13 @@ class PluginLoader(PluginManager.PluginLoader):
         return "SerialFan"
 
     @staticmethod
-    def getPlugin(opts: Config.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: Config.BasicConfig, logger: logging.Logger):
         try:
             import serial
         except ImportError as ie:
             import Tools.error as err
             err.try_install_package('pyserial', throw=ie, ask=False)
-        return SerialFan(opts, logger, device_id)
+        return SerialFan(opts, logger)
 
     @staticmethod
     def runConfig(conf: Config.BasicConfig, logger:logging.Logger):
@@ -49,7 +49,7 @@ try:
     from Tools import Pin
 
     class SerialFan(PluginManager.PluginInterface):
-        def __init__(self, opts: Config.BasicConfig, logger: logging.Logger, device_id: str):
+        def __init__(self, opts: Config.BasicConfig, logger: logging.Logger):
             self.__logger = logger.getChild("SerialFan")
             self._config = Config.PluginConfig(opts, "SerialFan")
             self._registered_callback_topics = []

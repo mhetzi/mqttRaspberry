@@ -37,13 +37,13 @@ class PluginLoader(PluginMan.PluginLoader):
         return "logind"
 
     @staticmethod
-    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger):
         try:
             import dasbus
         except ImportError as ie:
             import Tools.error as err
             err.try_install_package('dasbus', throw=ie, ask=False)
-        return logindDbus(opts, logger.getChild(PluginLoader.getConfigKey()), device_id)
+        return logindDbus(opts, logger.getChild(PluginLoader.getConfigKey()))
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
@@ -262,7 +262,7 @@ if BUILD_PLGUIN:
     class logindDbus(PluginMan.PluginInterface):
         _sleep_delay_lock: Union[int, None] = None
 
-        def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        def __init__(self, opts: conf.BasicConfig, logger: logging.Logger):
             self._bus    = None
             self._proxy  = None
             self._login1 = None
@@ -390,12 +390,15 @@ if BUILD_PLGUIN:
                         self.inhibit_delay(False)
                     except:
                         pass
-                delay_lock = self._proxy.Inhibit(
-                    'sleep:shutdown',
-                    'mqttScript',
-                    'Publish Powerstatus (Standby) to Network',
-                    'delay'
-                    )
+                try:
+                    delay_lock = self._proxy.Inhibit(
+                        'sleep:shutdown',
+                        'mqttScript',
+                        'Publish Powerstatus (Standby) to Network',
+                        'delay'
+                        )
+                except:
+                    self._logger.exception("Sleep Inhibit failed!")
                 self._sleep_delay_lock = delay_lock if delay_lock > -1 else None
                 self._logger.debug("Sleep delayed" if delay_lock > -1 else "Sleep delay failed!")
             elif not sleep and self._sleep_delay_lock is not None:

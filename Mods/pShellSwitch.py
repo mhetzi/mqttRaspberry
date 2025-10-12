@@ -16,8 +16,8 @@ class PluginLoader(PluginManager.PluginLoader):
         return "ShellSwitch"
 
     @staticmethod
-    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        return ShellSwitch(opts, logger, device_id)
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger):
+        return ShellSwitch(opts, logger)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
@@ -30,7 +30,7 @@ class PluginLoader(PluginManager.PluginLoader):
 
 class ShellSwitch(PluginManager.PluginInterface):
 
-    def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def __init__(self, opts: conf.BasicConfig, logger: logging.Logger):
         self._config = conf.PluginConfig(opts, "ShellSwitch")
         self.__logger = logger.getChild("ShellSwitch")
         self._registered_callback_topics = []

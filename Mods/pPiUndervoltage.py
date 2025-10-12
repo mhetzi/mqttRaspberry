@@ -32,13 +32,13 @@ class PluginLoader(PluginManager.PluginLoader):
         return "rPiUndervoltage"
 
     @staticmethod
-    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger):
         try:
             from rpi_bad_power import new_under_voltage
         except ImportError as ie:
             import Tools.error as err
             err.try_install_package('rpi-bad-power', throw=ie, ask=False)
-        return RaspberryPiUndervoltageDetector(opts, logger, device_id)
+        return RaspberryPiUndervoltageDetector(opts, logger)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
@@ -51,12 +51,11 @@ if DEPENDENCIES_LOADED:
         _shed_Job = None
         _plugin_manager = None
 
-        def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        def __init__(self, opts: conf.BasicConfig, logger: logging.Logger):
             self._config = conf.PluginConfig(opts, PluginLoader.getConfigKey())
             self.__logger = logger.getChild(PluginLoader.getConfigKey())
             self._prev_deg = True
             self.__lastTemp = 0.0
-            self.__ava_topic = device_id
             self._callables = []
             self.device = None
 
@@ -66,6 +65,9 @@ if DEPENDENCIES_LOADED:
 
         def set_pluginManager(self, pm):
             self._plugin_manager = weakref.ref(pm)
+
+        def disconnected(self):
+            return super().disconnected()
 
         def register(self):
             t = ad.Topics.get_std_devInf()

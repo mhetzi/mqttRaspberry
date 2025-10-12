@@ -15,13 +15,13 @@ class PluginLoader(PluginManager.PluginLoader):
         return "systemd"
 
     @staticmethod
-    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger):
         try:
             import dasbus
         except ImportError as ie:
             import Tools.error as err
             err.try_install_package('dasbus', throw=ie, ask=False)
-        return systemdDbus(opts, logger.getChild(PluginLoader.getConfigKey()), device_id)
+        return systemdDbus(opts, logger.getChild(PluginLoader.getConfigKey()))
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
@@ -146,7 +146,7 @@ try:
 
     class systemdDbus(PluginManager.PluginInterface):
 
-        def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        def __init__(self, opts: conf.BasicConfig, logger: logging.Logger):
             self._bus    = None
             self._proxy  = None
             self._logger = logger

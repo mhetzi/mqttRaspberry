@@ -18,11 +18,10 @@ class NetworkManagerPlugin(PluginManager.PluginInterface):
     _dbus_system: SystemMessageBus
     _nm_devices: dict[str, NetworkManagerDevice] = {}
 
-    def __init__(self, opts: BasicConfig, logger: logging.Logger, device_id: str):
+    def __init__(self, opts: BasicConfig, logger: logging.Logger):
         import NetworkManager
         self._config = PluginConfig(opts, NetworkManager.PluginLoader.getConfigKey())
         self._logger = logger.getChild(NetworkManager.PluginLoader.getConfigKey())
-        self._device_id = device_id
 
         self._dbus_system = SystemMessageBus()
         self._proxy  = self._dbus_system.get_proxy('org.freedesktop.NetworkManager', '/org/freedesktop/NetworkManager')

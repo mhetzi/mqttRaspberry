@@ -15,8 +15,8 @@ class PluginLoader(PluginManager.PluginLoader):
         return "logwatcher"
 
     @staticmethod
-    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        return LogWatcher(opts, logger.getChild(PluginLoader.getConfigKey()), device_id)
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger):
+        return LogWatcher(opts, logger.getChild(PluginLoader.getConfigKey()))
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):
@@ -70,13 +70,13 @@ try:
     
     class ShellLog(threading.Thread):
 
-        def __init__(self, name:str, config:conf.AbstractConfig, logger:logging.Logger) -> None:
+        def __init__(self, name:str, config:conf.PluginConfig, logger:logging.Logger) -> None:
             super().__init__()
-            cmd:    str = config["cmd"]
+            cmd:    str = config.get("cmd", "")
             args:   list[str] = shlex.split(cmd)
 
-            self.binary:    bool      = config["binary"]
-            self.filter:    str       = config["grep"]
+            self.binary:    bool      = config.get("binary", False)
+            self.filter:    str       = config.get("grep", "")
             self.filtered:  list[str] = self.filter.split("|")
             self.name    = name
             self._logger = logger
@@ -90,6 +90,9 @@ try:
 
 
         def run(self) -> None:
+            if self.proc.stdout is None:
+                self._logger.error("Stdout from Subprocess is None!")
+                return
             while not self._shutdown:
                 line = self.proc.stdout.readline()
                 if not line:
@@ -125,7 +128,7 @@ try:
 
     class LogWatcher(PluginManager.PluginInterface):
 
-        def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        def __init__(self, opts: conf.BasicConfig, logger: logging.Logger):
             self._logger = logger
             self._watchdog = watchdog.observers.Observer()
             self._watchdog.name = "Logwatcher"
@@ -136,8 +139,10 @@ try:
             self._pluginManager = pm
 
         def register(self, wasConnected=False):
+            if self._pluginManager is None:
+                return
             if not wasConnected:
-                logs = self._config["logs"]
+                logs = self._config.get("logs", {})
                 for name, d in logs.items():
                     log = ShellLog(name=name,
                                    config=conf.PluginConfig(self._config,
@@ -166,7 +171,7 @@ class LogConfig:
     def configure(self, conff: conf.BasicConfig, logger:logging.Logger):
         from Tools import ConsoleInputTools
         con = conf.PluginConfig(conff, PluginLoader.getConfigKey())
-        if con.get("logs", None) is None:
+        if con.get("logs", {}) is None:
             con["logs"] = {}
         while True:
             action = ConsoleInputTools.get_number_input("Was möchtest du tun? 0. Nichts 1. Log hinzufügen 2. Log löschen", 0)
@@ -177,7 +182,7 @@ class LogConfig:
                 filter = ""
                 if binary:
                     filter = ConsoleInputTools.get_input("Suchen nach String (mehrere getrennt durch |): ")
-                con["logs"][name] = {
+                con.get("logs", {})[name] = {
                     "cmd": args,
                     "binary": binary,
                     "grep": filter

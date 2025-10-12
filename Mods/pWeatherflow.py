@@ -12,9 +12,9 @@ class PluginLoader(pl):
         return "Weatherflow"
 
     @staticmethod
-    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger):
         import Mods.Weatherflow.plugin as p
-        return p.WeatherflowPlugin( opts, logger, device_id)
+        return p.WeatherflowPlugin( opts, logger)
 
     @staticmethod
     def runConfig(conf: conf.BasicConfig, logger:logging.Logger):

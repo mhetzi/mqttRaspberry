@@ -128,7 +128,7 @@ try:
     class uPowerDbus(PluginManager.PluginInterface):
         _sleep_delay_lock: Union[IO, None] = None
 
-        def __init__(self, opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
+        def __init__(self, opts: conf.BasicConfig, logger: logging.Logger):
             self._bus    = None
             self._proxy  = None
             self._upower = None
@@ -229,8 +229,8 @@ class PluginLoader(PluginManager.PluginLoader):
         return "uPower"
 
     @staticmethod
-    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger, device_id: str):
-        return uPowerDbus(opts, logger.getChild(PluginLoader.getConfigKey()), device_id)
+    def getPlugin(opts: conf.BasicConfig, logger: logging.Logger):
+        return uPowerDbus(opts, logger.getChild(PluginLoader.getConfigKey()))
 
     @staticmethod
     def runConfig(bc: conf.BasicConfig, logger:logging.Logger):
