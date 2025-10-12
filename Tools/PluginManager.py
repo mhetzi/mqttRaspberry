@@ -201,8 +201,7 @@ class PluginManager:
                 if x.getConfigKey() == key:
                     try:
                         self.logger.info("Konfiguriere Plugin...")
-                        plugin = x.getPlugin(opts=self.config, logger=self.logger,
-                                        device_id=self._client_name)
+                        plugin = x.getPlugin(opts=self.config, logger=self.logger)
                         self.logger.info("Plugin konfiguriert")
                         break
                     except:
