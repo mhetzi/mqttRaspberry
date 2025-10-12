@@ -324,7 +324,8 @@ if BUILD_PLGUIN:
             self._pluginManager = pm
 
         def disconnected(self):
-            return super().disconnected()
+            for name, sw in self._switches.items():
+                sw.offline()
 
         def register(self, wasConnected=False):
             if wasConnected:

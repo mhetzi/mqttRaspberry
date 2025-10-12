@@ -5,7 +5,7 @@ from pathlib import Path
 import threading
 import time
 import weakref
-from typing import Callable, NoReturn, Union
+from typing import Any, Callable, NoReturn, Union
 import Tools.error as err
 
 try:
@@ -396,11 +396,19 @@ class PluginManager:
         self._wasConnected = self.is_connected or self._wasConnected
         self.is_connected = False
         with self._offline_handlers_lock:
-            self._offline_handlers = [ref for ref in self._offline_handlers if ref() is not None]
+            self.logger.debug(f"self._offline_handlers.len = {len(self._offline_handlers)}")
+            self._offline_handlers = [rm for rm in self._offline_handlers if rm() is not None]
+            self.logger.debug(f"self._offline_handlers.len = {len(self._offline_handlers)}")
             for f in self._offline_handlers:
-                real_func = f()
-                if real_func is not None:
-                    real_func()
+                try:
+                    self.logger.debug(f"Call disconnect_callback {f=}")
+                    real_func = f()
+                    if real_func is not None:
+                        real_func()
+                    else:
+                        self.logger.warning(f"Callable is dead!")
+                except:
+                    self.logger.exception("")
         self.logger.info(f"Verbindung getrennt, alles aufgeräumt! {client=}")
         try:
             if rc == mqttEnums.MQTTErrorCode.MQTT_ERR_KEEPALIVE:
