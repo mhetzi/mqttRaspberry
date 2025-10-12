@@ -494,6 +494,25 @@ class PluginConfig(AbstractConfig):
         if t is None and default is not None:
             self[key] = default
         return self[key]
+    
+    def getExact(self, key, default: T) -> T:
+        data = self.get(key=key, default=default)
+        # If default is None we cannot infer a concrete type, so just raise exception.
+        if default is None:
+            raise ValueError("Without default we cant compare the value data")
+        # Compare against the type of the provided default value.
+        if isinstance(data, type(default)):
+            return data
+        if issubclass(type(default), int) and isinstance(data, float):
+            data = int(data)
+            self.sett(key=key, value=data)
+            return data
+        if issubclass(type(default), float) and isinstance(data, int):
+            data = float(data)
+            self.sett(key=key, value=data)
+            return data
+        # Fallback to the default if the stored value has a different type.
+        return default
 
     def sett(self, key: str, value):
         key = "{}/{}".format(self._pname, key)

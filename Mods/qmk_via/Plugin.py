@@ -21,11 +21,14 @@ class ViaPlugin(PluginManager.PluginInterface):
     _keyboard_defs: dict[DeviceConfigEntry, KeyboardParsedJson] = {}
     _vias: dict[DeviceConfigEntry, ViaHid] = {}
     _sched_job: schedule.Job | None = None
+    _polling_interval: int = 10
 
     def __init__(self, opts: PluginConfig, logger: logging.Logger):
         self._config = opts
         self._logger = logger
         keyboards: list[dict] = self._config.get("keyboards", []) # pyright: ignore[reportAssignmentType]
+        self._polling_interval = self._config.getExact("polling_every_seconds", self._polling_interval)
+
         for keyboard in keyboards:
             self._logger.debug(f"Loading keyboard config: {keyboard}")
             vid: int = keyboard.get("vid", 0)
@@ -86,7 +89,7 @@ class ViaPlugin(PluginManager.PluginInterface):
         eff.state(int(val))
         pass
 
-    def light_call(self, message: MQTTMessage, keyboard: DeviceConfigEntry, state_requested: bool):
+    def light_call(self, message: MQTTMessage | None, keyboard: DeviceConfigEntry, state_requested: bool):
         # {"state":"ON","brightness":102}
         if message is None:
             return
@@ -135,6 +138,9 @@ class ViaPlugin(PluginManager.PluginInterface):
         pass
 
     def register(self, wasConnected=False):
+        if self._pluginManager is None:
+            self._logger.error(f"{self._pluginManager=} it should not be none")
+            return
         if not wasConnected:
             self._lights.clear()
             for keyboard in self._keyboards:
@@ -216,7 +222,7 @@ class ViaPlugin(PluginManager.PluginInterface):
             eff.register()
         
         if self._sched_job is None:
-            self._sched_job = schedule.every(10).seconds.do(self.sendStates)
+            self._sched_job = schedule.every(self._polling_interval).seconds.do(self.sendStates)
 
     def stop(self):
         pass

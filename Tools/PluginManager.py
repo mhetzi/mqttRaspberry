@@ -396,12 +396,12 @@ class PluginManager:
         self._wasConnected = self.is_connected or self._wasConnected
         self.is_connected = False
         with self._offline_handlers_lock:
-            self.logger.debug(f"self._offline_handlers.len = {len(self._offline_handlers)}")
+            # self.logger.debug(f"self._offline_handlers.len = {len(self._offline_handlers)}")
             self._offline_handlers = [rm for rm in self._offline_handlers if rm() is not None]
             self.logger.debug(f"self._offline_handlers.len = {len(self._offline_handlers)}")
             for f in self._offline_handlers:
                 try:
-                    self.logger.debug(f"Call disconnect_callback {f=}")
+                    # self.logger.debug(f"Call disconnect_callback {f=}")
                     real_func = f()
                     if real_func is not None:
                         real_func()
