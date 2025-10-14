@@ -1,3 +1,4 @@
+from abc import ABCMeta
 from Tools import PluginManager
 from Tools.Config import BasicConfig, PluginConfig
 from Tools.Devices import Light, Number
@@ -20,6 +21,7 @@ class ViaPlugin(PluginManager.PluginInterface):
     _vias: dict[DeviceConfigEntry, ViaHid] = {}
     _sched_job: schedule.Job | None = None
     _polling_interval: int = 10
+    _connected_state: dict[DeviceConfigEntry, bool] = {}
 
     def __init__(self, opts: PluginConfig, logger: logging.Logger):
         self._config = opts
@@ -135,6 +137,73 @@ class ViaPlugin(PluginManager.PluginInterface):
                 via.setColor(h, s)
 
         pass
+    
+    def register_keyboard(self, keyboard:DeviceConfigEntry, d:KeyboardParsedJson):
+        if self._pluginManager is None:
+            self._logger.error("PluginManager is Gone!")
+            return
+        ki = KeyboardInfo.fromViaHid(self._vias[keyboard])
+        hid_data = keyboard.get_hid_info(self._logger)
+        hid_data = {} if hid_data is None else hid_data
+        kuid = keyboard.uid if keyboard.uid is not None else f"{keyboard.vid:04X}:{keyboard.pid:04X}"
+
+        di = DeviceInfo(
+            IDs = [kuid , f"{keyboard.vid:04X}:{keyboard.pid:04X}" ],
+            pi_serial = None,
+            mfr=hid_data.get("manufacturer_string", "Unknown"),
+            model=hid_data.get("product_string", "Unknown"),
+            sw_version=f"FW: {ki.firmware_version} PROTO: {self._vias[keyboard].getProtocolVersion()}",
+            name=keyboard.friendly_name,
+            via_device=Topics.get_std_devInf().IDs[0] if Topics.get_std_devInf() is not None else None
+        )
+
+        licht = Light.Light(
+            logger=self._logger,
+            pman=self._pluginManager,
+            callback=lambda state_requested, message: self.light_call(message=message, keyboard=keyboard, state_requested=state_requested),
+            name=keyboard.friendly_name,
+            device=di,
+            ava_topic=f"qmk_via/{kuid}/available"
+        )
+
+        if d.Brightness[1] > 0:
+            licht.enablebrightness(d.Brightness[1])
+            b = self._vias[keyboard].get_brightness()
+            if b is not None:
+                licht.brightness(b)
+        if len(d.Effects[0]) > 0:
+            licht.enableEffects(list(d.Effects[0].keys()))
+            e = self._vias[keyboard].get_effect()
+            if e is not None:
+                licht.effect(e)
+        if d.Color > 0:
+            licht.enableHs()
+            hs = self._vias[keyboard].getColor()
+            if hs is not None:
+                licht.hs(hs[0], hs[1])
+        self._lights[keyboard] = licht
+
+        if d.EffectSpeed[1] > 0:
+            eff = Number.Number(
+                logger=self._logger,
+                pman=self._pluginManager,
+                callback=lambda state_requested, message: self.effect_speed_call(message=message, keyboard=keyboard, state_requested=state_requested),
+                name=f"{keyboard.friendly_name} Effect Speed",
+                device_class=SensorDeviceClasses.GENERIC_SENSOR,
+                device=di,
+                ava_topic=f"qmk_via/{kuid}/available"
+            )
+            eff.step = 1
+            eff.min = d.EffectSpeed[0]
+            eff.max = d.EffectSpeed[1]
+            self._eff_speeds[keyboard] = eff
+            es = self._vias[keyboard].get_effect_speed()
+            if es is not None:
+                eff.state(es)
+
+        proto = self._vias[keyboard].getProtocolVersion()
+        self._logger.info(f"Keyboard {keyboard.friendly_name} info: {ki=}")
+        self._logger.info(f"Keyboard {keyboard.friendly_name} protocol: {proto}")
 
     def register(self, wasConnected=False):
         if self._pluginManager is None:
@@ -150,71 +219,8 @@ class ViaPlugin(PluginManager.PluginInterface):
                     continue
                 self._vias[keyboard] = ViaHid(keyboard, d, self._logger)
                 self._keyboard_defs[keyboard] = d
-                
-                ki = KeyboardInfo.fromViaHid(self._vias[keyboard])
-                hid_data = keyboard.get_hid_info(self._logger)
-                hid_data = {} if hid_data is None else hid_data
-                kuid = keyboard.uid if keyboard.uid is not None else f"{keyboard.vid:04X}:{keyboard.pid:04X}"
-
-                di = DeviceInfo(
-                    IDs = [kuid , f"{keyboard.vid:04X}:{keyboard.pid:04X}" ],
-                    pi_serial = None,
-                    mfr=hid_data.get("manufacturer_string", "Unknown"),
-                    model=hid_data.get("product_string", "Unknown"),
-                    sw_version=f"FW: {ki.firmware_version} PROTO: {self._vias[keyboard].getProtocolVersion()}",
-                    name=keyboard.friendly_name,
-                    via_device=Topics.get_std_devInf().IDs[0] if Topics.get_std_devInf() is not None else None
-                )
-
-                licht = Light.Light(
-                    logger=self._logger,
-                    pman=self._pluginManager,
-                    callback=lambda state_requested, message: self.light_call(message=message, keyboard=keyboard, state_requested=state_requested),
-                    name=keyboard.friendly_name,
-                    device=di,
-                    ava_topic=f"qmk_via/{kuid}/available"
-                )
-
-                if d.Brightness[1] > 0:
-                    licht.enablebrightness(d.Brightness[1])
-                    b = self._vias[keyboard].get_brightness()
-                    if b is not None:
-                        licht.brightness(b)
-                if len(d.Effects[0]) > 0:
-                    licht.enableEffects(list(d.Effects[0].keys()))
-                    e = self._vias[keyboard].get_effect()
-                    if e is not None:
-                        licht.effect(e)
-                if d.Color > 0:
-                    licht.enableHs()
-                    hs = self._vias[keyboard].getColor()
-                    if hs is not None:
-                        licht.hs(hs[0], hs[1])
-                self._lights[keyboard] = licht
-
-                if d.EffectSpeed[1] > 0:
-                    eff = Number.Number(
-                        logger=self._logger,
-                        pman=self._pluginManager,
-                        callback=lambda state_requested, message: self.effect_speed_call(message=message, keyboard=keyboard, state_requested=state_requested),
-                        name=f"{keyboard.friendly_name} Effect Speed",
-                        device_class=SensorDeviceClasses.GENERIC_SENSOR,
-                        device=di,
-                        ava_topic=f"qmk_via/{kuid}/available"
-                    )
-                    eff.step = 1
-                    eff.min = d.EffectSpeed[0]
-                    eff.max = d.EffectSpeed[1]
-                    self._eff_speeds[keyboard] = eff
-                    es = self._vias[keyboard].get_effect_speed()
-                    if es is not None:
-                        eff.state(es)
-
-                proto = self._vias[keyboard].getProtocolVersion()
-
-                self._logger.info(f"Keyboard {keyboard.friendly_name} info: {ki=}")
-                
-                self._logger.info(f"Keyboard {keyboard.friendly_name} protocol: {proto}")
+                if self._vias[keyboard].isConnected():
+                    self.register_keyboard(keyboard, d)
         
         for licht in self._lights.values():
             licht.register()
@@ -230,6 +236,12 @@ class ViaPlugin(PluginManager.PluginInterface):
     def sendStates(self):
         for keyboard in self._keyboards:
             light = self._lights.get(keyboard, None)
+            if light is None and self._vias[keyboard].isConnected():
+                self._logger.info("Found new Connected Keyboard, was previously not connected. Registering...")
+                d = GetKeyboardDefinition(keyboard)
+                if d is None:
+                    continue
+                self.register_keyboard(keyboard, d)
             if light is not None:
                 if not self._vias[keyboard].isConnected():
                     light.offline()
