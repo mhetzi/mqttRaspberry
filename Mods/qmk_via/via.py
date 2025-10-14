@@ -122,15 +122,17 @@ class ViaHid:
         self._dev_path = device.get_device_path(self._logger)
         self._io_lock = threading.Lock()
         self._dev: hid.Device | None = None
-        self._dev_timer: ManagedTimer = ManagedTimer(self.closeDevice, 0.5)
+        self._dev_timer: ManagedTimer = ManagedTimer(self.closeDevice, 0.5, logger=logger.getChild("timer"))
 
     def closeDevice(self):
         with self._io_lock:
             try:
                 if self._dev is not None:
                     self._dev.close()
+                    self._logger.debug(f"Closed device {self._device.friendly_name}")
             except:
                 self._logger.exception(f"closeDevice {self._device=} failed")
+            self._dev = None
 
     def send(self, command: Via_Command_t, channel: Via_Channels_t|Via_Attribute_t, attribute: Via_Attribute_t, value: int, value2:int=0) -> bytes | None:
         if self._dev_path is None:
@@ -140,10 +142,10 @@ class ViaHid:
             try:
                 if self._dev is None:
                     self._dev = hid.Device(path=p)
-                    self._dev_timer.reset()
+                    self._logger.debug(f"Opened device {self._device.friendly_name} at {p}")
                     if self._dev is None:
                         return None
-                self._logger.debug(f"Opened device {self._device.friendly_name} at {p}")
+                self._dev_timer.reset()
                 if self._dev is not None:
                     buf = bytearray(32)
                     buf[0] = command
