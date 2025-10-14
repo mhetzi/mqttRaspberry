@@ -72,7 +72,8 @@ class Switch:
 
         #Frage Callback nach aktuellen status
         self._callback(state_requested=True, message=None)
-        pm.addOfflineHandler(self.offline)
+        if self._topics.ava_topic is not None:
+            pm.addOfflineHandler(self.offline)
 
         if self._last_state is not None:
             self.turn()

@@ -8,9 +8,9 @@ from Tools.Autodiscovery import SensorDeviceClasses
 import logging
 import json
 from  Tools.PluginManager import PluginManager
-import enum
 from Tools.Devices.Filters import BaseFilter, DontSend, SilentDontSend
 import json
+import weakref
 
 from Tools.Config import DictBrowser
 
@@ -26,7 +26,7 @@ class Sensor:
         self._log = log.getChild("Sensor")
         self._log.setLevel(logging.NOTSET)
         self._log.debug("Sensor Object für {} mit custom uid {} erstellt.".format(name, unique_id))
-        self._pm = pman
+        self._pm = weakref.ref(pman)
         self._name = name
         self._ava_topic = ava_topic
         self._vt = value_template
@@ -52,12 +52,19 @@ class Sensor:
         return self.state(state=state, force_send=force_send, keypath=keypath)
 
     def register(self):
+        pm = self._pm()
+        if pm is None:
+            self._log.error("PluginManager is gone!")
+            return
+        if pm._client is None:
+            self._log.error("Tried to register() while MQTT is disconnected!")
+            return
         # Setze Discovery Configuration
         self._log.debug("Publish configuration")
         plugin_name = self._log.parent.name
         import re
         safename = re.sub('[\W_]+', '', self._name) 
-        uid = "switch.MqttScripts{}.switch.{}.{}".format(self._pm._client_name, plugin_name, safename) if self._unique_id is None else self._unique_id
+        uid = "switch.MqttScripts{}.switch.{}.{}".format(pm._client_name, plugin_name, safename) if self._unique_id is None else self._unique_id
         zeroc = self._topics.get_config_payload(
             name=self._name,
             ava_topic=None,
@@ -68,10 +75,11 @@ class Sensor:
             unique_id=uid,
             icon=self._icon
         )
-        self._pm._client.publish(self._topics.config, zeroc, retain=True)
+        pm._client.publish(self._topics.config, zeroc, retain=True)
         self._log.debug("Publish configuration: {}".format(zeroc))
-        self._pm._client.subscribe(self._topics.command)
-        self._pm.addOfflineHandler(self.offline)
+        pm._client.subscribe(self._topics.command)
+        if self._has_offline:
+            pm.addOfflineHandler(self.offline)
         self.reset()
 
     def reset(self):
@@ -112,6 +120,9 @@ class Sensor:
             except DontSend:
                 self._log.exception("Filtering failed!")
                 return None
+        if state is None:
+            self._log.warning("state is none")
+            return None
         payload = state.encode('utf-8') if self._jsattrib else str(state)
         if self._playload == payload and not force_send:
             self._log.debug("new payload == old payload ignoring...")
@@ -126,27 +137,59 @@ class Sensor:
             sleep(1)
         self._log.debug(f"Sending on {self._topics.state} payload {payload}")
 
+        pm = self._pm()
+        if pm is None:
+            self._log.error("PluginManager is gone!")
+            return
+        if pm._client is None:
+            self._log.error("Tried to register() while MQTT is disconnected!")
+            return
+        
         try:
-            return self._pm._client.publish(self._topics.state, payload=payload)
+            return pm._client.publish(self._topics.state, payload=payload)
         except:
             self._log.exception(f"Konnte {payload = } nicht versenden!")
 
     def resend(self):
-        return self._pm._client.publish(self._topics.state, payload=self._playload)
+        pm = self._pm()
+        if pm is None:
+            self._log.error("PluginManager is gone!")
+            return
+        if pm._client is None:
+            self._log.error("Tried to register() while MQTT is disconnected!")
+            return
+        return pm._client.publish(self._topics.state, payload=self._playload)
     
     def offline(self):
         self._is_offline = True
+
+        pm = self._pm()
+        if pm is None:
+            self._log.error("PluginManager is gone!")
+            return
+        if pm._client is None:
+            self._log.error("Tried to register() while MQTT is disconnected!")
+            return
+        
         try:
-            if self._pm._client is not None and self._topics.ava_topic is not None:
-                return self._pm._client.publish(self._topics.ava_topic, payload="offline", retain=True)
+            if self._topics.ava_topic is not None:
+                return pm._client.publish(self._topics.ava_topic, payload="offline", retain=True)
         except Exception as e:
             self._log.exception("Markieren des Sensors als offline fehlgeschlagen!")
         return None
     def online(self):
+        pm = self._pm()
+        if pm is None:
+            self._log.error("PluginManager is gone!")
+            return
+        if pm._client is None:
+            self._log.error("Tried to register() while MQTT is disconnected!")
+            return
+        
         self._is_offline = False
         try:
-            if self._pm._client is not None and self._topics.ava_topic is not None:
-                return self._pm._client.publish(self._topics.ava_topic, payload="online", retain=True)
+            if self._topics.ava_topic is not None:
+                return pm._client.publish(self._topics.ava_topic, payload="online", retain=True)
         except Exception as e:
             self._log.exception("Markieren des Sensors als online fehlgeschlagen!")
         return None
