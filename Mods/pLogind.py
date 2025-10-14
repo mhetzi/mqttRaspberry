@@ -3,7 +3,7 @@ Könnte sein dass es nur als Benutzerservice (systemctl --user) funktioniert!
 Could be that this Plugin only works when run as user service (systemctl --user)!
 """
 from typing import IO, Union
-import paho.mqtt.client as mclient
+from paho.mqtt.client import MQTTMessage
 import Tools.Config as conf
 import Tools.Autodiscovery as autodisc
 import Tools.PluginManager as PluginMan
@@ -14,6 +14,7 @@ import schedule
 import json
 import os
 import threading
+import weakref
 #try:
 #    import gi
 #    gi.require_version('GLib', '2.0')
@@ -211,13 +212,14 @@ if BUILD_PLGUIN:
 
         def register(self):
             if self.isGUI and self.uID[0] == os.getuid():
-                self._lock = Lock(
-                    self._log,
-                    self._pman,
-                    self.callback,
-                    "GUI-Anmeldung {}".format(self.uname),
-                    unique_id=f"lock.logind.{autodisc.Topics.get_std_devInf().name}.session.gui.{self.uname}.screenlock"
-                )
+                if self._lock is None:
+                    self._lock = Lock(
+                        self._log,
+                        self._pman,
+                        self.callback,
+                        "GUI-Anmeldung {}".format(self.uname),
+                        unique_id=f"lock.logind.{autodisc.Topics.get_std_devInf().name}.session.gui.{self.uname}.screenlock"
+                    )
                 self._lock.register()
 
                 self._lock_notify    = self._proxy.Lock.connect  ( lambda: self._lock.lock()  )
@@ -246,7 +248,7 @@ if BUILD_PLGUIN:
             except:
                 self._log.exception("Lock failed!")
 
-        def unloock(self):
+        def unlock(self):
             self._log.info("OK Unlocking session")
             self._proxy._handler._call_method("org.freedesktop.login1.Session", "Unlock", None, None)
             #self._proxy_m.Unlock()
@@ -255,7 +257,7 @@ if BUILD_PLGUIN:
             if message == LockState.LOCK:
                 self.lock()
             elif message == LockState.UNLOCK:
-                self.unloock()
+                self.unlock()
             else:
                 self._log.warning("LockState Requested, but it´s invalid.")
 
@@ -285,6 +287,9 @@ if BUILD_PLGUIN:
         
         def _setup_dbus_interfaces(self):
             #init_dbus()
+            if self._pluginManager is None:
+                self._logger.error("_setup_dbus_interface failed! PluginManager is gone!")
+                return
 
             self._bus    = SystemMessageBus()
             self._session_bus = SessionMessageBus()
@@ -302,21 +307,24 @@ if BUILD_PLGUIN:
                 self._logger.info("Neue Benutzersession gefunden {} auf {} in Pfad {}.".format(session[2], session[3], session[4]))
                 self._mod_session(add=True, path=session[4])
             
-            if self._config.get("inactivity_ms", None) is not None: 
+            if self._config.get("inactivity_ms", None) is not None and self._idle_monitor is None:
                 self._idle_monitor = IdleMonitor(
-                    self._config["inactivity_ms"],
+                    self._config.get("inactivity_ms", 30000),
                     self._logger,
                     self._pluginManager,
                     self._session_bus,
-                    netName=autodisc.Topics.get_std_devInf().name if self._config.get("custom_name", None) is None else self._config.get("custom_name", None)
+                    netName=autodisc.Topics.get_std_devInf().name if self._config.get("custom_name", None) is None else self._config.get("custom_name", "")
                 )
             
         
-        def _mod_session(self, add=True, path=str):
+        def _mod_session(self, add=True, path=""):
             if path in self.sessions.keys():
                 self.sessions[path].stop()
                 del self.sessions[path]
             if add:
+                if self._pluginManager is None:
+                    self._logger.error("_mod_session failed! PluginManager is gone!")
+                    return
                 self.sessions[path] = Session(self._logger, self._pluginManager, path, self._bus)
                 self.sessions[path].register()
 
@@ -328,8 +336,12 @@ if BUILD_PLGUIN:
                 sw.offline()
 
         def register(self, wasConnected=False):
+            if self._pluginManager is None:
+                self._logger.error("register() failed! PluginManager is gone!")
+                return
             if wasConnected:
                 for v in self._switches.values():
+                    v.is_online = False
                     v.register()
             if not wasConnected:
                 self._setup_dbus_interfaces()
@@ -337,6 +349,8 @@ if BUILD_PLGUIN:
                 # Kann ich ausschalten?
 
                 if self._proxy.CanPowerOff() == "yes" and self._config.get("allow_power_off", True):
+                    if "isOn" in self._switches.keys():
+                        del self._switches["isOn"]
                     self._switches["isOn"] = Switch(
                         self._logger,
                         self._pluginManager,
@@ -348,6 +362,8 @@ if BUILD_PLGUIN:
                 # Kann ich suspend?
 
                 if self._proxy.CanSuspend() == "yes" and self._config.get("allow_suspend", True):
+                    if "suspend" in self._switches.keys():
+                        del self._switches["suspend"]
                     self._switches["suspend"] = Switch(
                         self._logger,
                         self._pluginManager,
@@ -359,6 +375,8 @@ if BUILD_PLGUIN:
                 # Kann ich neustarten?
 
                 if self._proxy.CanReboot() == "yes" and self._config.get("allow_reboot", True):
+                    if "reboot" in self._switches.keys():
+                        del self._switches["reboot"]
                     self._switches["reboot"] = Switch(
                         self._logger,
                         self._pluginManager,
@@ -368,6 +386,8 @@ if BUILD_PLGUIN:
                 # Kann ich inhibit
                 if self.inhibit( ) > 0 and self._config.get("allow_inhibit", True):
                     self.uninhibit( )
+                    if "inhibit" in self._switches.keys():
+                        del self._switches["inhibit"]
                     self._switches["inhibit"] = Switch(
                         self._logger,
                         self._pluginManager,
@@ -523,7 +543,7 @@ if BUILD_PLGUIN:
                 self._switches["isOn"].turnOn().wait_for_publish(timeout=2)
             self.inhibit_delay(sleep=not sig)
 
-        def sw_call(self, userdata=None, state_requested=False, message=None):
+        def sw_call(self, userdata:str | None=None, state_requested=False, message:MQTTMessage | None=None):
             if state_requested:
                 if userdata == "isOn":
                     if self.shutdown or self.sleeping:
@@ -542,6 +562,8 @@ if BUILD_PLGUIN:
                         self._switches["inhibit"].turnOn()
                     else:
                         self._switches["inhibit"].turnOff()
+                return
+            if message is None:
                 return
             msg = message.payload.decode('utf-8')
             if userdata == "isOn" and msg == "OFF":

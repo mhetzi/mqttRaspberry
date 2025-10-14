@@ -7,11 +7,9 @@ from uuid import uuid4
 import logging
 import json
 
-from paho.mqtt.client import Client as MqttClient
 from paho.mqtt.client import MQTTMessage
 
 from Mods.qmk_via.via import DeviceConfigEntry, KeyboardParsedJson, GetKeyboardDefinition, ViaHid, KeyboardInfo
-from Mods.qmk_via import CONSTANTS
 import schedule
 
 class ViaPlugin(PluginManager.PluginInterface):
@@ -28,6 +26,7 @@ class ViaPlugin(PluginManager.PluginInterface):
         self._logger = logger
         keyboards: list[dict] = self._config.get("keyboards", []) # pyright: ignore[reportAssignmentType]
         self._polling_interval = self._config.getExact("polling_every_seconds", self._polling_interval)
+        self._keyboards.clear()
 
         for keyboard in keyboards:
             self._logger.debug(f"Loading keyboard config: {keyboard}")
@@ -143,6 +142,7 @@ class ViaPlugin(PluginManager.PluginInterface):
             return
         if not wasConnected:
             self._lights.clear()
+            self._eff_speeds.clear()
             for keyboard in self._keyboards:
                 d = GetKeyboardDefinition(keyboard)
                 if d is None:

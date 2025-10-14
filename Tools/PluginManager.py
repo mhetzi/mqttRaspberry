@@ -158,6 +158,7 @@ class PluginManager:
 
     def addOfflineHandler(self, func: Callable[[], None | MQTTMessageInfo]):
         with self._offline_handlers_lock:
+            self.logger.debug(f"Adding {func=} to offlineHandlers...")
             self._offline_handlers.append(weakref.WeakMethod(func))
 
     def get_pip_list(self):

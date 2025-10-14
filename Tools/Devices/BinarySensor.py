@@ -6,13 +6,14 @@ import json
 from  Tools.PluginManager import PluginManager
 import enum
 from Tools.Autodiscovery import BinarySensorDeviceClasses
+import weakref
 
 class BinarySensor:
     def __init__(self, logger:logging.Logger, pman: PluginManager, name: str, binary_sensor_type: BinarySensorDeviceClasses, measurement_unit: str='', ava_topic=None, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None, nodeID=None, subnode_id=None):
 
         self._log = logger.getChild("BinarySensor")
         self._log.debug("BinarySensor Object für {} mit custom uid {} erstellt.".format(name, unique_id))
-        self._pm = pman
+        self._pm = weakref.ref(pman)
         self._name = name
         self._ava_topic = ava_topic
         self._vt = value_template
@@ -35,13 +36,20 @@ class BinarySensor:
         self._once = None
     
     def register(self):
-
+        pm = self._pm()
+        if pm is None:
+            self._log.error("PluginManager is gone!")
+            return
+        client = pm._client
+        if client is None:
+            self._log.error("Cant register without MQTT Connection!")
+            return
         # Setze Discovery Configuration
         self._log.debug("Publish configuration")
         plugin_name = self._log.parent.name
         import re
         safename = re.sub('[\W_#]+', '', self._name) 
-        uid = "switch.MqttScripts{}.switch.{}.{}".format(self._pm._client_name, plugin_name, safename) if self._unique_id is None else self._unique_id
+        uid = "switch.MqttScripts{}.switch.{}.{}".format(pm._client_name, plugin_name, safename) if self._unique_id is None else self._unique_id
         zeroc = self._topics.get_config_payload(
             name=self._name,
             ava_topic=None,
@@ -52,13 +60,21 @@ class BinarySensor:
             unique_id=uid,
             icon=self._icon
         )
-        self._pm._client.publish(self._topics.config, zeroc, retain=True)
-        self._pm._client.subscribe(self._topics.command)
+        client.publish(self._topics.config, zeroc, retain=True)
+        client.subscribe(self._topics.command)
 
     def turn(self, state=None):
+        pm = self._pm()
+        if pm is None:
+            self._log.error("PluginManager is gone!")
+            return
+        client = pm._client
+        if client is None:
+            self._log.error("Cant send state update without MQTT Connection!")
+            return
         self._state = json.dumps(state) if isinstance(state, dict) else state
         try:
-            self._pm._client.publish(self._topics.state, payload=self._state.encode('utf-8'))
+            client.publish(self._topics.state, payload=self._state.encode('utf-8'))
         except:
             self._log.exception(f"Error while sending {state = }")
 
@@ -91,7 +107,15 @@ class BinarySensor:
             self._once = state
 
     def resend(self):
-        return self._pm._client.publish(self._topics.state, payload=self._state)
+        pm = self._pm()
+        if pm is None:
+            self._log.error("PluginManager is gone!")
+            return
+        client = pm._client
+        if client is None:
+            self._log.error("Cant register without MQTT Connection!")
+            return
+        return client.publish(self._topics.state, payload=self._state)
 
     def reset(self):
         pass

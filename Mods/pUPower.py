@@ -82,6 +82,7 @@ try:
                     device_type = self._proxy.Get("org.freedesktop.UPower.Device", "Type").get_uint32()
                 except:
                     self._log.exception("Device type err")
+                    return
                 state = {
                     "soc": self._proxy.Get("org.freedesktop.UPower.Device", "Percentage").get_double(),
                     "capaciy": self._proxy.Get("org.freedesktop.UPower.Device", "Capacity").get_double(),

@@ -6,6 +6,8 @@ import json
 import ctypes
 from ctypes import ArgumentError
 import logging
+from Tools.ResettableThreadingTimer import ManagedTimer
+import threading
 
 from Tools.Misc import getDictWithContaining
 from Mods.qmk_via import CONSTANTS
@@ -118,34 +120,46 @@ class ViaHid:
         self._definition = definition
         self._logger = logger.getChild(f"ViaHid:{device.friendly_name}")
         self._dev_path = device.get_device_path(self._logger)
-    
+        self._io_lock = threading.Lock()
+        self._dev: hid.Device | None = None
+        self._dev_timer: ManagedTimer = ManagedTimer(self.closeDevice, 0.5)
+
+    def closeDevice(self):
+        with self._io_lock:
+            try:
+                if self._dev is not None:
+                    self._dev.close()
+            except:
+                self._logger.exception(f"closeDevice {self._device=} failed")
+
     def send(self, command: Via_Command_t, channel: Via_Channels_t|Via_Attribute_t, attribute: Via_Attribute_t, value: int, value2:int=0) -> bytes | None:
         if self._dev_path is None:
             self._dev_path = self._device.get_device_path(self._logger)
         p = self._dev_path
-        try:
-            dev = hid.Device(path=p)
-            if dev is None:
-                return None
-            self._logger.debug(f"Opened device {self._device.friendly_name} at {p}")
-            if dev is not None:
-                buf = bytearray(32)
-                buf[0] = command
-                buf[1] = channel
-                buf[2] = attribute
-                buf[3] = value & 0xFF
-                buf[4] = value2 & 0xFF
-                arr = ctypes.create_string_buffer(bytes(buf))
-                dev.write(arr)
-                try:
-                    return dev.read(32, 500)
-                except TypeError:
-                    self._logger.warning("Read not supported on this platform/version of hidapi")
-                    return dev.read(32)
-        except Exception as e:
-            self._logger.exception(f"Error sending HID report: {e}")
-        finally:
-            dev.close()
+        with self._io_lock:
+            try:
+                if self._dev is None:
+                    self._dev = hid.Device(path=p)
+                    self._dev_timer.reset()
+                    if self._dev is None:
+                        return None
+                self._logger.debug(f"Opened device {self._device.friendly_name} at {p}")
+                if self._dev is not None:
+                    buf = bytearray(32)
+                    buf[0] = command
+                    buf[1] = channel
+                    buf[2] = attribute
+                    buf[3] = value & 0xFF
+                    buf[4] = value2 & 0xFF
+                    arr = ctypes.create_string_buffer(bytes(buf))
+                    self._dev.write(arr)
+                    try:
+                        return self._dev.read(32, 500)
+                    except TypeError:
+                        self._logger.warning("Read not supported on this platform/version of hidapi")
+                        return self._dev.read(32)
+            except Exception as e:
+                self._logger.exception(f"Error sending HID report: {e}")
         return None
     
     def get(self, command: Via_Command_t, attribute: Via_Attribute_t) -> bytes | None:

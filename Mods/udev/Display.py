@@ -204,8 +204,11 @@ class Displays(UdevDeviceProcessor):
         if not display.edid_valid:
             self._log.error("EDID is not valid! Ignoring Display...")
             return
-        if self._sensors.get(hash(display)) is not None and self.__plugin_manager is None:
-            self._log.warn("Device duplicate or pm is none")
+        if self._sensors.get(hash(display)) is not None:
+            self._log.warning("Device duplicate")
+            return
+        if self.__plugin_manager is None:
+            self._log.warning("PluginManager is gone")
             return
         sensor = BinarySensor.BinarySensor(
             self._log,
@@ -220,6 +223,9 @@ class Displays(UdevDeviceProcessor):
         self._sensors[hash(display)] = sensor
 
     def updateDevices(self):
+        if self._config is None:
+            self._log.warning("_config is none")
+            return
         for hsh, dev in self._sensors.items():
             state = {
                 "s": 1 if self._display_list.get(hsh, None) is not None and self._display_list[hsh].connected else 0
