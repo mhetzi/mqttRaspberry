@@ -219,7 +219,8 @@ class PluginManager:
         self.needed_list = []
 
         p = Path(Mods.__path__[0])
-        lp = [str(x) for x in list(p.glob('**/**.py')) if str(x.name).startswith("p", 0) or x.name == "__init__.py"]
+        paths = list(p.glob('*/*.py')) + list(p.glob('*.py')) 
+        lp = [str(x) for x in paths if str(x.name).startswith("p", 0) or x.name == "__init__.py"]
         plugin_names = self.config.get_all_plugin_names()
 
         i = 0
