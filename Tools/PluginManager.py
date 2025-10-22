@@ -379,14 +379,21 @@ class PluginManager:
             except Exception as x:
                 self.logger.exception("Modul unterstützt sendStates() nicht!")
 
-    def disconnect(self, skip_callbacks=False) -> mqttEnums.MQTTErrorCode:
-        self._mqttEvent.clear()
+    def disconnect(self, skip_callbacks=False, reconnect:float=0) -> mqttEnums.MQTTErrorCode:
+        if reconnect < 0.5:
+            self._mqttEvent.set()
         err = mqttEnums.MQTTErrorCode.MQTT_ERR_UNKNOWN
         if self._client is not None:
             self._client.reconnect_delay_set(min_delay=5, max_delay=300)
             err = self._client.disconnect()
             if skip_callbacks:
                 self.disconnect_callback(self._client, self, err)
+            self.logger.debug("Waiting for MQTT Client to exit")
+            self._client.loop_stop()
+        if reconnect > 0.5:
+            import time
+            time.sleep(reconnect)
+            self.reconnect()
         return err
 
     def reconnect(self):
@@ -430,6 +437,15 @@ class PluginManager:
         if self._connected_callback_thread is None or not self._connected_callback_thread.is_alive():
             self._connected_callback_thread = PropagetingThread.PropagatingThread(name="mqttConnected", target=lambda: self._connect_callback(client,userdata,flags,rc))
             self._connected_callback_thread.start()
+        else:
+            self.logger.error("on_connect callback already running!")
+            try:
+                client.disconnect()
+                client.loop_stop()
+            except:
+                pass
+            self.disconnect(reconnect=30)
+
 
     def hass_online_call(self, client:MqttClient, userdata, message):
         msg = message.payload.decode('utf-8')
@@ -441,12 +457,7 @@ class PluginManager:
     def _connect_callback(self, client:MqttClient, userdata, flags, rc):
         if self.is_connected:
             self.logger.error(f"Bin Verbunden ({client=}). Trenne verbindung...")
-            self.disconnect()
-            try:
-                client.disconnect()
-            except:
-                pass
-            self.reconnect()
+            self.disconnect(reconnect=15)
             return
         self._client = client
         
@@ -459,7 +470,7 @@ class PluginManager:
                 self.register_mods()
 
                 self.logger.info("Setze onlinestatus {} auf online".format(self.config.get_client_config().isOnlineTopic))
-                self._client.publish(self.config.get_client_config().isOnlineTopic, "online", 0, True)
+                self._client.publish(self.config.get_client_config().isOnlineTopic, "online", 0, True).wait_for_publish(30)
                 self._client.subscribe("broadcast/updateAll")
                 self._client.message_callback_add("broadcast/updateAll", self.reSendStates)
                 self.reSendStates()
@@ -469,11 +480,11 @@ class PluginManager:
                 self.logger.warning("Nicht verbunden, Plugins werden nicht regestriert. rc: {}, flags: {}".format(rc, flags))
         except:
             self.logger.exception("Fehler in on_connect")
+            self.is_connected = False
         
         if not self.is_connected:
             self.logger.debug("Connection Lost while setup")
-            self.disconnect()
-            self.reconnect()
+            self.disconnect(reconnect=30)
             return
         self.logger.info("Verbunden. Alles OK!")
 
@@ -503,21 +514,21 @@ class PluginManager:
         from Tools.PropagetingThread import PropagatingThread
         from Tools.Config import NoClientConfigured
         from time import sleep
-        self._mqttEvent.set()
         self._mqttShutdown.clear()
         try:
             while not self._mqttShutdown.is_set():
+                self._mqttEvent.clear()
                 mqtt_client, deviceID = self.start_mqtt_client()
                 self.logger.info("Running MQTT Main Loop")
                 mqtt_client.loop_start()
                 thread: PropagatingThread = mqtt_client._thread
                 ret, exc = thread.joinNoRaise()
-                self.logger.warning(f"PropagatingThread has {ret=} with {exc=}", exc_info=exc)
+                self.logger.warning(f"MQTT PropagatingThread has {ret=} with {exc=}", exc_info=exc)
                 if isinstance(exc, (ConnectionRefusedError, KeyboardInterrupt, NoClientConfigured)):
                     raise exc
-                if not self._mqttEvent.is_set():
-                    self._mqttEvent.wait()
-                    sleep(5)
+                if not self._mqttEvent.wait(120):
+                    self.logger.error("Stuck in Reconnect wait!")
+                    self.shutdown()
         except:
             self.logger.exception("MQTT Exception")
 
