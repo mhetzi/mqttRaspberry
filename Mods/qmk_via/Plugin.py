@@ -236,7 +236,7 @@ class ViaPlugin(PluginManager.PluginInterface):
     def sendStates(self):
         for keyboard in self._keyboards:
             light = self._lights.get(keyboard, None)
-            if light is None and self._vias[keyboard].isConnected():
+            if light is None and keyboard in self._vias.keys() and self._vias[keyboard].isConnected():
                 self._logger.info("Found new Connected Keyboard, was previously not connected. Registering...")
                 d = GetKeyboardDefinition(keyboard)
                 if d is None:
