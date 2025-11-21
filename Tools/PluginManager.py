@@ -484,7 +484,7 @@ class PluginManager:
         
         if not self.is_connected:
             self.logger.debug("Connection Lost while setup")
-            self.disconnect(reconnect=30)
+            self.shutdown()
             return
         self.logger.info("Verbunden. Alles OK!")
 
