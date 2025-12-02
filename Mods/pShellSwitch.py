@@ -135,9 +135,6 @@ class ShellSwitch(PluginManager.PluginInterface):
             if self._config["entrys"][name].get("setOnLoad", True):
                 self.exec_switch(name, self._config["entrys"][name]["wasOn"], simulate=True)
 
-    def set_pluginManager(self, pm):
-        pass
-
 class ShellSwitchConf:
     def __init__(self, opts: conf.BasicConfig):
         self.c = conf.PluginConfig(opts, "ShellSwitch")
