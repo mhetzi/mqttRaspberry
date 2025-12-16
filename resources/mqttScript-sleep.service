@@ -6,8 +6,8 @@ Wants=sleep.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/opt/mqttScripts/data/resources/mqttScrips-sleep-wait.sh
-ExecStop=/opt/mqttScripts/data/resources/mqttScrips-sleep-wait.sh
+ExecStart=/usr/bin/timeout -f --signal=SIGUSR1 -p 2s /opt/mqttScripts/data/resources/mqttScrips-sleep-wait.sh
+ExecStop=/usr/bin/timeout -f --signal=SIGUSR1 -p 2s /opt/mqttScripts/data/resources/mqttScrips-sleep-wait.sh
 TimeoutStartSec=6
 TimeoutStopSec=6
 

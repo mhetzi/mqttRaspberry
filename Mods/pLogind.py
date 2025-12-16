@@ -274,6 +274,7 @@ if BUILD_PLGUIN:
             
             self.sleeping = False
             self.shutdown = False
+            self.is_disconnected = False
 
             self.inhibit_lock = -1
             self._switches: dict[str, Switch] = {}
@@ -286,7 +287,9 @@ if BUILD_PLGUIN:
             self._rsess_notiy = None
             self._idle_monitor = None
 
-            fifo_path = os.environ.get('XDG_RUNTIME_DIR') or "/tmp"
+            XDG_RUNTIME_DIR = os.environ.get('XDG_RUNTIME_DIR') if opts.get("use_xdg_runtime_dir", False) else None
+
+            fifo_path = XDG_RUNTIME_DIR or "/tmp"
             self._fifo_path = os.path.join(fifo_path, "mqttScript-logind.fifo")
             try:
                 if not os.path.exists(self._fifo_path):
@@ -342,6 +345,7 @@ if BUILD_PLGUIN:
             self._pluginManager = pm
 
         def disconnected(self):
+            self.is_disconnected = True
             for name, sw in self._switches.items():
                 sw.offline()
 
@@ -355,13 +359,12 @@ if BUILD_PLGUIN:
                     v.register()
             if not wasConnected:
                 self._setup_dbus_interfaces()
-                netName = autodisc.Topics.get_std_devInf().name if self._config.get("custom_name", None) is None else self._config.get("custom_name", None)
-                # Kann ich ausschalten?
-
+             
+            # Kann ich ausschalten?
             self._proxy.PrepareForShutdown.disconnect(self.sendShutdown)
             self._proxy.PrepareForSleep.disconnect(self.sendSuspend)
 
-            if self._proxy.CanPowerOff() == "yedas" and self._config.get("allow_power_off", True):
+            if self._proxy.CanPowerOff() == "yes" and self._config.get("allow_power_off", True):
                 if "isOn" in self._switches.keys():
                     del self._switches["isOn"]
                 self._switches["isOn"] = Switch(
@@ -525,7 +528,7 @@ if BUILD_PLGUIN:
                 try:
                     self._switches["suspend"].turnOn().wait_for_publish(timeout=2)
                     if self._fifo_path is not None:
-                        for _ in range(0, 5):
+                        for i in range(0, 24):
                             try:
                                 fifo_file = os.open(self._fifo_path, os.O_WRONLY | os.O_NONBLOCK)
                                 os.write(fifo_file, b"SUSPEND\n")
@@ -533,7 +536,9 @@ if BUILD_PLGUIN:
                                 break
                             except:
                                 sleep(0.25)
-                                self._logger.exception("Could not write SUSPEND to FIFO, retrying...")
+                                self._logger.exception("[{i}/24]Could not write SUSPEND to FIFO, retrying...")
+                                if self.is_disconnected:
+                                    break
                     sendOK = True
                     #self._pluginManager.disconnect()
                 except:
@@ -544,7 +549,7 @@ if BUILD_PLGUIN:
                 try:
                     self._switches["suspend"].turnOff().wait_for_publish(timeout=2)
                     sendOK = True
-                    for _ in range(0, 5):
+                    for _ in range(0, 24):
                         try:
                             if self._fifo_path is not None:
                                 fifo_file = os.open(self._fifo_path, os.O_WRONLY | os.O_NONBLOCK)

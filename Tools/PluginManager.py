@@ -438,8 +438,7 @@ class PluginManager:
         else:
             self.logger.error("on_connect callback already running!")
             try:
-                client.disconnect()
-                client.loop_stop()
+                self.shutdown()
             except Exception as e:
                 self.logger.debug(f"Fehler beim Trennen des Clients: {e}")
             self.disconnect(reconnect=30)
