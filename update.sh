@@ -1,7 +1,7 @@
 #!/bin/bash
-SCRIPTPATH=$( cd $(dirname $0) ; pwd -P );
-SELF=`basename $0`;
-username=$(whoami);
+SCRIPTPATH="$( cd "$(dirname "$0")" || exit ; pwd -P )";
+SELF="$(basename "$0")";
+username="$(whoami)";
 
 python3 -c "import sys, pkgutil; sys.exit(0 if pkgutil.find_loader('virtualenv') else 1)"
 hasVenvInstalled=$?;
@@ -41,9 +41,8 @@ install_system() {
 }
 
 install() {
-    echo $1
     sudo bash -c "mkdir -p /opt/mqttScripts/config/ ; chown $username /opt/mqttScripts/ -Rv;"
-    cd /opt/mqttScripts/
+    cd /opt/mqttScripts/ || exit 1;
     if [[ $hasVenvInstalled -eq 1 ]]; then
         read -p "virtualenvironments nicht installiert. Installieren? " -n 1 -r
         if [[ $REPLY =~ ^[YyJj]$ ]]
@@ -53,8 +52,11 @@ install() {
     fi
     echo "Erselle VENV"
     python3 -m virtualenv venv --system-site-packages --clear
+
     echo "Aktivieren venv"
+    # shellcheck source=/dev/null # to ignore the error
     source venv/bin/activate
+
     python3 -m pip install pip-review
     echo "mqttScripts wird heruntergeladen..."
     git clone git://xeon.lan/mqttRaspberry data || git clone https://github.com/mhetzi/mqttRaspberry.git data;

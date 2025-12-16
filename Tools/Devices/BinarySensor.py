@@ -63,20 +63,16 @@ class BinarySensor:
         client.publish(self._topics.config, zeroc, retain=True)
         client.subscribe(self._topics.command)
 
-    def turn(self, state=None):
+    def turn(self, state=None) -> mclient.MQTTMessageInfo:
         pm = self._pm()
         if pm is None:
-            self._log.error("PluginManager is gone!")
-            return
+            raise RuntimeError("PluginManager is gone!")
         client = pm._client
         if client is None:
             self._log.error("Cant send state update without MQTT Connection!")
-            return
+            raise ValueError("Cant send state update without MQTT Connection!")
         self._state = json.dumps(state) if isinstance(state, dict) else state
-        try:
-            client.publish(self._topics.state, payload=self._state.encode('utf-8'))
-        except:
-            self._log.exception(f"Error while sending {state = }")
+        return client.publish(self._topics.state, payload=self._state.encode('utf-8'))
 
     def turnOn(self, json=None):
         if json is not None and self._jsattrib:
@@ -84,7 +80,7 @@ class BinarySensor:
             raise AttributeError("Sending json without declaring json_attributes true. Homeassistant does not like that!")
         if json is None:
             return self.turn("1")
-        self.turn(json)
+        return self.turn(json)
 
     def turnOff(self, json=None):
         if json is not None and self._jsattrib:
@@ -92,7 +88,7 @@ class BinarySensor:
             raise AttributeError("Sending json without declaring json_attributes true. Homeassistant does not like that!")
         if json is None:
             return self.turn("0")
-        self.turn(json)
+        return self.turn(json)
 
     def turnOnOff(self, state: bool):
         if state:
@@ -103,18 +99,19 @@ class BinarySensor:
     
     def turnOnOffOnce(self, state: bool):
         if self._once != state:
-            self.turnOnOff(state)
+            val = self.turnOnOff(state)
             self._once = state
+            return val
 
     def resend(self):
         pm = self._pm()
         if pm is None:
             self._log.error("PluginManager is gone!")
-            return
+            raise RuntimeError("PluginManager is gone!")
         client = pm._client
         if client is None:
             self._log.error("Cant register without MQTT Connection!")
-            return
+            raise ValueError("Cant register without MQTT Connection!")
         return client.publish(self._topics.state, payload=self._state)
 
     def reset(self):

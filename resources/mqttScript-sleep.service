@@ -1,0 +1,15 @@
+[Unit]
+Description=mqttScript: Zustände vor / nach Suspend
+Before=sleep.target
+Wants=sleep.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/mqttScripts/data/resources/mqttScrips-sleep-wait.sh
+ExecStop=/opt/mqttScripts/data/resources/mqttScrips-sleep-wait.sh
+TimeoutStartSec=6
+TimeoutStopSec=6
+
+[Install]
+WantedBy=sleep.target

@@ -41,24 +41,24 @@ class PluginInterface(ABC):
     
     # Do necessary registrations, this gets called on (re)connect with the mqtt broker 
     @abstractmethod
-    def register(self, wasConnected=False): pass
+    def register(self, wasConnected: bool = False) -> None: pass
 
     # Shutdown plugin
     @abstractmethod
-    def stop(self): pass
+    def stop(self) -> None: pass
 
     # Resend states, this can get invoked over MQTT via sending anything to "broadcast/updateAll"
     # Gets called when homeassistant/status becomes "online"
     @abstractmethod
-    def sendStates(self): pass
+    def sendStates(self) -> None: pass
 
     # Give the PluginManager instance to the Plugin
-    def set_pluginManager(self, pm: "PluginManager"):
+    def set_pluginManager(self, pm: "PluginManager") -> None:
         self._pluginManager = pm
 
     #Inform Plugin about disconnect
     @abstractmethod
-    def disconnected(self): pass
+    def disconnected(self) -> None: pass
 
 
 @dataclasses.dataclass(slots=True)
@@ -73,7 +73,7 @@ class PluginLoader(ABC):
 
     @staticmethod
     @abstractmethod 
-    def runConfig(conf: tc.BasicConfig, logger:logging.Logger): raise NotImplementedError()
+    def runConfig(conf: tc.BasicConfig, logger: logging.Logger) -> None: raise NotImplementedError()
 
     @staticmethod
     @abstractmethod
@@ -97,14 +97,15 @@ class ConfiguratorInterface(ABC):
     def getCurrentConfig(conf: tc.BasicConfig) -> tc.PluginConfig: raise NotImplementedError()
 
 class PluginManager:
-    needed_list: list[PluginLoader] = []
-    configured_list: dict[str, PluginInterface] = {}
-    is_connected = False
-    scheduler_event = None
-    _client: MqttClient | None
-    _connected_callback_thread: PropagetingThread.PropagatingThread | None = None
-
-    def run_scheduler_continuously(self, interval=1):
+    # MQTT Topics und Konstanten
+    MQTT_BROADCAST_TOPIC = "broadcast/updateAll"
+    MQTT_HASS_STATUS_TOPIC = "homeassistant/status"
+    MQTT_OFFLINE_MESSAGE = "offline"
+    MQTT_ONLINE_MESSAGE = "online"
+    SCHEDULER_THREAD_NAME = "scheduler"
+    MQTT_THREAD_NAME = "mqttConnected"
+    
+    def run_scheduler_continuously(self, interval: int = 1) -> tuple[threading.Event, threading.Thread]:
         """Continuously run, while executing pending jobs at each elapsed
         time interval.
         @return cease_continuous_run: threading.Event which can be set to
@@ -145,7 +146,13 @@ class PluginManager:
         self.logger = logger.getChild("PM")
         self.logger.setLevel(logging.NOTSET)
         self.config = config
-        self._client = None
+        # Klassenvariablen als Instanzvariablen initialisieren
+        self.needed_list: list[PluginLoader] = []
+        self.configured_list: dict[str, PluginInterface] = {}
+        self.is_connected = False
+        self.scheduler_event = None
+        self._connected_callback_thread: PropagetingThread.PropagatingThread | None = None
+        self._client: MqttClient | None = None
         self._client_name = None
         self._wasConnected = False
         self.shed_thread = None
@@ -156,19 +163,16 @@ class PluginManager:
         self._mqttEvent = threading.Event()
         self._mqttShutdown = threading.Event()
 
-    def addOfflineHandler(self, func: Callable[[], None | MQTTMessageInfo]):
+    def addOfflineHandler(self, func: Callable[[], MQTTMessageInfo | None]) -> None:
         with self._offline_handlers_lock:
             self.logger.debug(f"Adding {func=} to offlineHandlers...")
             self._offline_handlers.append(weakref.WeakMethod(func))
 
-    def get_pip_list(self):
+    def get_pip_list(self) -> None:
         pip_list: list[str] = []
         mep = list(self.config.get_all_plugin_names())
-        i = 0
-        while i < len(mep):
-            key = mep[i]
-            self.logger.debug("[{}/{}] Teste Pip {}.".format(1+i, len(mep), key))
-            i += 1
+        for i, key in enumerate(mep, 1):
+            self.logger.debug("[{}/{}] Teste Pip {}.".format(i, len(mep), key))
             for x in self.needed_list:
                 try:
                     pip_list = pip_list + x.getNeededPipModules()
@@ -187,16 +191,13 @@ class PluginManager:
                 self.logger.exception("Installing required Packages failed!")
 
 
-    def enable_mods(self):
+    def enable_mods(self) -> None:
         if self.scheduler_event is None:
             self.scheduler_event, self.shed_thread = self.run_scheduler_continuously()
         self.configured_list = {}
         mep = list(self.config.get_all_plugin_names())
-        i = 0
-        while i < len(mep):
-            key = mep[i]
-            self.logger.debug("[{}/{}] Lade Plugin {}.".format(1+i, len(mep), key))
-            i += 1
+        for i, key in enumerate(mep, 1):
+            self.logger.debug("[{}/{}] Lade Plugin {}.".format(i, len(mep), key))
             plugin = None
             for x in self.needed_list:
                 if x.getConfigKey() == key:
@@ -223,11 +224,8 @@ class PluginManager:
         lp = [str(x) for x in paths if str(x.name).startswith("p", 0) or x.name == "__init__.py"]
         plugin_names = self.config.get_all_plugin_names()
 
-        i = 0
-
-        while i < len(lp):
-            x = lp[i]
-            self.logger.info("[{}/{}] Überprüfe Plugindatei: {}".format(i+1, len(lp), x))
+        for i, x in enumerate(lp, 1):
+            self.logger.info("[{}/{}] Überprüfe Plugindatei: {}".format(i, len(lp), x))
             try:
                 spec = importlib.util.spec_from_file_location("module.name", x)
                 if spec is None:
@@ -259,10 +257,9 @@ class PluginManager:
                 self.logger.exception("Kann Modul nicht installieren. In Systemd Modus!")
             except Exception as ex:
                 self.logger.exception("Modul %s hat eine Exception verursacht. NICHT laden.", x)
-            i += 1
         return self.needed_list
 
-    def register_mods(self):
+    def register_mods(self) -> None:
         self.logger.info("Regestriere Plugins in MQTT")
 
         clen = len(self.configured_list)
@@ -273,8 +270,8 @@ class PluginManager:
             i += 1
             try:
                 pobject.set_pluginManager(self)
-            except:
-                pass
+            except AttributeError:
+                self.logger.debug(f"Plugin {pname} hat keine set_pluginManager Methode")
             
             try:
                 pobject.register(wasConnected=self._wasConnected)
@@ -284,7 +281,7 @@ class PluginManager:
                 except Exception as e:
                     self.logger.exception(f"Fehler beim Registrieren des Plugins {pname}: {e=} ")
 
-    def send_disconnected_to_mods(self):
+    def send_disconnected_to_mods(self) -> None:
         self.logger.info("Verbindung getrennt!")
         clen = len(self.configured_list)
         i: int = 1
@@ -294,13 +291,13 @@ class PluginManager:
             i += 1
             try:
                 pobject.disconnected()
-            except:
-                self.logger.debug("Fehler beim Informieren des Plugins")
+            except (AttributeError, Exception) as e:
+                self.logger.debug(f"Fehler beim Informieren des Plugins {pname}: {e}")
 
-    def get_plguins_by_config_id(self, id:str):
+    def get_plguins_by_config_id(self, id: str) -> PluginInterface:
         return self.configured_list[id]
 
-    def disable_mods(self):
+    def disable_mods(self) -> None:
         for x in self.configured_list.keys():
             try:
                 self.logger.info("Schalte {} aus".format(x))
@@ -311,11 +308,11 @@ class PluginManager:
             except Exception as x:
                 self.logger.exception(x)
 
-    def get_configs(self):
+    def get_configs(self) -> list[PluginLoader]:
         self.needed_plugins(True)
         return self.needed_list
 
-    def run_configurator(self, name=None):
+    def run_configurator(self, name: str | None = None) -> None:
         self.needed_plugins(True)
         for n in self.needed_list:
             if name and n.getConfigKey() != name:
@@ -328,13 +325,14 @@ class PluginManager:
                     self.logger.warning("Konfiguration von Plugin abgebrochen.")
         self.config.save()
 
-    def start_mqtt_client(self):
+    def start_mqtt_client(self) -> tuple[MqttClient, str]:
         self.logger.debug("Erstelle MQTT Client...")
         cc = self.config.get_client_config()
         
         try:
             client = MqttClient(client_id=cc.client_id, clean_session=cc.clean_session)
-        except:
+        except TypeError:
+            # Fallback für ältere paho-mqtt Versionen
             client = MqttClient(client_id=cc.client_id, clean_session=cc.clean_session, callback_api_version=mqttEnums.CallbackAPIVersion.VERSION1)
         self.logger.debug("Client erstellt.")
 
@@ -368,21 +366,21 @@ class PluginManager:
         client.will_set(cc.isOnlineTopic, "offline", 0, True)
         return client, my_name
 
-    def reSendStates(self, client=None, userdata=None, message: MQTTMessageInfo=None):
+    def reSendStates(self, client: MqttClient | None = None, userdata: Any | None = None, message: MQTTMessageInfo | None = None) -> None:
         self.logger.info("Resend Topic empfangen. alles neu senden...")
         for x in self.configured_list.keys():
             try:
                 p = self.configured_list[x]
                 p.sendStates()
             except AttributeError:
-                pass
-            except Exception as x:
-                self.logger.exception("Modul unterstützt sendStates() nicht!")
+                self.logger.debug(f"Plugin {x} hat keine sendStates() Methode")
+            except Exception as e:
+                self.logger.exception(f"Fehler beim Senden von States für Plugin {x}: {e}")
 
-    def disconnect(self, skip_callbacks=False, reconnect:float=0) -> mqttEnums.MQTTErrorCode:
+    def disconnect(self, skip_callbacks: bool = False, reconnect: float = 0) -> mqttEnums.MQTTErrorCode:
         if reconnect < 0.5:
             self._mqttEvent.set()
-        err = mqttEnums.MQTTErrorCode.MQTT_ERR_UNKNOWN
+        err: mqttEnums.MQTTErrorCode = mqttEnums.MQTTErrorCode.MQTT_ERR_UNKNOWN
         if self._client is not None:
             self._client.reconnect_delay_set(min_delay=5, max_delay=300)
             err = self._client.disconnect()
@@ -396,10 +394,10 @@ class PluginManager:
             self.reconnect()
         return err
 
-    def reconnect(self):
+    def reconnect(self) -> None:
         self._mqttEvent.set()
 
-    def disconnect_callback(self, client:MqttClient, userdata, rc:mqttEnums.MQTTErrorCode):
+    def disconnect_callback(self, client: MqttClient, userdata: Any, rc: mqttEnums.MQTTErrorCode) -> None:
         self.is_connected = False
         self.logger.info(f"Verbindung getrennt {rc=}")
         self._wasConnected = self.is_connected or self._wasConnected
@@ -416,8 +414,8 @@ class PluginManager:
                         real_func()
                     else:
                         self.logger.warning(f"Callable is dead!")
-                except:
-                    self.logger.exception("")
+                except Exception as e:
+                    self.logger.exception(f"Fehler beim Aufrufen des Offline-Handlers: {e}")
         self.logger.info(f"Verbindung getrennt, alles aufgeräumt! {client=}")
         try:
             if rc == mqttEnums.MQTTErrorCode.MQTT_ERR_KEEPALIVE:
@@ -429,10 +427,10 @@ class PluginManager:
         
         try:
             self.send_disconnected_to_mods()
-        except:
-            self.logger.exception("self.send_disconnected_to_mods() exception")
+        except Exception as e:
+            self.logger.exception(f"Fehler beim Benachrichtigen der Module: {e}")
 
-    def connect_callback(self, client:MqttClient, userdata, flags, rc):
+    def connect_callback(self, client: MqttClient, userdata: Any, flags: int, rc: int) -> None:
         self.logger.info(f"Verbunden ({client}), regestriere Plugins...")
         if self._connected_callback_thread is None or not self._connected_callback_thread.is_alive():
             self._connected_callback_thread = PropagetingThread.PropagatingThread(name="mqttConnected", target=lambda: self._connect_callback(client,userdata,flags,rc))
@@ -442,27 +440,27 @@ class PluginManager:
             try:
                 client.disconnect()
                 client.loop_stop()
-            except:
-                pass
+            except Exception as e:
+                self.logger.debug(f"Fehler beim Trennen des Clients: {e}")
             self.disconnect(reconnect=30)
 
 
-    def hass_online_call(self, client:MqttClient, userdata, message):
+    def hass_online_call(self, client: MqttClient, userdata: Any, message: Any) -> None:
         msg = message.payload.decode('utf-8')
         if msg == "online":
             self.logger.info("HomeAssistant ist online. Alle sensoren neu senden!")
             self.reSendStates()
 
 
-    def _connect_callback(self, client:MqttClient, userdata, flags, rc):
+    def _connect_callback(self, client: MqttClient, userdata: Any, flags: int, rc: int) -> None:
         if self.is_connected:
             self.logger.error(f"Bin Verbunden ({client=}). Trenne verbindung...")
             self.disconnect(reconnect=15)
             return
         self._client = client
         
-        self._client.subscribe("homeassistant/status")
-        self._client.message_callback_add("homeassistant/status", self.hass_online_call)
+        self._client.subscribe(self.MQTT_HASS_STATUS_TOPIC)
+        self._client.message_callback_add(self.MQTT_HASS_STATUS_TOPIC, self.hass_online_call)
         try:
             if rc == 0:
                 self.is_connected = True
@@ -470,15 +468,15 @@ class PluginManager:
                 self.register_mods()
 
                 self.logger.info("Setze onlinestatus {} auf online".format(self.config.get_client_config().isOnlineTopic))
-                self._client.publish(self.config.get_client_config().isOnlineTopic, "online", 0, True).wait_for_publish(30)
-                self._client.subscribe("broadcast/updateAll")
-                self._client.message_callback_add("broadcast/updateAll", self.reSendStates)
+                self._client.publish(self.config.get_client_config().isOnlineTopic, self.MQTT_ONLINE_MESSAGE, 0, True).wait_for_publish(30)
+                self._client.subscribe(self.MQTT_BROADCAST_TOPIC)
+                self._client.message_callback_add(self.MQTT_BROADCAST_TOPIC, self.reSendStates)
                 self.reSendStates()
                 self._wasConnected = True
 
             else:
                 self.logger.warning("Nicht verbunden, Plugins werden nicht regestriert. rc: {}, flags: {}".format(rc, flags))
-        except:
+        except Exception as e:
             self.logger.exception("Fehler in on_connect")
             self.is_connected = False
         
@@ -488,7 +486,7 @@ class PluginManager:
             return
         self.logger.info("Verbunden. Alles OK!")
 
-    def _shutdown(self):
+    def _shutdown(self) -> None:
         pass
     
     def _shutdownFromExit(self) -> None:
@@ -498,6 +496,10 @@ class PluginManager:
         self._mqttEvent.set()
         self._mqttShutdown.set()
         if self._client is not None:
+            try:
+                self._client.publish(self.config.get_client_config().isOnlineTopic, self.MQTT_OFFLINE_MESSAGE, 0, True).wait_for_publish(30)
+            except Exception as e:
+                self.logger.debug(f"Fehler beim Offline Publish: {e}")
             self._client.disconnect()
         self.logger.info("Beende Scheduler")
         schedule.clear()
@@ -510,7 +512,7 @@ class PluginManager:
         self._shutdownFromExit()
         exit(0)
     
-    def mqtt_loopforever(self):
+    def mqtt_loopforever(self) -> None:
         from Tools.PropagetingThread import PropagatingThread
         from Tools.Config import NoClientConfigured
         from time import sleep
