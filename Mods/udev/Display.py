@@ -45,7 +45,7 @@ class Display(DataClassJsonMixin):
     enabled:    bool = False
     connected:  bool = False
     connected_via: Union[str, None] = None
-    serial:     int = 0
+    serial:     str = ""
 
     product_id: int = 0
     mfr_id:     int = 0
@@ -59,8 +59,8 @@ class Display(DataClassJsonMixin):
         if self._saved_hash > 0:
             return self._saved_hash
 
-        if None is not self.serial > 0:
-            return self.serial
+        if None is not self.serial and self.serial != "":
+            return self.serial.__hash__()
         max_numbers = len(str(sys.maxsize))
 
         if self.connected:
@@ -71,34 +71,41 @@ class Display(DataClassJsonMixin):
         return super().__hash__()
 
     @staticmethod
-    def processEDID(port: Path):
+    def processEDID(port: Path, log: logging.Logger):
         d = Display()
-        with port.joinpath("status").open("r") as f:
+
+        status_path = port.joinpath("status")
+        enabled_path = port.joinpath("enabled")
+        edid_path = port.joinpath("edid")
+
+        if not status_path.exists() or not enabled_path.exists() or not edid_path.exists():
+            return d
+
+        with status_path.open("r") as f:
             state = f.readline()
             d.connected = "connected" in state
-        with port.joinpath("enabled").open("r") as f:
+        with enabled_path.open("r") as f:
             state = f.readline()
             d.enabled = "enabled" in state
-        
+
         edid = None
-        with port.joinpath("edid").open("rb") as f:
+        with edid_path.open("rb") as f:
             edid_file = b""
             while True:
                 buf = f.read(100)
                 if not buf:
                     break
                 edid_file += buf
-            print(edid_file)
             try:
                 edid = pyedid.parse_edid(edid_file)
             except:
                 pass          
-            print(edid)
+            log.info(f"Processed edid {edid} with length {len(edid_file)} from {edid_path}")
         if edid is not None:
             d.model = edid.name 
             d.mfr   = edid.manufacturer
             d.madeIn = edid.year
-            d.serial = int(edid.serial)
+            d.serial = str(edid.serial)
             d.mfr_id = edid.manufacturer_id
             d.product_id = edid.product_id
             d.edid_valid = True
@@ -130,12 +137,12 @@ class Displays(UdevDeviceProcessor):
             for port in card.iterdir():
                 try:
                     # extract Display info
-                    display = Display.processEDID(port)
+                    display = Display.processEDID(port, self._log)
                     if display.connected:
-                        self._log.info(f"Display {port} wird eingetragen...")
+                        self._log.info(f"Display {port} {display.model} wird eingetragen...")
                         displays.append(display)
                 except:
-                    self._log.error(f"Error Quering Port {port}")
+                    self._log.exception(f"Error Quering Port {port}")
         return displays
 
     def setConfig(self, config: PluginConfig):
