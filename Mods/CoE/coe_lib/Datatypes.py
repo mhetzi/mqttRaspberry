@@ -42,6 +42,7 @@ class MeasureType(enum.IntEnum):
     CELSIUS = 46
     EUR = 50
     USD = 51
+    WATT = 69
 
 
     def getScaleFactor(self):
@@ -120,5 +121,7 @@ class MeasureType(enum.IntEnum):
                 return "EUR"
             case MeasureType.USD:
                 return "USD"
+            case MeasureType.WATT:
+                return "W"
             case _:
                 return ""
