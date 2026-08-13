@@ -9,7 +9,6 @@ import threading
 import time
 from typing import Any, Coroutine
 
-from textual.message import Message
 import Tools.PluginManager as pman
 import Tools.Config as tc
 import signal

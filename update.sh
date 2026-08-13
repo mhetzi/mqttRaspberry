@@ -57,7 +57,7 @@ install() {
     # shellcheck source=/dev/null # to ignore the error
     source venv/bin/activate
 
-    python3 -m pip install pip-review
+    python3 -m pip install pip-review paho.mqtt watchdog
     echo "mqttScripts wird heruntergeladen..."
     git clone git://xeon.lan/mqttRaspberry data || git clone https://github.com/mhetzi/mqttRaspberry.git data;
     echo "Repo geladen"
