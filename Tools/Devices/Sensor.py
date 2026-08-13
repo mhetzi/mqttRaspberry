@@ -40,6 +40,7 @@ class Sensor:
             autodisc.Component.SENSOR,
             name,
             sensor_type,
+            state_class=state_class,
             ownOfflineTopic=ownOfflineTopic,
             node_id=nodeID
         )

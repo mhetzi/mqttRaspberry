@@ -161,7 +161,7 @@ class Topics:
         global __global_device_info
         return __global_device_info
 
-    def __init__(self, comp: Component, dev_class: DeviceClass, hass_device_class: StateClass, autodiscovery: bool):
+    def __init__(self, comp: Component, dev_class: DeviceClass, hass_device_class: StateClass|None, autodiscovery: bool):
         self._component = comp
         if isinstance(dev_class, BinarySensorDeviceClasses) or isinstance(dev_class, SensorDeviceClasses) or isinstance(dev_class, CoverDeviceClasses):
             self._dev_class = dev_class
@@ -371,11 +371,11 @@ class Topics:
             device=device,
             append_data=data,
             keep_light_attribs=True,
-            measurement_unit=None
+            measurement_unit=""
         )
 
 
-def getTopics(discoveryPrefix: str, comp: Component, devicedID: str, entitiyID: str, device_class: DeviceClass, hass_device_class: StateClass) -> Topics:
+def getTopics(discoveryPrefix: str, comp: Component, devicedID: str, entitiyID: str, device_class: DeviceClass, hass_device_class: StateClass|None) -> Topics:
 
     if comp == Component.SENSOR and isinstance(device_class, BinarySensorDeviceClasses):
         print("getTopics: BinarySensorDeviceClasses angegeben, Component ist aber Sensor, Sensor wird zu BinarySensor abgeändert.")
@@ -392,7 +392,7 @@ def getTopics(discoveryPrefix: str, comp: Component, devicedID: str, entitiyID: 
     t = Topics(comp, device_class, hass_device_class, discoveryPrefix is not None)
     t.state = mainPath + "state"
     t.command = mainPath + "set"
-    t.config = mainPath + "config" if discoveryPrefix is not None else None
+    t.config = mainPath + "config" if discoveryPrefix is not None else ""
     t.ava_topic = mainPath + "online"
     t.base = mainPath
     return t
