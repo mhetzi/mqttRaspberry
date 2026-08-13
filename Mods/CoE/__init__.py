@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from Mods.CoE.coe_lib import Datatypes
-from Tools.Devices.Sensor import SensorDeviceClasses, DeviceClass
+from Tools.Devices.Sensor import SensorDeviceClasses, StateClass
 
 def getConfigKey() -> str:
     return "TA_CoE"
@@ -44,34 +44,34 @@ def get_sensor_class_from_mt(mt: Datatypes.MeasureType):
 def get_sensor_state_class_from_mt(mt: Datatypes.MeasureType):
     match mt:
         case Datatypes.MeasureType.TEMPERATURE | Datatypes.MeasureType.CELSIUS | Datatypes.MeasureType.KELVIN:
-            return  DeviceClass.MEASUREMENT
+            return  StateClass.MEASUREMENT
         case Datatypes.MeasureType.SECONDS | Datatypes.MeasureType.MINUTES | Datatypes.MeasureType.DAYS | Datatypes.MeasureType.HOURS:
-            return  DeviceClass.MEASUREMENT
+            return  StateClass.MEASUREMENT
         case Datatypes.MeasureType.KILOWATT:
-            return  DeviceClass.MEASUREMENT
+            return  StateClass.MEASUREMENT
         case Datatypes.MeasureType.KILOWATTHOURS | Datatypes.MeasureType.MEGAWATTHOURS:
-            return  DeviceClass.TOTAL_INCREASING
+            return  StateClass.TOTAL_INCREASING
         case Datatypes.MeasureType.VOLT:
-            return  DeviceClass.MEASUREMENT
+            return  StateClass.MEASUREMENT
         case Datatypes.MeasureType.MILLIAMPERE:
-            return  DeviceClass.MEASUREMENT
+            return  StateClass.MEASUREMENT
         case Datatypes.MeasureType.LITER:
-            return  DeviceClass.MEASUREMENT
+            return  StateClass.MEASUREMENT
         case Datatypes.MeasureType.Hz:
-            return  DeviceClass.MEASUREMENT
+            return  StateClass.MEASUREMENT
         case Datatypes.MeasureType.BAR:
-            return  DeviceClass.MEASUREMENT
+            return  StateClass.MEASUREMENT
         case Datatypes.MeasureType.KILLOMETER | Datatypes.MeasureType.METER | Datatypes.MeasureType.MILLIMETER:
-            return  DeviceClass.MEASUREMENT
+            return  StateClass.MEASUREMENT
         case Datatypes.MeasureType.KUBIKMETER:
-            return  DeviceClass.TOTAL_INCREASING
+            return  StateClass.TOTAL_INCREASING
         case Datatypes.MeasureType.KMH | Datatypes.MeasureType.METERSECOND:
-            return  DeviceClass.MEASUREMENT
+            return  StateClass.MEASUREMENT
         case Datatypes.MeasureType.MILLIMETER_DAY | Datatypes.MeasureType.MILLIMETER_HOUR:
-            return  DeviceClass.MEASUREMENT
+            return  StateClass.MEASUREMENT
         case Datatypes.MeasureType.MILLIMETER:
-            return  DeviceClass.MEASUREMENT
+            return  StateClass.MEASUREMENT
         case Datatypes.MeasureType.EUR | Datatypes.MeasureType.USD:
-            return  DeviceClass.MEASUREMENT
+            return  StateClass.MEASUREMENT
         case _:
-            return  DeviceClass.NONE
+            return  StateClass.NONE

@@ -29,6 +29,7 @@ class BinarySensor:
             autodisc.Component.BINARY_SENROR,
             name,
             binary_sensor_type,
+            state_class=None,
             node_id=nodeID,
             subnode_id=subnode_id
             )

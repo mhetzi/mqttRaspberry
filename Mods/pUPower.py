@@ -105,7 +105,8 @@ try:
                     self._pman,
                     self.name,
                     SensorDeviceClasses.BATTERY,
-                    "%",
+                    state_class=autodisc.StateClass.MEASUREMENT,
+                    measurement_unit="%",
                     json_attributes=True,
                     unique_id=f"lock.upower.device.{self.name}",
                     value_template="{{value_json.soc}}"
