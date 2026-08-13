@@ -109,7 +109,7 @@ try:
 
             if self._err_topics is not None:
                 self._err_topics = self._config.get_autodiscovery_topic(
-                    Autodiscovery.Component.BINARY_SENROR,
+                    Autodiscovery.Component.BINARY_SENSOR,
                     "SerialFan Error",
                     Autodiscovery.BinarySensorDeviceClasses.PROBLEM
                 )

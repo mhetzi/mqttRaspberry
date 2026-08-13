@@ -75,7 +75,7 @@ try:
             else:
                 mv = ""
                 vt = "{{ value_json.triggered }}"
-                ty = conf.autodisc.Component.BINARY_SENROR
+                ty = conf.autodisc.Component.BINARY_SENSOR
                 ety = conf.autodisc.BinarySensorDeviceClasses.OCCUPANCY
 
             topics = self._config.get_autodiscovery_topic(ty, name, ety)

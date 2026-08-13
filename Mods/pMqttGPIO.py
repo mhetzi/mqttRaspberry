@@ -101,7 +101,7 @@ if DEPENDENCIES_LOADED:
                 if pin.get_direction() == Pin.PinDirection.OUT:
                     t = self._config.get_autodiscovery_topic(Autodiscovery.Component.SWITCH, p["name"], Autodiscovery.SensorDeviceClasses.GENERIC_SENSOR)
                 else:
-                    t = self._config.get_autodiscovery_topic(Autodiscovery.Component.BINARY_SENROR, p["name"], Autodiscovery.BinarySensorDeviceClasses.GENERIC_SENSOR)
+                    t = self._config.get_autodiscovery_topic(Autodiscovery.Component.BINARY_SENSOR, p["name"], Autodiscovery.BinarySensorDeviceClasses.GENERIC_SENSOR)
                 d["t"] = t
                 if p.get("meassurement_value", None) is not None:
                     d["mv"] = p["meassurement_value"]

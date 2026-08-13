@@ -26,7 +26,7 @@ class BinarySensor:
             nodeID = re.sub('[\W_#]+', '', nodeID)
             self._log.debug("NodeID {} wird verwendet.")
         self._topics = pman.config.get_autodiscovery_topic(
-            autodisc.Component.BINARY_SENROR,
+            autodisc.Component.BINARY_SENSOR,
             name,
             binary_sensor_type,
             state_class=None,

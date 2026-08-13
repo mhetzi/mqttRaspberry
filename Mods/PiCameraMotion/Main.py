@@ -178,7 +178,7 @@ class PiMotionMain(threading.Thread):
         uid_motion = "binary_sensor.piMotion-{}-{}".format(
             self._device_id, sensorName)
         self._motion_topic = self._config._main.get_autodiscovery_topic(  
-            autodisc.Component.BINARY_SENROR,
+            autodisc.Component.BINARY_SENSOR,
             sensorName,
             autodisc.BinarySensorDeviceClasses.MOTION
         )
@@ -191,7 +191,7 @@ class PiMotionMain(threading.Thread):
         
         errName = "{} Kamera Fehler".format(sensorName)
         self._err_topics = self._config.get_autodiscovery_topic(
-            autodisc.Component.BINARY_SENROR,
+            autodisc.Component.BINARY_SENSOR,
             errName,
             autodisc.BinarySensorDeviceClasses.PROBLEM
         )

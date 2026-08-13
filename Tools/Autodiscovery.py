@@ -20,7 +20,7 @@ except ImportError as ie:
 import dataclasses
 
 class Component(enum.Enum):
-    BINARY_SENROR = "binary_sensor"
+    BINARY_SENSOR = "binary_sensor"
     COVER   = "cover"
     FAN     = "fan"
     LIGHT   = "light"
@@ -161,14 +161,14 @@ class Topics:
         global __global_device_info
         return __global_device_info
 
-    def __init__(self, comp: Component, dev_class: DeviceClass, hass_device_class: StateClass|None, autodiscovery: bool):
+    def __init__(self, comp: Component, dev_class: DeviceClass, state_class: StateClass|None, autodiscovery: bool):
         self._component = comp
         if isinstance(dev_class, BinarySensorDeviceClasses) or isinstance(dev_class, SensorDeviceClasses) or isinstance(dev_class, CoverDeviceClasses):
             self._dev_class = dev_class
         else:
             self._dev_class = SensorDeviceClasses.GENERIC_SENSOR
 
-        self._hass_device_class = hass_device_class
+        self._state_class = state_class
 
         if comp == Component.LIGHT:
             self.brightness_cmd = None
@@ -260,9 +260,9 @@ class Topics:
             logging.getLogger("Launch").getChild("autodisc").debug("del[\"device_class\"]")
             del p["device_class"]
 
-        if device_class is not None and device_class != StateClass.NONE:
-            p["state_class"] = device_class.value
-            logging.getLogger("Launch").getChild("autodisc").debug("Config Payload {} wird Hass DeviceClass {} angehängt.".format(name, str(device_class.value)))
+        if self._state_class is not None and self._state_class != StateClass.NONE:
+            p["state_class"] = self._state_class.value
+            logging.getLogger("Launch").getChild("autodisc").debug("Config Payload {} wird Hass DeviceClass {} angehängt.".format(name, str(self._state_class.value)))
         else:
             logging.getLogger("Launch").getChild("autodisc").debug("Config Payload {} wird keine Hass DeviceClass angehängt.".format(name))
 
@@ -271,7 +271,7 @@ class Topics:
         if ava_topic is not None:
             p["availability_topic"] = ava_topic
         
-        if self._component != Component.SENSOR and self._component != Component.BINARY_SENROR:
+        if self._component != Component.SENSOR and self._component != Component.BINARY_SENSOR:
             logging.getLogger("Launch").getChild("autodisc").debug("Command_topic [{}] wird gebraucht".format(self.command))
             p["command_topic"] = self.command
         else:
@@ -379,7 +379,7 @@ def getTopics(discoveryPrefix: str, comp: Component, devicedID: str, entitiyID: 
 
     if comp == Component.SENSOR and isinstance(device_class, BinarySensorDeviceClasses):
         print("getTopics: BinarySensorDeviceClasses angegeben, Component ist aber Sensor, Sensor wird zu BinarySensor abgeändert.")
-        comp = Component.BINARY_SENROR
+        comp = Component.BINARY_SENSOR
 
     
     import re
