@@ -58,7 +58,7 @@ class HVAC_Callbacks:
     
     # get which fanmodes are supported
     def call_get_supported_fan_modes(self) -> list:
-        return None # return has to be subset of [“auto”, “low”, “medium”, “high”]
+        return [] # return has to be subset of [“auto”, “low”, “medium”, “high”]
 
 class HvacDevice:
     
@@ -77,7 +77,8 @@ class HvacDevice:
         self._topics = pman.config.get_autodiscovery_topic(
             autodisc.Component.SWITCH,
             name,
-            autodisc.DeviceClass()
+            autodisc.DeviceClass(),
+            state_class=None
             )
         self._mqtt_callbacks = []
 
@@ -86,7 +87,7 @@ class HvacDevice:
         
         # power Switch
         try:
-            self._callbacks.call_set_power()
+            self._callbacks.call_set_power(False)
             self.__registerPower(bcp)
         except NotImplementedError:
             pass
@@ -132,6 +133,9 @@ class HvacDevice:
     def __registerPower(self, bcp: dict):
         cmd = self._topics.command + "/pwr"
         bcp["power_command_topic"] = cmd
+        if self._pm._client is None:
+            self._log.error("MQTT Client ist None, kann Power nicht registrieren")
+            return
         self._pm._client.subscribe(cmd)
         self._pm._client.message_callback_add(cmd, 
             lambda client,userdata,message: self._callbacks.call_set_power(on=message.decode('utf-8') == "ON") )

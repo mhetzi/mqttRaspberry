@@ -54,7 +54,7 @@ class WeatherflowPlugin:
                 this.count_lightnings_per_minute()
 
     def __init__(self, opts: BasicConfig, logger: logging.Logger):
-        self._pluginManager
+        self._pluginManager = None
         self._config = opts
         self._logger = logger.getChild("Weatherflow")
         self._udp = None
@@ -63,7 +63,6 @@ class WeatherflowPlugin:
         self._raining_info = {}
         self._wind_info = {}
         self._online_states = {}
-        self._pluginManager = None
         self._deviceUpdates = {}
         self.wasWindy = 0
 
@@ -218,10 +217,10 @@ class WeatherflowPlugin:
             )
             self.update_sensor(serial_number, "windy", 0, autodisc.BinarySensorDeviceClasses.GENERIC_SENSOR)
 
-    def register_new_sensor(self, serial_number, visible_name, name, messurement_value, device_class: autodisc.DeviceClass, devInf: autodisc.DeviceInfo, value_template=None, json_attributes=None):
+    def register_new_sensor(self, serial_number, visible_name, name, messurement_value, device_class: autodisc.DeviceClass, devInf: autodisc.DeviceInfo, value_template=None, json_attributes=False):
         if self._pluginManager is None or self._pluginManager._client is None:
             return
-        topic = self._config.get_autodiscovery_topic(autodisc.Component.SENSOR, name, device_class, node_id=serial_number)
+        topic = self._config.get_autodiscovery_topic(autodisc.Component.SENSOR, name, device_class, node_id=serial_number, state_class=None)
         online_topic = WeatherflowPlugin.get_device_online_topic(serial_number)
 
         uID = "{}.wf-{}.{}".format( "binary_sensor" if isinstance(device_class, autodisc.BinarySensorDeviceClasses) else "sensor", serial_number, name )
@@ -236,7 +235,9 @@ class WeatherflowPlugin:
             reg.append(topic.config)
 
     def update_sensor(self, serial_number, name, value, device_class: autodisc.DeviceClass):
-        topic = self._config.get_autodiscovery_topic(autodisc.Component.SENSOR, name, device_class, node_id=serial_number)
+        if self._pluginManager is None or self._pluginManager._client is None:
+            return
+        topic = self._config.get_autodiscovery_topic(autodisc.Component.SENSOR, name, device_class, node_id=serial_number, state_class=None)
         if isinstance(value, dict):
             value = json.dumps(value)
         self._pluginManager._client.publish(topic.state, value)
@@ -400,7 +401,7 @@ class WeatherflowPlugin:
         self.update_sensor(update.serial_number, "station_pressure", update.station_pressure, autodisc.SensorDeviceClasses.GENERIC_SENSOR)
         
         if self._config.get("Weatherflow/temp_diff", None) is not None:
-            diff = self._config["Weatherflow/temp_diff"]
+            diff: float = self._config["Weatherflow/temp_diff"]
             if update.air_temperatur > (self._wind_filter["temp"] + diff) or update.air_temperatur < (self._wind_filter["temp"] - diff):
                 self._wind_filter["temp"] = update.air_temperatur
                 self.update_sensor(update.serial_number, "air_temperature", temperature_json, autodisc.SensorDeviceClasses.GENERIC_SENSOR)

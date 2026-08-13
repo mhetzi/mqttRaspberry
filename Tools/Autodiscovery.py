@@ -75,6 +75,7 @@ class SensorDeviceClasses(DeviceClass, enum.Enum):
     VOC = "volatile_organic_compounds" # Concentration of volatile organic compounds in µg/m³
     VOL = "volume" # Generic volume in L, mL, gal, fl. oz., m³, or ft³
     WATER = "water" # Water consumption in L, gal, m³, or ft³
+    VOLUME_FLOW_RATE = "volume_flow_rate" # Volume flow rate in m³/h, m³/min, m³/s, ft³/min, L/h, L/min, L/s, gal/d, gal/h, gal/min, or mL/s
     WEIGHT = "weight" # Generic mass in kg, g, mg, µg, oz, or lb
     WIND_SPEED = "wind_speed" # Wind speed in ft/s, km/h, kn, m/s, or mph
 
@@ -121,6 +122,12 @@ class CoverDeviceClasses(DeviceClass, enum.Enum):
     WINDOW = "window"
     GENERIC_SENSOR = None
 
+class StateClass(enum.Enum):
+    MEASUREMENT = "measurement"
+    TOTAL = "total"
+    TOTAL_INCREASING = "total_increasing"
+    NONE = ""
+
 class LightOnCommandType(enum.Enum):
     LAST = "last"
     FIRTS = "first"
@@ -154,13 +161,15 @@ class Topics:
         global __global_device_info
         return __global_device_info
 
-    def __init__(self, comp: Component, dev_class: DeviceClass, autodiscovery: bool):
+    def __init__(self, comp: Component, dev_class: DeviceClass, hass_device_class: StateClass, autodiscovery: bool):
         self._component = comp
         if isinstance(dev_class, BinarySensorDeviceClasses) or isinstance(dev_class, SensorDeviceClasses) or isinstance(dev_class, CoverDeviceClasses):
             self._dev_class = dev_class
         else:
             self._dev_class = SensorDeviceClasses.GENERIC_SENSOR
-        
+
+        self._hass_device_class = hass_device_class
+
         if comp == Component.LIGHT:
             self.brightness_cmd = None
             self.brightness_state = None
@@ -208,7 +217,7 @@ class Topics:
         mqtt_client.publish(self.config, config, 0, True)
 
     # Wenn unique_id gesetzt ist wird die globale device info verwendet, ist device gesetzt wird diese device info genommen
-    def get_config_payload(self, name: str, measurement_unit: str, ava_topic=None, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None, asDict=False, append_data=None, keep_light_attribs=False) -> str:
+    def get_config_payload(self, name: str, measurement_unit: str, ava_topic=None, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None, asDict=False, append_data=None, keep_light_attribs=False, device_class=StateClass.NONE) -> str | dict | None:
         
         p = append_data if isinstance(append_data, dict) else {}
 
@@ -250,6 +259,12 @@ class Topics:
         if "device_class" in p.keys() and p["device_class"] is None:
             logging.getLogger("Launch").getChild("autodisc").debug("del[\"device_class\"]")
             del p["device_class"]
+
+        if device_class is not None and device_class != StateClass.NONE:
+            p["state_class"] = device_class.value
+            logging.getLogger("Launch").getChild("autodisc").debug("Config Payload {} wird Hass DeviceClass {} angehängt.".format(name, str(device_class.value)))
+        else:
+            logging.getLogger("Launch").getChild("autodisc").debug("Config Payload {} wird keine Hass DeviceClass angehängt.".format(name))
 
         if self.ava_topic is not None:
             ava_topic = self.ava_topic
@@ -360,7 +375,7 @@ class Topics:
         )
 
 
-def getTopics(discoveryPrefix: str, comp: Component, devicedID: str, entitiyID: str, device_class: DeviceClass) -> Topics:
+def getTopics(discoveryPrefix: str, comp: Component, devicedID: str, entitiyID: str, device_class: DeviceClass, hass_device_class: StateClass) -> Topics:
 
     if comp == Component.SENSOR and isinstance(device_class, BinarySensorDeviceClasses):
         print("getTopics: BinarySensorDeviceClasses angegeben, Component ist aber Sensor, Sensor wird zu BinarySensor abgeändert.")
@@ -374,7 +389,7 @@ def getTopics(discoveryPrefix: str, comp: Component, devicedID: str, entitiyID: 
         mainPath = "{0}/{1}/{2}/{3}/".format(discoveryPrefix, str(comp.value), devicedID, safename).replace(" ", "_").replace("-","_")
     else:
         mainPath = "{0}/{1}/{2}/".format(devicedID, comp.value, safename).replace(" ", "_").replace("-","_")
-    t = Topics(comp, device_class, discoveryPrefix is not None)
+    t = Topics(comp, device_class, hass_device_class, discoveryPrefix is not None)
     t.state = mainPath + "state"
     t.command = mainPath + "set"
     t.config = mainPath + "config" if discoveryPrefix is not None else None

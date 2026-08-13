@@ -80,7 +80,8 @@ try:
                 fan_speed = self._config.get_autodiscovery_topic(
                     Autodiscovery.Component.LIGHT,
                     "SerialFan",
-                    Autodiscovery.DeviceClass
+                    dev_class=Autodiscovery.SensorDeviceClasses.GENERIC_SENSOR,
+                    state_class=None
                 )
                 fan_speed.register_light(
                     self._pluginManager._client,

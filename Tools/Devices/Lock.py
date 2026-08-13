@@ -8,7 +8,7 @@ import enum
 from Tools.Devices.Switch import Switch
 
 class LockState(enum.IntEnum):
-    UNLOCK = 0,
+    UNLOCK = 0
     LOCK   = 1
 
 class Lock(Switch):
@@ -17,7 +17,8 @@ class Lock(Switch):
         self._topics = pman.config.get_autodiscovery_topic(
             autodisc.Component.LOCK,
             name,
-            autodisc.DeviceClass()
+            autodisc.DeviceClass(),
+            state_class=None
         )
         self._cb = callback
         if not callable(callback):
@@ -42,6 +43,9 @@ class Lock(Switch):
     def callback_translate(self, state_requested=False, message=None):
         if state_requested:
             return self._cb(state_requested=True, message=None)
+        if message is None:
+            self._log.error("Callback called without message and state_requested=False")
+            return
         msg = message.payload.decode('utf-8')
         if msg == "LOCK":
             return self._cb(message=LockState.LOCK, state_requested=False)

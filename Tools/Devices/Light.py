@@ -38,7 +38,8 @@ class Light:
         self._topics = pman.config.get_autodiscovery_topic(
             autodisc.Component.LIGHT,
             name,
-            autodisc.DeviceClass()
+            autodisc.DeviceClass(),
+            state_class=None
             )
         if ava_topic is not None:
             self._topics.ava_topic = ava_topic
@@ -94,7 +95,10 @@ class Light:
             raise RuntimeError("PluginManager or MQTT Client is None")
         # Setze Discovery Configuration
         self._log.debug("Publish configuration")
-        plugin_name = self._log.parent.name
+        if self._log.parent is None:
+            plugin_name = self._log.name
+        else:
+            plugin_name = self._log.parent.name
         import re
         safename = re.sub('[\W_]+', '', self._name) 
         uid = "switch.MqttScripts{}.light.{}.{}".format(self._pm._client_name, plugin_name, safename) if self._unique_id is None else self._unique_id

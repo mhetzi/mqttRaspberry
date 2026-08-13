@@ -32,7 +32,7 @@ from Mods.CoE.coe_lib import Message
 from Mods.CoE import getConfigKey
 from Mods.CoE.Devices import CoeOutSwitch, CoeOutNumber
 from Mods.CoE.udp_sender import UDP_Sender
-from Mods.CoE import get_sensor_class_from_mt
+from Mods.CoE import get_sensor_class_from_mt, get_sensor_state_class_from_mt
 
 class TaCoePlugin(Tools.PluginManager.PluginInterface):
     __slots__ = ("_udp", "_timer", "_from_cmi_analog", "_from_cmi_digital", "sensors", "_via_devices", "_switches", "_numbers", "_to_cmi_digital", "_to_cmi_analog", "_upd_senders", "_last_online", "_pluginManager", "_rtimer")
@@ -217,6 +217,7 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
         dev.model = "CoE Analog"
 
         st = get_sensor_class_from_mt(channel[3])
+        sc = get_sensor_state_class_from_mt(channel[3])
 
         bs = Sensor.Sensor(
             log=self._logger,
@@ -225,6 +226,7 @@ class TaCoePlugin(Tools.PluginManager.PluginInterface):
             device=dev,
             unique_id=f"{dev.IDs[0]}_{channel[0]}_{channel[1]}",
             sensor_type=st,
+            state_class=sc,
             ava_topic=TaCoePlugin.get_device_online_topic(addr),
             value_template="{{ value_json.value }}",
             json_attributes=True,

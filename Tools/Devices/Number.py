@@ -29,7 +29,8 @@ class Number:
         self._topics = pman.config.get_autodiscovery_topic(
             autodisc.Component.NUMBER,
             name,
-            autodisc.DeviceClass()
+            autodisc.DeviceClass(),
+            state_class=None
             )
         if ava_topic is not None:
             self._topics.ava_topic = ava_topic
@@ -46,6 +47,9 @@ class Number:
         return self.state(state=state, qos=qos)
 
     def register(self):
+        if self._pm is None or self._pm._client is None:
+            self._log.error("register() called but PluginManager or MQTT client is None!")
+            return
 
         # Setze Discovery Configuration
         self._log.debug("Publish configuration")
@@ -91,6 +95,9 @@ class Number:
         self._log.debug(f"number \n{self._topics.state =} \n{payload =}")
         self._last_val = state
         try:
+            if self._pm._client is None:
+                self._log.error("MQTT Client ist None, kann Status nicht senden")
+                return None
             return self._pm._client.publish(self._topics.state, payload=payload,qos=qos)
         except:
             self._log.exception(f"Error while sending {payload = }!")

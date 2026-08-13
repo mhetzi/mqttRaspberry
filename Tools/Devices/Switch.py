@@ -27,7 +27,8 @@ class Switch:
         self._topics = pman.config.get_autodiscovery_topic(
             autodisc.Component.SWITCH,
             name,
-            autodisc.DeviceClass()
+            autodisc.DeviceClass(),
+            state_class=None
             )
         if ava_topic is not None:
             self._topics.ava_topic = ava_topic

@@ -151,7 +151,7 @@ class DictBrowser:
                     if isinstance(item, dict):
                         ls.append(self.listDeep(value, "{}/{}/".format(prepand, key)))
             else:
-                ls.append("{}/{}".format(prepand, key), value)
+                ls.append("{}/{}:{}".format(prepand, key, value))
         return ls
 
 class NoClientConfigured(Exception):
@@ -227,7 +227,7 @@ class AbstractConfig:
 
 class BasicConfig(AbstractConfig):
     _is_in_saving = False
-    _dict_browser: DictBrowser = None
+    _dict_browser: DictBrowser | None = None
 
     def __init__(self, pfad: Path, logger: logging.Logger, do_load=False, filesystem_listen=True):
         self._conf_path = pfad.expanduser()
@@ -315,7 +315,8 @@ class BasicConfig(AbstractConfig):
         pass
 
     def get_client_config(self) -> ClientConfig:
-
+        if self._config is None:
+            self._config = {}
         if self._config.get("CLIENT", None) is None:
             self._config["CLIENT"] = {}
             self._config["CLIENT"]["host"] = "localhost"
@@ -343,6 +344,8 @@ class BasicConfig(AbstractConfig):
                             client_config["USER"], client_config["PW"], client_config["autodiscovery"])
 
     def get_all_plugin_names(self) -> set:
+        if self._config is None:
+            self._config = {}
         plugins_config = self._config.get("PLUGINS", None)
         if plugins_config is None:
             self._config["PLUGINS"] = {}
@@ -352,7 +355,7 @@ class BasicConfig(AbstractConfig):
     def get_discovery_prefix(self):
         return self.get_client_config().discorvery_prefix
 
-    def get_autodiscovery_topic(self, component: autodisc.Component, entitiy_id: str, dev_class: autodisc.DeviceClass, node_id=None, ownOfflineTopic=False, subnode_id=None) -> autodisc.Topics:
+    def get_autodiscovery_topic(self, component: autodisc.Component, entitiy_id: str, dev_class: autodisc.DeviceClass, state_class: autodisc.StateClass|None, node_id=None, ownOfflineTopic=False, subnode_id=None) -> autodisc.Topics:
         cc = self.get_client_config()
         topics = None
         if node_id is None:
@@ -360,14 +363,16 @@ class BasicConfig(AbstractConfig):
             if subnode_id is not None:
                 nid = "{}_{}".format(subnode_id, entitiy_id)
             topics = autodisc.getTopics(cc.discorvery_prefix, component, cc.client_id if cc.client_id is not None else cc.username, 
-                nid, dev_class)
+                nid, dev_class, state_class)
         else:
-            topics = autodisc.getTopics(cc.discorvery_prefix, component, node_id, entitiy_id, dev_class)
+            topics = autodisc.getTopics(cc.discorvery_prefix, component, node_id, entitiy_id, dev_class, state_class)
         if not ownOfflineTopic:
             topics.ava_topic = cc.isOnlineTopic
         return topics
 
     def get_plugins_config(self, name) -> dict:
+        if self._config is None:
+            self._config = {}
         if self._config.get("PLUGINS", {}).get(name, None) is None:
             self._config["PLUGINS"][name] = {}
         return self._config["PLUGINS"][name]
@@ -397,24 +402,34 @@ class BasicConfig(AbstractConfig):
     def get(self, key: str, default: None) -> None:
         pass
     def get(self, key: str, default=None) -> object:
+        if self._dict_browser is None:
+            raise RuntimeError("DictBrowser is not initialized. Call load() first.")
         return self._dict_browser.get(key, default)
 
     def sett(self, key: str, value):
         key = "PLUGINS/{}".format(key)
+        if self._dict_browser is None:
+            raise RuntimeError("DictBrowser is not initialized. Call load() first.")
         self._dict_browser[key] = value
         self.save(delayed=True)
 
     def __getitem__(self, key: str):
         key = "PLUGINS/{}".format(key)
+        if self._dict_browser is None:
+            raise RuntimeError("DictBrowser is not initialized. Call load() first.")
         return self._dict_browser[key]
 
     def __setitem__(self, key: str, value):
         key = "PLUGINS/{}".format(key)
+        if self._dict_browser is None:
+            raise RuntimeError("DictBrowser is not initialized. Call load() first.")
         self._dict_browser[key] = value
         self.file_is_dirty = True
         self.save(True)
 
     def __delitem__(self, key:str):
+        if self._dict_browser is None:
+            raise RuntimeError("DictBrowser is not initialized. Call load() first.")
         key = "PLUGINS/{}".format(key)
         del self._dict_browser[key]
         
@@ -457,7 +472,9 @@ if FILEWATCHING:
 
         def stop(self):
             try:
-                self._observer.stop()
+                if self._observer is not None:
+                    self._observer.stop()
+                    self._observer = None
                 print("Observer killed")
             except:
                 pass

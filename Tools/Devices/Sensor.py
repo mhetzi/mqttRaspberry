@@ -4,7 +4,7 @@ from typing import Union
 import paho.mqtt.client as mclient
 import Tools.Config as conf
 import Tools.Autodiscovery as autodisc
-from Tools.Autodiscovery import SensorDeviceClasses
+from Tools.Autodiscovery import SensorDeviceClasses, StateClass
 import logging
 import json
 from  Tools.PluginManager import PluginManager
@@ -22,7 +22,7 @@ class Sensor:
     _has_offline = False
     _ignored_counter = -1
 
-    def __init__(self, log:logging.Logger, pman: PluginManager, name: str, sensor_type: SensorDeviceClasses, measurement_unit: str='', ava_topic=None, ownOfflineTopic=False, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None, nodeID=None):
+    def __init__(self, log:logging.Logger, pman: PluginManager, name: str, sensor_type: SensorDeviceClasses, state_class=StateClass.NONE, measurement_unit: str='', ava_topic=None, ownOfflineTopic=False, value_template=None, json_attributes=False, device=None, unique_id=None, icon=None, nodeID=None):
         self._log = log.getChild("Sensor")
         self._log.setLevel(logging.NOTSET)
         self._log.debug("Sensor Object für {} mit custom uid {} erstellt.".format(name, unique_id))

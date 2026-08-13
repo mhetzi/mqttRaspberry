@@ -125,3 +125,18 @@ class MeasureType(enum.IntEnum):
                 return "W"
             case _:
                 return ""
+
+    def getStateClass(self):
+        match self:
+            case MeasureType.TEMPERATURE | MeasureType.CELSIUS:
+                return "measurement"
+            case MeasureType.WATTQUADRMETER | MeasureType.WATT | MeasureType.KILOWATT:
+                return "measurement"
+            case MeasureType.KILOWATTHOURS | MeasureType.MEGAWATTHOURS:
+                return "total_increasing"
+            case MeasureType.literhour | MeasureType.LITERIMPULS | MeasureType.LITERMIN | MeasureType.LITERDAY:
+                return "total_increasing"
+            case MeasureType.LITER | MeasureType.KUBIKMETER:
+                return "measurement"
+            case _:
+                return None

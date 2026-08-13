@@ -25,7 +25,8 @@ class Button:
         self._topics = pman.config.get_autodiscovery_topic(
             autodisc.Component.BUTTON,
             name,
-            autodisc.DeviceClass()
+            autodisc.DeviceClass(),
+            state_class=None
             )
         if ava_topic is not None:
             self._topics.ava_topic = ava_topic
@@ -39,6 +40,9 @@ class Button:
         raise NotImplementedError
 
     def register(self):
+        if self._pm is None or self._pm._client is None:
+            self._log.error("register() called but PluginManager or MQTT client is None!")
+            return
         # Setze Discovery Configuration
         self._log.debug("Publish configuration")
         plugin_name = self._log.parent.name if self._log.parent is not None else self._log.name
