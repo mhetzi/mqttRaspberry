@@ -2,7 +2,7 @@
 import paho.mqtt.client as mclient
 import Tools.Config as conf
 import Tools.Autodiscovery as ad
-from Tools.Devices.Sensor import Sensor, SensorDeviceClasses
+from Tools.Devices.Sensor import Sensor, SensorDeviceClasses, StateClass
 from Tools.Devices.Filters import DeltaFilter, TooHighFilter, MinTimeElapsed
 from Tools import PluginManager
 
@@ -65,6 +65,7 @@ class RaspberryPiCpuTemp(PluginManager.PluginInterface):
                 self._plugin_manager,
                 n,
                 SensorDeviceClasses.TEMPERATURE,
+                StateClass.MEASUREMENT,
                 "°C"
             )
             self._sensor.register()

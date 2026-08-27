@@ -261,7 +261,7 @@ class Topics:
             del p["device_class"]
 
         if self._state_class is not None and self._state_class != StateClass.NONE:
-            p["state_class"] = self._state_class.value
+            p["state_class"] = str(self._state_class.value)
             logging.getLogger("Launch").getChild("autodisc").debug("Config Payload {} wird Hass DeviceClass {} angehängt.".format(name, str(self._state_class.value)))
         else:
             logging.getLogger("Launch").getChild("autodisc").debug("Config Payload {} wird keine Hass DeviceClass angehängt.".format(name))

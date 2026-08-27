@@ -103,10 +103,12 @@ class ShellSwitch(PluginManager.PluginInterface):
             self._config["dereg"] = False
 
         for name in self._config.get("entrys", {}).keys():
+            if self._pluginManager is None or self._pluginManager._client is None:
+                raise AttributeError("pluginManager is None")
             self.__logger.info("Erstelle MQTT zeugs für {}...".format(name))
-            friendly_name = self._config["entrys"][name]["name"]
+            friendly_name: str = self._config["entrys"][name]["name"]
             uid = "switch.ShSw-{}.{}".format(conf.autodisc.Topics.get_std_devInf().pi_serial, name)
-            topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SWITCH, name, conf.autodisc.SensorDeviceClasses.GENERIC_SENSOR)
+            topics = self._config.get_autodiscovery_topic(conf.autodisc.Component.SWITCH, name, conf.autodisc.SensorDeviceClasses.GENERIC_SENSOR, conf.autodisc.StateClass.NONE)
             conf_payload = topics.get_config_payload(friendly_name, "", None, value_template="{{ value_json.state }}", json_attributes=["on", "off", "error_code"], unique_id=uid)
             self.__logger.debug("Veröffentliche Config Payload {} in Topic {}".format(topics.config, conf_payload))
             self._pluginManager._client.publish(topics.config, conf_payload, retain=True)
