@@ -166,14 +166,16 @@ class ViaPlugin(PluginManager.PluginInterface):
             ava_topic=f"qmk_via/{kuid}/available"
         )
 
+        b = self._vias[keyboard].get_brightness()
+        e = self._vias[keyboard].get_effect()
+        licht.onOff(not (b is not None and (e is None or e == "None")))
+
         if d.Brightness[1] > 0:
             licht.enablebrightness(d.Brightness[1])
-            b = self._vias[keyboard].get_brightness()
             if b is not None:
                 licht.brightness(b)
         if len(d.Effects[0]) > 0:
             licht.enableEffects(list(d.Effects[0].keys()))
-            e = self._vias[keyboard].get_effect()
             if e is not None:
                 licht.effect(e)
         if d.Color > 0:
