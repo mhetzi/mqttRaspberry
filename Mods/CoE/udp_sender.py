@@ -2,7 +2,7 @@ import socket
 import schedule
 
 from Mods.CoE.coe_lib.ChannelRegestry import AnalogChannels, DigitalChannels
-import bitstring
+#import bitstring
 import logging
 
 class UDP_Sender:
@@ -21,16 +21,16 @@ class UDP_Sender:
             blist = self._channels.getBytesForAllWrittenPages()
             for b in blist:
                 self._sock.sendto(b, self._address)
-                cbs = bitstring.ConstBitStream(bytes=b)
-                print("Outgoing bytes:")
-                cbs.pp()
+                #cbs = bitstring.ConstBitStream(bytes=b)
+                #print("Outgoing bytes:")
+                #cbs.pp()
         except:
             self._log.exception("send_all_channels Exception")
     
     def sendBytes(self, b: bytes):
-        cbs = bitstring.ConstBitStream(bytes=b)
-        print("Outgoing bytes:")
-        cbs.pp()
+        #cbs = bitstring.ConstBitStream(bytes=b)
+        #print("Outgoing bytes:")
+        #cbs.pp()
         self._sock.sendto(b, self._address)
 
     def stop(self):

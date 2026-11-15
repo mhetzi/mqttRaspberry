@@ -2,7 +2,7 @@ import socket
 import threading
 import logging
 import sys
-import bitstring
+#import bitstring
 
 class UdpServer(threading.Thread):
     def __init__(self, broad_addr="0.0.0.0", port=5441, logger=logging.getLogger("UdpServer")):
@@ -20,8 +20,8 @@ class UdpServer(threading.Thread):
         while not self._shutdown:
             self.__logger.debug("Recv")
             data, address = self._sock.recvfrom(14)
-            self.__logger.debug(f"Packet from {address}")
-            bitstring.ConstBitStream(bytes=data).pp()
+            #self.__logger.debug(f"Packet from {address}")
+            #bitstring.ConstBitStream(bytes=data).pp()
             try:
                 self.on_message(data, address)
             except KeyboardInterrupt:
